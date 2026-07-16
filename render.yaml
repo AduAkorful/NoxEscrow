@@ -1,0 +1,19 @@
+services:
+  - type: worker
+    name: noxescrow-webhook-listener
+    runtime: node
+    repo: https://github.com/your-username/NoxEscrow # Replace with your repository URL
+    branch: main
+    rootDir: arbiter
+    buildCommand: npm install
+    startCommand: npm run listener
+    envVars:
+      - key: RPC_URL
+        sync: false
+        placeholder: "e.g., https://opt-sepolia.g.all-that-node.com/..."
+      - key: ESCROW_FACTORY_ADDRESS
+        sync: false
+        placeholder: "The deployed NoxEscrowFactory proxy address"
+      - key: IEXEC_RUNNER_ENDPOINT
+        sync: false
+        placeholder: "The endpoint to trigger the iExec TEE task"

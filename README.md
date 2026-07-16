@@ -31,7 +31,7 @@ NoxEscrow/
 │   │   └── enclave-script.js       # Secured code evaluation script running inside TEE
 │   └── Dockerfile                  # iExec TEE enclave environment packaging
 │
-└── web/                            # Component 3: Frontend dApp (Vite + React)
+└── dApp/                           # Component 3: Frontend dApp (Vite + React)
     ├── src/
     │   ├── components/             # Polished shadcn/ui components
     │   └── crypto/                 # Web3 wallet message signature + AES-GCM local file crypto

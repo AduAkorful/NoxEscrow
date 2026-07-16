@@ -1,0 +1,16 @@
+{
+  "name": "noxescrow-arbiter",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "listener": "node src/listener.js",
+    "enclave": "node src/enclave-script.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.15.0",
+    "@iexec-nox/handle": "^0.1.0-beta.13",
+    "@supabase/supabase-js": "^2.43.0",
+    "axios": "^1.7.2",
+    "ethers": "^6.13.1"
+  }
+}
