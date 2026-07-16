@@ -17,7 +17,7 @@ NoxEscrow/
 │   ├── component-2-tee-arbiter.md
 │   └── component-3-frontend.md
 │
-├── contracts/                      # Component 1: Smart Contracts (Hardhat 3)
+├── smart-contracts/                # Component 1: Smart Contracts (Hardhat 3)
 │   ├── contracts/
 │   │   ├── NoxEscrowContract.sol   # State machine, releases, and dispute raising
 │   │   ├── NoxEscrowFactory.sol    # Escrow deployment registry
