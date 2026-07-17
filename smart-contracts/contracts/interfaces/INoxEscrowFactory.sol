@@ -44,6 +44,13 @@ interface INoxEscrowFactory {
     event ReviewWindowUpdated(uint256 oldWindow, uint256 newWindow);
 
     /**
+     * @notice Emitted when the global mutual cancellation window is updated.
+     * @param oldWindow The previous mutual cancel window duration.
+     * @param newWindow The new mutual cancel window duration.
+     */
+    event MutualCancelWindowUpdated(uint256 oldWindow, uint256 newWindow);
+
+    /**
      * @notice Emitted when the canonical cUSDCToken address is updated.
      * @param oldToken The previous token address.
      * @param newToken The new token address.
@@ -127,6 +134,19 @@ interface INoxEscrowFactory {
      * @param _newReviewWindow The new review window duration in seconds.
      */
     function setReviewWindow(uint256 _newReviewWindow) external;
+
+    /**
+     * @notice Update the global default mutual cancellation window.
+     * @dev Only callable by the factory owner.
+     * @param _newMutualCancelWindow The new mutual cancel window duration in seconds.
+     */
+    function setMutualCancelWindow(uint256 _newMutualCancelWindow) external;
+
+    /**
+     * @notice Get the global default mutual cancellation window.
+     * @return The mutual cancel window duration.
+     */
+    function mutualCancelWindow() external view returns (uint256);
 
     /**
      * @notice Update the canonical cUSDCToken address.

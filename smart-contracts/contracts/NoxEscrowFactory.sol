@@ -24,6 +24,7 @@ contract NoxEscrowFactory is
     address public escrowImplementation;
     address public reputationRegistry;
     uint256 public reviewWindow;
+    uint256 public mutualCancelWindow;
     address public cUSDCToken; // Canonical ERC-7984 Token
 
     mapping(address => bool) public isEscrowContract;
@@ -56,6 +57,7 @@ contract NoxEscrowFactory is
         reputationRegistry = _reputationRegistry;
         cUSDCToken = _cUSDCToken;
         reviewWindow = 3 days;
+        mutualCancelWindow = 7 days;
     }
 
     // ============ External Functions ============
@@ -91,7 +93,8 @@ contract NoxEscrowFactory is
             cUSDCToken,
             reputationRegistry,
             _totalMilestones,
-            finalReviewWindow
+            finalReviewWindow,
+            mutualCancelWindow
         );
 
         isEscrowContract[clone] = true;
@@ -149,6 +152,19 @@ contract NoxEscrowFactory is
         uint256 oldWindow = reviewWindow;
         reviewWindow = _newReviewWindow;
         emit ReviewWindowUpdated(oldWindow, _newReviewWindow);
+    }
+
+    /**
+     * @notice Update the global default mutual cancellation window.
+     * @param _newMutualCancelWindow The new mutual cancellation window duration in seconds.
+     */
+    function setMutualCancelWindow(
+        uint256 _newMutualCancelWindow
+    ) external override onlyOwner {
+        if (_newMutualCancelWindow < 5 seconds || _newMutualCancelWindow > 90 days) revert InvalidWindow();
+        uint256 oldWindow = mutualCancelWindow;
+        mutualCancelWindow = _newMutualCancelWindow;
+        emit MutualCancelWindowUpdated(oldWindow, _newMutualCancelWindow);
     }
 
     /**

@@ -10,7 +10,7 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
 
     getEvent(nameOrSignatureOrTopic: "ContractInitialized" | "DeliverableSubmitted" | "DisputeOpened" | "DisputeResolved" | "MilestoneApproved" | "MutualCancellationExecuted"): EventFragment;
 
-    encodeFunctionData(functionFragment: 'initialize', values: [AddressLike, AddressLike, AddressLike, AddressLike, AddressLike, BigNumberish, BigNumberish]): string;
+    encodeFunctionData(functionFragment: 'initialize', values: [AddressLike, AddressLike, AddressLike, AddressLike, AddressLike, BigNumberish, BigNumberish, BigNumberish]): string;
 encodeFunctionData(functionFragment: 'initializeEscrow', values: [BytesLike[], BytesLike[], BytesLike[], BytesLike[]]): string;
 encodeFunctionData(functionFragment: 'mutualCancel', values?: undefined): string;
 encodeFunctionData(functionFragment: 'raiseDispute', values?: undefined): string;
@@ -135,7 +135,7 @@ decodeFunctionResult(functionFragment: 'submitDeliverable', data: BytesLike): Re
     
     
     initialize: TypedContractMethod<
-      [_client: AddressLike, _freelancer: AddressLike, _teeArbiter: AddressLike, _cUSDC: AddressLike, _reputationRegistry: AddressLike, _totalMilestones: BigNumberish, _reviewWindow: BigNumberish, ],
+      [_client: AddressLike, _freelancer: AddressLike, _teeArbiter: AddressLike, _cUSDC: AddressLike, _reputationRegistry: AddressLike, _totalMilestones: BigNumberish, _reviewWindow: BigNumberish, _mutualCancelWindow: BigNumberish, ],
       [void],
       'nonpayable'
     >
@@ -193,7 +193,7 @@ decodeFunctionResult(functionFragment: 'submitDeliverable', data: BytesLike): Re
     getFunction<T extends ContractMethod = ContractMethod>(key: string | FunctionFragment): T;
 
     getFunction(nameOrSignature: 'initialize'): TypedContractMethod<
-      [_client: AddressLike, _freelancer: AddressLike, _teeArbiter: AddressLike, _cUSDC: AddressLike, _reputationRegistry: AddressLike, _totalMilestones: BigNumberish, _reviewWindow: BigNumberish, ],
+      [_client: AddressLike, _freelancer: AddressLike, _teeArbiter: AddressLike, _cUSDC: AddressLike, _reputationRegistry: AddressLike, _totalMilestones: BigNumberish, _reviewWindow: BigNumberish, _mutualCancelWindow: BigNumberish, ],
       [void],
       'nonpayable'
     >;

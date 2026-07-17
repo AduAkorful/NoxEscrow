@@ -102,7 +102,8 @@ interface INoxEscrowContract {
         address _cUSDC,
         address _reputationRegistry,
         uint256 _totalMilestones,
-        uint256 _reviewWindow
+        uint256 _reviewWindow,
+        uint256 _mutualCancelWindow
     ) external;
 
     /**

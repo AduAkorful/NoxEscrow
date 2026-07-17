@@ -12,6 +12,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const PRIVATE_KEY = process.env.TEE_ARBITER_PRIVATE_KEY;
 const RPC_URL = process.env.RPC_URL || "http://127.0.0.1:8545";
 const NOX_GATEWAY_URL = process.env.NOX_GATEWAY_URL || `http://127.0.0.1:${process.env.NOX_HANDLE_GATEWAY_HOST_PORT || "8080"}`;
+const NOX_SUBGRAPH_URL = process.env.NOX_SUBGRAPH_URL || "https://example.com/subgraphs/id/none";
 
 // ABI for resolveDispute on NoxEscrowContract
 const escrowABI = [
@@ -106,7 +107,7 @@ async function main() {
   const handleClient = await createEthersHandleClient(wallet, {
     smartContractAddress: "0x75C6AF4430cc474b1bb9b8540b7E46D6f8e1C685",
     gatewayUrl: NOX_GATEWAY_URL,
-    subgraphUrl: "https://example.com/subgraphs/id/none"
+    subgraphUrl: NOX_SUBGRAPH_URL
   });
 
   // 3. Decrypt Handles using the Nox KMS
@@ -229,6 +230,21 @@ async function main() {
     
     console.log(`📝 Recovered Plaintext Requirements: "${plaintextRequirements}"`);
     console.log(`📝 Recovered Plaintext Deliverables: "${plaintextDeliverables}"`);
+  }
+
+  // Decode hex file deliverables to UTF-8 text if needed (e.g. if uploaded as file via dApp)
+  if (plaintextDeliverables) {
+    const cleanDevs = plaintextDeliverables.trim();
+    // Check if cleanDevs is a valid hex string (even length, only hex chars)
+    const isHex = cleanDevs.length % 2 === 0 && /^[0-9a-fA-F]+$/.test(cleanDevs);
+    if (isHex) {
+      console.log("📝 Hex-encoded deliverable file detected. Decoding to readable UTF-8 text...");
+      try {
+        plaintextDeliverables = hexToUtf8(cleanDevs);
+      } catch (err) {
+        console.warn("⚠️ Failed to decode hex-encoded deliverable, proceeding with original string:", err.message);
+      }
+    }
   }
 
   // 5. Invoke Google Gemini 2.5 Flash

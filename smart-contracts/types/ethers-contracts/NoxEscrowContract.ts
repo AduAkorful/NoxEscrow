@@ -6,21 +6,24 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   
 
   export interface NoxEscrowContractInterface extends Interface {
-    getFunction(nameOrSignature: "activeMilestoneIndex" | "cUSDCToken" | "client" | "clientCancelRequested" | "factory" | "freelancer" | "freelancerCancelRequested" | "initialize" | "initializeEscrow" | "milestones" | "mutualCancel" | "raiseDispute" | "releaseMilestone" | "reputationRegistry" | "resolveDispute" | "reviewWindow" | "status" | "submitDeliverable" | "teeArbiter" | "totalMilestones"): FunctionFragment;
+    getFunction(nameOrSignature: "activeMilestoneIndex" | "cUSDCToken" | "client" | "clientCancelRequestTime" | "clientCancelRequested" | "factory" | "freelancer" | "freelancerCancelRequestTime" | "freelancerCancelRequested" | "initialize" | "initializeEscrow" | "milestones" | "mutualCancel" | "mutualCancelWindow" | "raiseDispute" | "releaseMilestone" | "reputationRegistry" | "resolveDispute" | "reviewWindow" | "status" | "submitDeliverable" | "teeArbiter" | "totalMilestones"): FunctionFragment;
 
     getEvent(nameOrSignatureOrTopic: "ContractInitialized" | "DeliverableSubmitted" | "DisputeOpened" | "DisputeResolved" | "Initialized" | "MilestoneApproved" | "MutualCancellationExecuted"): EventFragment;
 
     encodeFunctionData(functionFragment: 'activeMilestoneIndex', values?: undefined): string;
 encodeFunctionData(functionFragment: 'cUSDCToken', values?: undefined): string;
 encodeFunctionData(functionFragment: 'client', values?: undefined): string;
+encodeFunctionData(functionFragment: 'clientCancelRequestTime', values?: undefined): string;
 encodeFunctionData(functionFragment: 'clientCancelRequested', values?: undefined): string;
 encodeFunctionData(functionFragment: 'factory', values?: undefined): string;
 encodeFunctionData(functionFragment: 'freelancer', values?: undefined): string;
+encodeFunctionData(functionFragment: 'freelancerCancelRequestTime', values?: undefined): string;
 encodeFunctionData(functionFragment: 'freelancerCancelRequested', values?: undefined): string;
-encodeFunctionData(functionFragment: 'initialize', values: [AddressLike, AddressLike, AddressLike, AddressLike, AddressLike, BigNumberish, BigNumberish]): string;
+encodeFunctionData(functionFragment: 'initialize', values: [AddressLike, AddressLike, AddressLike, AddressLike, AddressLike, BigNumberish, BigNumberish, BigNumberish]): string;
 encodeFunctionData(functionFragment: 'initializeEscrow', values: [BytesLike[], BytesLike[], BytesLike[], BytesLike[]]): string;
 encodeFunctionData(functionFragment: 'milestones', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'mutualCancel', values?: undefined): string;
+encodeFunctionData(functionFragment: 'mutualCancelWindow', values?: undefined): string;
 encodeFunctionData(functionFragment: 'raiseDispute', values?: undefined): string;
 encodeFunctionData(functionFragment: 'releaseMilestone', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'reputationRegistry', values?: undefined): string;
@@ -34,14 +37,17 @@ encodeFunctionData(functionFragment: 'totalMilestones', values?: undefined): str
     decodeFunctionResult(functionFragment: 'activeMilestoneIndex', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'cUSDCToken', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'client', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'clientCancelRequestTime', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'clientCancelRequested', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'factory', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'freelancer', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'freelancerCancelRequestTime', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'freelancerCancelRequested', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'initialize', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'initializeEscrow', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'milestones', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'mutualCancel', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'mutualCancelWindow', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'raiseDispute', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'releaseMilestone', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'reputationRegistry', data: BytesLike): Result;
@@ -196,6 +202,14 @@ decodeFunctionResult(functionFragment: 'totalMilestones', data: BytesLike): Resu
     
 
     
+    clientCancelRequestTime: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
+    
     clientCancelRequested: TypedContractMethod<
       [],
       [boolean],
@@ -220,6 +234,14 @@ decodeFunctionResult(functionFragment: 'totalMilestones', data: BytesLike): Resu
     
 
     
+    freelancerCancelRequestTime: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
+    
     freelancerCancelRequested: TypedContractMethod<
       [],
       [boolean],
@@ -229,7 +251,7 @@ decodeFunctionResult(functionFragment: 'totalMilestones', data: BytesLike): Resu
 
     
     initialize: TypedContractMethod<
-      [_client: AddressLike, _freelancer: AddressLike, _teeArbiter: AddressLike, _cUSDC: AddressLike, _reputationRegistry: AddressLike, _totalMilestones: BigNumberish, _reviewWindow: BigNumberish, ],
+      [_client: AddressLike, _freelancer: AddressLike, _teeArbiter: AddressLike, _cUSDC: AddressLike, _reputationRegistry: AddressLike, _totalMilestones: BigNumberish, _reviewWindow: BigNumberish, _mutualCancelWindow: BigNumberish, ],
       [void],
       'nonpayable'
     >
@@ -256,6 +278,14 @@ decodeFunctionResult(functionFragment: 'totalMilestones', data: BytesLike): Resu
       [],
       [void],
       'nonpayable'
+    >
+    
+
+    
+    mutualCancelWindow: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
     >
     
 
@@ -349,6 +379,11 @@ getFunction(nameOrSignature: 'client'): TypedContractMethod<
       [string],
       'view'
     >;
+getFunction(nameOrSignature: 'clientCancelRequestTime'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
 getFunction(nameOrSignature: 'clientCancelRequested'): TypedContractMethod<
       [],
       [boolean],
@@ -364,13 +399,18 @@ getFunction(nameOrSignature: 'freelancer'): TypedContractMethod<
       [string],
       'view'
     >;
+getFunction(nameOrSignature: 'freelancerCancelRequestTime'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
 getFunction(nameOrSignature: 'freelancerCancelRequested'): TypedContractMethod<
       [],
       [boolean],
       'view'
     >;
 getFunction(nameOrSignature: 'initialize'): TypedContractMethod<
-      [_client: AddressLike, _freelancer: AddressLike, _teeArbiter: AddressLike, _cUSDC: AddressLike, _reputationRegistry: AddressLike, _totalMilestones: BigNumberish, _reviewWindow: BigNumberish, ],
+      [_client: AddressLike, _freelancer: AddressLike, _teeArbiter: AddressLike, _cUSDC: AddressLike, _reputationRegistry: AddressLike, _totalMilestones: BigNumberish, _reviewWindow: BigNumberish, _mutualCancelWindow: BigNumberish, ],
       [void],
       'nonpayable'
     >;
@@ -388,6 +428,11 @@ getFunction(nameOrSignature: 'mutualCancel'): TypedContractMethod<
       [],
       [void],
       'nonpayable'
+    >;
+getFunction(nameOrSignature: 'mutualCancelWindow'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
     >;
 getFunction(nameOrSignature: 'raiseDispute'): TypedContractMethod<
       [],

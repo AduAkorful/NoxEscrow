@@ -40,9 +40,78 @@ NoxEscrow/
 
 ---
 
-## 🛠️ Quick Start & Development
+## 🛠️ Step-by-Step Setup & Deployment Guide
 
-To setup and compile each component, refer to the individual component plans:
-*   [Smart Contracts (Solidity Layer)](plans/component-1-smart-contracts.md)
-*   [TEE AI Arbiter (Off-chain Enclave)](plans/component-2-tee-arbiter.md)
-*   [Frontend dApp (Client-side UI)](plans/component-3-frontend.md)
+Follow these steps to deploy, run, and test NoxEscrow locally or on live networks.
+
+### Prerequisites
+*   **Node.js Version:** You **must** use Node.js `v22.13.0` or later (Node `v26.2.0` is highly recommended for Hardhat compilation compatibility).
+*   Use `nvm` to easily switch Node versions:
+    ```bash
+    nvm use 26.2.0
+    ```
+
+---
+
+### Step 1: Install Dependencies
+Install npm modules inside each workspace folder:
+```bash
+# Install smart contract dependencies
+npm install --prefix smart-contracts
+
+# Install arbiter dependencies
+npm install --prefix arbiter
+
+# Install frontend dApp dependencies
+npm install --prefix dApp
+```
+
+---
+
+### Step 2: Compile & Deploy Smart Contracts
+1.  **Compile the contracts:**
+    ```bash
+    npm run compile --prefix smart-contracts
+    ```
+2.  **Deploy contracts:**
+    ```bash
+    npm run deploy --prefix smart-contracts
+    ```
+    *This script deploys the mock USDC token, implementations, factory and reputation registry UUPS proxies, links their associations, and **automatically synchronizes the deployed addresses** inside both `dApp/src/contracts/addresses.json` and your frontend environment file `dApp/.env`.*
+
+---
+
+### Step 3: Run the Off-chain TEE Webhook Listener
+The Webhook Listener acts as the bridge that listens for on-chain disputes and triggers the hardware enclave process:
+1.  **Configure Environment:** Copy `arbiter/.env.example` to `arbiter/.env` if it has not been auto-provisioned (the deploy script will try to create and align it with correct contract addresses automatically!).
+2.  **Run the listener:**
+    ```bash
+    npm run listener --prefix arbiter
+    ```
+
+---
+
+### Step 4: Run & Build the Frontend dApp
+1.  **Launch local development server:**
+    ```bash
+    npm run dev --prefix dApp
+    ```
+2.  **Compile production-optimized build:**
+    ```bash
+    npm run build --prefix dApp
+    ```
+    *This runs strict TypeScript and ESLint audits before outputting optimized bundles in `dApp/dist/`.*
+
+---
+
+## 🧪 Testing the Protocol Suite
+You can execute our exhaustive integration and fuzzing suites using Hardhat:
+```bash
+# Runs the full Hardhat unit and invariant test suite (Requires local Docker running)
+npm run test --prefix smart-contracts
+```
+
+---
+
+## 📑 Feedback & Roadmap
+Refer to our comprehensive developer report [feedback.md](feedback.md) in the workspace root for detailed critiques regarding the development experience with `@iexec-nox/nox-protocol-contracts`, toolchain limitations (such as lack of Foundry support), and future scaling roadmaps.

@@ -514,6 +514,55 @@ describe("NoxEscrow Core Protocol Suite", function () {
       // Verify final status is REFUNDED (4)
       expect(await escrow.status()).to.equal(4n);
     });
+
+    it("should respect the mutual cancel window and expire outstanding cancellation requests after the window passes", async function () {
+      // Configure mutualCancelWindow in factory to 5 seconds
+      await factory.connect(client).setMutualCancelWindow(5n);
+
+      const createTx = await factory.connect(client).createEscrow(
+        freelancer.address,
+        teeArbiter.address,
+        1n,
+        0n
+      );
+      const receipt = await createTx.wait();
+      const escrowAddress = await getEscrowAddress(receipt, factory);
+      const escrow = await hardhatEthers.getContractAt("NoxEscrowContract", escrowAddress);
+
+      // Initialize
+      const payoutEnc = await encryptInputWithSigner(client, 1000n, "uint256", escrowAddress);
+      const reqsEnc = await encryptInputWithSigner(client, ethersHash("req"), "uint256", escrowAddress);
+      await cUSDC.connect(client).setOperator(escrowAddress, uint48(Math.floor(Date.now() / 1000) + 3600));
+      await escrow.connect(client).initializeEscrow([payoutEnc.handle], [payoutEnc.handleProof], [reqsEnc.handle], [reqsEnc.handleProof]);
+
+      // Client requests cancel
+      await escrow.connect(client).mutualCancel();
+
+      // Fast-forward 6 seconds (beyond 5 second window)
+      await hardhatEthers.provider.send("evm_increaseTime", [6]);
+      await hardhatEthers.provider.send("evm_mine", []);
+
+      // Freelancer requests cancel. Since Client's request expired, it should NOT execute mutual cancellation, and contract status should remain ACTIVE (1)
+      await escrow.connect(freelancer).mutualCancel();
+      expect(await escrow.status()).to.equal(1n); // Status.ACTIVE
+
+      // Client requests cancel again (this time within the new freelancer request's 5s window)
+      await expect(escrow.connect(client).mutualCancel()).to.emit(escrow, "MutualCancellationExecuted");
+
+      // Verify final status is REFUNDED (4)
+      expect(await escrow.status()).to.equal(4n);
+    });
+
+    it("should allow configuring the mutualCancelWindow by the owner on the factory", async function () {
+      // Set to 10 seconds
+      await factory.connect(client).setMutualCancelWindow(10n);
+      expect(await factory.mutualCancelWindow()).to.equal(10n);
+
+      // Prevent non-owner from setting mutualCancelWindow
+      await expect(
+        factory.connect(attacker).setMutualCancelWindow(20n)
+      ).to.be.revertedWithCustomError(factory, "OwnableUnauthorizedAccount");
+    });
   });
 
   // =========================================================================

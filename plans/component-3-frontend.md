@@ -75,11 +75,17 @@ export async function encryptAndUploadToIPFS(file, encryptionKey) {
     fileBytes
   );
   
-  // Package into a binary blob containing IV + Ciphertext
-  const payload = new Blob([iv, new Uint8Array(encryptedBytes)], { type: "application/octet-stream" });
+  // Package into a JSON payload with hex strings for TEE-Arbiter compatibility
+  const ciphertextHex = Buffer.from(encryptedBytes).toString("hex");
+  const ivHex = Buffer.from(iv).toString("hex");
+  
+  const payload = JSON.stringify({
+    ciphertext: ciphertextHex,
+    iv: ivHex
+  });
   
   // Upload to IPFS
-  const response = await pinata.upload.file(new File([payload], file.name));
+  const response = await pinata.upload.json(JSON.parse(payload));
   return response.IpfsHash; // Return CID to store on-chain
 }
 ```

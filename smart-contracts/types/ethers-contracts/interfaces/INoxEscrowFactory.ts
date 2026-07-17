@@ -6,16 +6,18 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   
 
   export interface INoxEscrowFactoryInterface extends Interface {
-    getFunction(nameOrSignature: "allEscrows" | "createEscrow" | "escrowsCount" | "initialize" | "isEscrowContract" | "setEscrowImplementation" | "setReputationRegistry" | "setReviewWindow" | "setUSDCToken"): FunctionFragment;
+    getFunction(nameOrSignature: "allEscrows" | "createEscrow" | "escrowsCount" | "initialize" | "isEscrowContract" | "mutualCancelWindow" | "setEscrowImplementation" | "setMutualCancelWindow" | "setReputationRegistry" | "setReviewWindow" | "setUSDCToken"): FunctionFragment;
 
-    getEvent(nameOrSignatureOrTopic: "EscrowCreated" | "ImplementationUpdated" | "ReputationRegistryUpdated" | "ReviewWindowUpdated" | "TokenUpdated"): EventFragment;
+    getEvent(nameOrSignatureOrTopic: "EscrowCreated" | "ImplementationUpdated" | "MutualCancelWindowUpdated" | "ReputationRegistryUpdated" | "ReviewWindowUpdated" | "TokenUpdated"): EventFragment;
 
     encodeFunctionData(functionFragment: 'allEscrows', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'createEscrow', values: [AddressLike, AddressLike, BigNumberish, BigNumberish]): string;
 encodeFunctionData(functionFragment: 'escrowsCount', values?: undefined): string;
 encodeFunctionData(functionFragment: 'initialize', values: [AddressLike, AddressLike, AddressLike]): string;
 encodeFunctionData(functionFragment: 'isEscrowContract', values: [AddressLike]): string;
+encodeFunctionData(functionFragment: 'mutualCancelWindow', values?: undefined): string;
 encodeFunctionData(functionFragment: 'setEscrowImplementation', values: [AddressLike]): string;
+encodeFunctionData(functionFragment: 'setMutualCancelWindow', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'setReputationRegistry', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'setReviewWindow', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'setUSDCToken', values: [AddressLike]): string;
@@ -25,7 +27,9 @@ decodeFunctionResult(functionFragment: 'createEscrow', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'escrowsCount', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'initialize', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'isEscrowContract', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'mutualCancelWindow', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'setEscrowImplementation', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'setMutualCancelWindow', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'setReputationRegistry', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'setReviewWindow', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'setUSDCToken', data: BytesLike): Result;
@@ -48,6 +52,18 @@ decodeFunctionResult(functionFragment: 'setUSDCToken', data: BytesLike): Result;
       export type InputTuple = [oldImpl: AddressLike, newImpl: AddressLike];
       export type OutputTuple = [oldImpl: string, newImpl: string];
       export interface OutputObject {oldImpl: string, newImpl: string };
+      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
+      export type Filter = TypedDeferredTopicFilter<Event>
+      export type Log = TypedEventLog<Event>
+      export type LogDescription = TypedLogDescription<Event>
+    }
+
+  
+
+    export namespace MutualCancelWindowUpdatedEvent {
+      export type InputTuple = [oldWindow: BigNumberish, newWindow: BigNumberish];
+      export type OutputTuple = [oldWindow: bigint, newWindow: bigint];
+      export interface OutputObject {oldWindow: bigint, newWindow: bigint };
       export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
       export type Filter = TypedDeferredTopicFilter<Event>
       export type Log = TypedEventLog<Event>
@@ -166,8 +182,24 @@ decodeFunctionResult(functionFragment: 'setUSDCToken', data: BytesLike): Result;
     
 
     
+    mutualCancelWindow: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
+    
     setEscrowImplementation: TypedContractMethod<
       [_newImplementation: AddressLike, ],
+      [void],
+      'nonpayable'
+    >
+    
+
+    
+    setMutualCancelWindow: TypedContractMethod<
+      [_newMutualCancelWindow: BigNumberish, ],
       [void],
       'nonpayable'
     >
@@ -225,8 +257,18 @@ getFunction(nameOrSignature: 'isEscrowContract'): TypedContractMethod<
       [boolean],
       'view'
     >;
+getFunction(nameOrSignature: 'mutualCancelWindow'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
 getFunction(nameOrSignature: 'setEscrowImplementation'): TypedContractMethod<
       [_newImplementation: AddressLike, ],
+      [void],
+      'nonpayable'
+    >;
+getFunction(nameOrSignature: 'setMutualCancelWindow'): TypedContractMethod<
+      [_newMutualCancelWindow: BigNumberish, ],
       [void],
       'nonpayable'
     >;
@@ -248,6 +290,7 @@ getFunction(nameOrSignature: 'setUSDCToken'): TypedContractMethod<
 
     getEvent(key: 'EscrowCreated'): TypedContractEvent<EscrowCreatedEvent.InputTuple, EscrowCreatedEvent.OutputTuple, EscrowCreatedEvent.OutputObject>;
 getEvent(key: 'ImplementationUpdated'): TypedContractEvent<ImplementationUpdatedEvent.InputTuple, ImplementationUpdatedEvent.OutputTuple, ImplementationUpdatedEvent.OutputObject>;
+getEvent(key: 'MutualCancelWindowUpdated'): TypedContractEvent<MutualCancelWindowUpdatedEvent.InputTuple, MutualCancelWindowUpdatedEvent.OutputTuple, MutualCancelWindowUpdatedEvent.OutputObject>;
 getEvent(key: 'ReputationRegistryUpdated'): TypedContractEvent<ReputationRegistryUpdatedEvent.InputTuple, ReputationRegistryUpdatedEvent.OutputTuple, ReputationRegistryUpdatedEvent.OutputObject>;
 getEvent(key: 'ReviewWindowUpdated'): TypedContractEvent<ReviewWindowUpdatedEvent.InputTuple, ReviewWindowUpdatedEvent.OutputTuple, ReviewWindowUpdatedEvent.OutputObject>;
 getEvent(key: 'TokenUpdated'): TypedContractEvent<TokenUpdatedEvent.InputTuple, TokenUpdatedEvent.OutputTuple, TokenUpdatedEvent.OutputObject>;
@@ -260,6 +303,10 @@ getEvent(key: 'TokenUpdated'): TypedContractEvent<TokenUpdatedEvent.InputTuple, 
 
       'ImplementationUpdated(address,address)': TypedContractEvent<ImplementationUpdatedEvent.InputTuple, ImplementationUpdatedEvent.OutputTuple, ImplementationUpdatedEvent.OutputObject>;
       ImplementationUpdated: TypedContractEvent<ImplementationUpdatedEvent.InputTuple, ImplementationUpdatedEvent.OutputTuple, ImplementationUpdatedEvent.OutputObject>;
+    
+
+      'MutualCancelWindowUpdated(uint256,uint256)': TypedContractEvent<MutualCancelWindowUpdatedEvent.InputTuple, MutualCancelWindowUpdatedEvent.OutputTuple, MutualCancelWindowUpdatedEvent.OutputObject>;
+      MutualCancelWindowUpdated: TypedContractEvent<MutualCancelWindowUpdatedEvent.InputTuple, MutualCancelWindowUpdatedEvent.OutputTuple, MutualCancelWindowUpdatedEvent.OutputObject>;
     
 
       'ReputationRegistryUpdated(address,address)': TypedContractEvent<ReputationRegistryUpdatedEvent.InputTuple, ReputationRegistryUpdatedEvent.OutputTuple, ReputationRegistryUpdatedEvent.OutputObject>;

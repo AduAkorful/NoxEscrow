@@ -26,9 +26,12 @@ contract NoxEscrowContract is Initializable, INoxEscrowContract {
     uint256 public activeMilestoneIndex;                // Slot 6 (32 bytes)
     uint256 public reviewWindow;                        // Slot 7 (32 bytes)
     uint256 public totalMilestones;                     // Slot 8 (32 bytes)
+    uint256 public mutualCancelWindow;                  // Slot 9 (32 bytes)
+    uint256 public clientCancelRequestTime;             // Slot 10 (32 bytes)
+    uint256 public freelancerCancelRequestTime;         // Slot 11 (32 bytes)
 
-    bool public clientCancelRequested;                  // Packed in Slot 9 (1 byte)
-    bool public freelancerCancelRequested;              // Packed in Slot 9 (1 byte)
+    bool public clientCancelRequested;                  // Packed in Slot 12 (1 byte)
+    bool public freelancerCancelRequested;              // Packed in Slot 12 (1 byte)
 
     mapping(uint256 => Milestone) public milestones;
 
@@ -52,7 +55,8 @@ contract NoxEscrowContract is Initializable, INoxEscrowContract {
         address _cUSDC,
         address _reputationRegistry,
         uint256 _totalMilestones,
-        uint256 _reviewWindow
+        uint256 _reviewWindow,
+        uint256 _mutualCancelWindow
     ) external override initializer {
         if (_client == address(0)) revert InvalidClient();
         if (_freelancer == address(0)) revert InvalidFreelancer();
@@ -69,6 +73,7 @@ contract NoxEscrowContract is Initializable, INoxEscrowContract {
         reputationRegistry = INoxEscrowReputation(_reputationRegistry);
         totalMilestones = _totalMilestones;
         reviewWindow = _reviewWindow;
+        mutualCancelWindow = _mutualCancelWindow;
         status = Status.SIGNING;
     }
 
@@ -297,20 +302,45 @@ contract NoxEscrowContract is Initializable, INoxEscrowContract {
 
     /**
      * @notice Requests/approves mutual cancellation of the escrow contract.
-     * If both parties call this, the contract is aborted and remaining funds are refunded to the client.
+     * If both parties call this within the mutualCancelWindow, the contract is aborted and remaining funds are refunded to the client.
      */
     function mutualCancel() external override {
         if (status != Status.ACTIVE && status != Status.SIGNING) revert InvalidState();
 
         if (msg.sender == client) {
-            clientCancelRequested = true;
+            // Check if freelancer cancel is requested and has not expired
+            if (freelancerCancelRequested && block.timestamp <= freelancerCancelRequestTime + mutualCancelWindow) {
+                clientCancelRequested = true;
+                clientCancelRequestTime = block.timestamp;
+            } else {
+                // Freelancer request is either not set or expired; start a new client request
+                clientCancelRequested = true;
+                clientCancelRequestTime = block.timestamp;
+                freelancerCancelRequested = false;
+                freelancerCancelRequestTime = 0;
+            }
         } else if (msg.sender == freelancer) {
-            freelancerCancelRequested = true;
+            // Check if client cancel is requested and has not expired
+            if (clientCancelRequested && block.timestamp <= clientCancelRequestTime + mutualCancelWindow) {
+                freelancerCancelRequested = true;
+                freelancerCancelRequestTime = block.timestamp;
+            } else {
+                // Client request is either not set or expired; start a new freelancer request
+                freelancerCancelRequested = true;
+                freelancerCancelRequestTime = block.timestamp;
+                clientCancelRequested = false;
+                clientCancelRequestTime = 0;
+            }
         } else {
             revert Unauthorized();
         }
 
-        if (clientCancelRequested && freelancerCancelRequested) {
+        if (
+            clientCancelRequested && 
+            freelancerCancelRequested && 
+            block.timestamp <= clientCancelRequestTime + mutualCancelWindow &&
+            block.timestamp <= freelancerCancelRequestTime + mutualCancelWindow
+        ) {
             // Settle all remaining milestones as cancelled and refund to client
             uint256 total = totalMilestones;
             for (uint256 i = activeMilestoneIndex; i < total; ) {
