@@ -38,6 +38,7 @@ import { TransactionStepper } from './components/TransactionStepper';
 import type { StepItem } from './components/TransactionStepper';
 import { ToastContainer } from './components/ToastContainer';
 import type { Toast } from './components/ToastContainer';
+import { TokenWrapper } from './components/TokenWrapper';
 
 const LOCAL_DEMO_WALLET = "0x8f2a63050b447f5b271aa9b9beb9a49b8d14e10";
 const LOCAL_DEMO_ESCROWS: EscrowContract[] = [
@@ -87,6 +88,7 @@ function App() {
   const [viewMode, setViewMode] = useState<'client' | 'freelancer'>('client');
   const [showShortcutsHUD, setShowShortcutsHUD] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showTokenWrapper, setShowTokenWrapper] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -132,6 +134,7 @@ function App() {
   const cUSDCAddress = import.meta.env.VITE_CUSDC_TOKEN || addresses.cUSDC || "0x5FbDB2315678afecb367f032d93F642f64180aa3";
   const teeArbiterAddress = import.meta.env.VITE_TEE_ARBITER || addresses.teeArbiter || "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
   const gatewayUrl = import.meta.env.VITE_GATEWAY_URL || addresses.gatewayUrl || DEFAULT_NOX_GATEWAY;
+  const publicUSDCAddress = import.meta.env.VITE_PUBLIC_USDC_TOKEN || "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
 
   // Sync Privy connection with application walletAddress state
   useEffect(() => {
@@ -296,11 +299,13 @@ function App() {
         e.preventDefault();
         setSelectedContract(null);
         setShowDraftWizard(false);
+        setShowTokenWrapper(false);
       } else if (key === 'escape') {
         e.preventDefault();
         setShowShortcutsHUD(false);
         setShowDraftWizard(false);
         setShowSettings(false);
+        setShowTokenWrapper(false);
       }
     };
 
@@ -774,9 +779,11 @@ function App() {
             selectedContract={selectedContract}
             showDraftWizard={showDraftWizard}
             showSettings={showSettings}
+            showTokenWrapper={showTokenWrapper}
             isAdmin={isAdmin}
-            onSelectVaults={() => { setSelectedContract(null); setShowDraftWizard(false); }}
-            onSelectDeploy={() => setShowDraftWizard(true)}
+            onSelectVaults={() => { setSelectedContract(null); setShowDraftWizard(false); setShowTokenWrapper(false); }}
+            onSelectDeploy={() => { setShowDraftWizard(true); setShowTokenWrapper(false); }}
+            onSelectWrapper={() => { setShowTokenWrapper(true); setShowDraftWizard(false); setSelectedContract(null); }}
             onToggleAdminConfig={() => setShowSettings(prev => !prev)}
             logout={logout}
             viewMode={viewMode}
@@ -843,7 +850,17 @@ function App() {
                   </div>
                 )}
 
-                {showDraftWizard ? (
+                {showTokenWrapper ? (
+                  <div className="animate-fade-in">
+                    <TokenWrapper
+                      walletAddress={walletAddress!}
+                      cUSDCAddress={cUSDCAddress}
+                      publicUSDCAddress={publicUSDCAddress}
+                      gatewayUrl={gatewayUrl}
+                      getWeb3Signer={getWeb3Signer}
+                    />
+                  </div>
+                ) : showDraftWizard ? (
                   <div className="animate-slide-up">
                     <DraftWizard
                       walletAddress={walletAddress}

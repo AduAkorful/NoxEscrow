@@ -104,6 +104,14 @@ The Webhook Listener acts as the bridge that listens for on-chain disputes and t
 
 ---
 
+### Step 5: Wrap public USDC to cUSDC via the Swap Portal
+Clients who arrive with standard public `USDC` can easily swap their tokens in-app for confidential, wrapped `cUSDC`:
+1. Navigate to the **Swap Portal** tab in the Sidebar.
+2. Enter the amount of `USDC` to wrap, click **Approve** (to authorize the wrapper contract), and then click **Wrap to cUSDC**.
+3. Once uncompleted milestones are settled or mutually cancelled, contractors or clients can unwrap `cUSDC` back to public `USDC` instantly in a single on-chain transaction by flipping the swap direction and clicking **Unwrap to USDC**.
+
+---
+
 ## 🧪 Testing the Protocol Suite
 You can execute our exhaustive integration and fuzzing suites using Hardhat:
 ```bash

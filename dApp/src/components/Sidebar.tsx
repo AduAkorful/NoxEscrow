@@ -1,13 +1,15 @@
-import { ShieldCheck, Fingerprint, Database, Plus, Settings, LogOut } from 'lucide-react';
+import { ShieldCheck, Fingerprint, Database, Plus, Settings, LogOut, Coins } from 'lucide-react';
 import { type EscrowContract } from '../services/escrowService';
 
 interface SidebarProps {
   selectedContract: EscrowContract | null;
   showDraftWizard: boolean;
   showSettings: boolean;
+  showTokenWrapper: boolean;
   isAdmin: boolean;
   onSelectVaults: () => void;
   onSelectDeploy: () => void;
+  onSelectWrapper: () => void;
   onToggleAdminConfig: () => void;
   logout: () => Promise<void>;
   viewMode: 'client' | 'freelancer';
@@ -18,9 +20,11 @@ export function Sidebar({
   selectedContract,
   showDraftWizard,
   showSettings,
+  showTokenWrapper,
   isAdmin,
   onSelectVaults,
   onSelectDeploy,
+  onSelectWrapper,
   onToggleAdminConfig,
   logout,
   viewMode,
@@ -49,7 +53,7 @@ export function Sidebar({
         <nav className="flex flex-col gap-2 flex-1">
           <button 
             onClick={onSelectVaults}
-            className={`px-4 py-3 flex items-center gap-3.5 font-mono text-xs font-bold tracking-widest rounded-xl text-left transition-smooth border border-transparent ${!selectedContract && !showDraftWizard ? 'text-[#00F2FE] bg-[#00F2FE]/5 border-[#00F2FE]/25 shadow-[0_0_15px_rgba(0,242,254,0.03)]' : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'}`}
+            className={`px-4 py-3 flex items-center gap-3.5 font-mono text-xs font-bold tracking-widest rounded-xl text-left transition-smooth border border-transparent ${!selectedContract && !showDraftWizard && !showTokenWrapper ? 'text-[#00F2FE] bg-[#00F2FE]/5 border-[#00F2FE]/25 shadow-[0_0_15px_rgba(0,242,254,0.03)]' : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'}`}
           >
             <Database className="w-4 h-4" /> Vaults
           </button>
@@ -58,6 +62,12 @@ export function Sidebar({
             className={`px-4 py-3 flex items-center gap-3.5 font-mono text-xs font-bold tracking-widest rounded-xl text-left transition-smooth border border-transparent ${showDraftWizard ? 'text-[#00F2FE] bg-[#00F2FE]/5 border-[#00F2FE]/25 shadow-[0_0_15px_rgba(0,242,254,0.03)]' : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'}`}
           >
             <Plus className="w-4 h-4" /> Deploy Escrow
+          </button>
+          <button 
+            onClick={onSelectWrapper}
+            className={`px-4 py-3 flex items-center gap-3.5 font-mono text-xs font-bold tracking-widest rounded-xl text-left transition-smooth border border-transparent ${showTokenWrapper ? 'text-[#00F2FE] bg-[#00F2FE]/5 border-[#00F2FE]/25 shadow-[0_0_15px_rgba(0,242,254,0.03)]' : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'}`}
+          >
+            <Coins className="w-4 h-4" /> Swap Portal
           </button>
           {/* Protocol configuration sidebar trigger */}
           {isAdmin && (

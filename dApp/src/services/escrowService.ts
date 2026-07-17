@@ -520,3 +520,140 @@ export async function executeMutualCancel(
   const tx = await escrow.mutualCancel();
   await tx.wait();
 }
+
+// Standard Human-readable ERC-20 ABI for public USDC token
+export const ERC20ABI = [
+  "function balanceOf(address account) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)"
+];
+
+// Human-readable ABI for wrapping features on ERC-7984 contract
+export const TokenWrapperABI = [
+  "function wrap(address to, uint256 amount) external returns (bytes32)"
+];
+
+/**
+ * Approves the confidential cUSDC contract to spend the user's public USDC tokens.
+ */
+export async function approvePublicUSDC(
+  signer: ethers.JsonRpcSigner,
+  publicUSDCAddress: string,
+  cUSDCAddress: string,
+  amount: bigint
+): Promise<void> {
+  const publicToken = new ethers.Contract(publicUSDCAddress, ERC20ABI, signer);
+  const tx = await publicToken.approve(cUSDCAddress, amount);
+  await tx.wait();
+}
+
+/**
+ * Checks the allowance of public USDC granted to the confidential cUSDC contract.
+ */
+export async function checkPublicUSDCAllowance(
+  signer: ethers.JsonRpcSigner,
+  publicUSDCAddress: string,
+  cUSDCAddress: string,
+  ownerAddress: string
+): Promise<bigint> {
+  const publicToken = new ethers.Contract(publicUSDCAddress, ERC20ABI, signer);
+  const allowance = await publicToken.allowance(ownerAddress, cUSDCAddress);
+  return BigInt(allowance);
+}
+
+/**
+ * Fetches the standard public USDC balance of a user.
+ */
+export async function getPublicUSDCBalance(
+  signer: ethers.JsonRpcSigner,
+  publicUSDCAddress: string,
+  userAddress: string
+): Promise<bigint> {
+  const publicToken = new ethers.Contract(publicUSDCAddress, ERC20ABI, signer);
+  const balance = await publicToken.balanceOf(userAddress);
+  return BigInt(balance);
+}
+
+/**
+ * Wraps standard public USDC into confidential cUSDC.
+ */
+export async function wrapToken(
+  signer: ethers.JsonRpcSigner,
+  cUSDCAddress: string,
+  recipientAddress: string,
+  amount: bigint
+): Promise<void> {
+  const wrapper = new ethers.Contract(cUSDCAddress, TokenWrapperABI, signer);
+  const tx = await wrapper.wrap(recipientAddress, amount);
+  await tx.wait();
+}
+
+/**
+ * Unwraps confidential cUSDC back into standard public USDC.
+ * Handles the secure two-step iExec Nox protocol flow: unwrap -> KMS decrypt -> finalizeUnwrap.
+ */
+export async function unwrapToken(
+  signer: ethers.JsonRpcSigner,
+  cUSDCAddress: string,
+  userAddress: string,
+  amount: bigint,
+  gatewayUrl: string = DEFAULT_NOX_GATEWAY
+): Promise<void> {
+  const wrapper = new ethers.Contract(cUSDCAddress, [
+    "function unwrap(address from, address to, bytes32 amount) external returns (bytes32)",
+    "function finalizeUnwrap(bytes32 unwrapRequestId, bytes calldata decryptedAmountAndProof) external"
+  ], signer);
+
+  // 1. Encrypt unwrap amount using Nox KMS
+  const amountEnc = await encryptNoxInput(signer, amount, "uint256", cUSDCAddress, gatewayUrl);
+
+  // Grant wrapper contract permission to read the encrypted unwrap amount handle
+  const noxContractManager = new ethers.Contract(NOX_CONTRACT_MANAGER, [
+    "function allow(bytes32 handle, address contractAddress) external"
+  ], signer);
+  const allowTx = await noxContractManager.allow(amountEnc.handle, cUSDCAddress);
+  await allowTx.wait();
+
+  // 2. Call unwrap to burn confidential tokens and initiate request
+  const unwrapTx = await wrapper.unwrap(userAddress, userAddress, amountEnc.handle);
+  await unwrapTx.wait();
+
+  // 3. Decrypt unwrapRequestId handle via Nox KMS using publicDecrypt to get decryptionProof
+  const handleClient = await createEthersHandleClient(signer as any, {
+    smartContractAddress: NOX_CONTRACT_MANAGER,
+    gatewayUrl: gatewayUrl as any,
+    subgraphUrl: NOX_SUBGRAPH_URL,
+  });
+
+  const { decryptionProof } = await handleClient.publicDecrypt(amountEnc.handle);
+  
+  // 4. Finalize unwrap to claim public USDC tokens
+  const finalizeTx = await wrapper.finalizeUnwrap(amountEnc.handle, decryptionProof);
+  await finalizeTx.wait();
+}
+
+/**
+ * Fetches and decrypts the user's confidential cUSDC balance.
+ */
+export async function getConfidentialUSDCBalance(
+  signer: ethers.JsonRpcSigner,
+  cUSDCAddress: string,
+  userAddress: string,
+  gatewayUrl: string = DEFAULT_NOX_GATEWAY
+): Promise<bigint> {
+  const token = new ethers.Contract(cUSDCAddress, MockERC7984ABI, signer);
+  const balanceHandle = await token.confidentialBalanceOf(userAddress);
+  
+  if (balanceHandle === "0x0000000000000000000000000000000000000000000000000000000000000000" || !balanceHandle) {
+    return 0n;
+  }
+
+  const handleClient = await createEthersHandleClient(signer as any, {
+    smartContractAddress: NOX_CONTRACT_MANAGER,
+    gatewayUrl: gatewayUrl as any,
+    subgraphUrl: NOX_SUBGRAPH_URL,
+  });
+
+  const decrypted = await handleClient.decrypt(balanceHandle);
+  return BigInt(decrypted.value);
+}
