@@ -6,36 +6,60 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   
 
   export interface INoxEscrowFactoryInterface extends Interface {
-    getFunction(nameOrSignature: "allEscrows" | "createEscrow" | "escrowsCount" | "initialize" | "isEscrowContract" | "mutualCancelWindow" | "setEscrowImplementation" | "setMutualCancelWindow" | "setReputationRegistry" | "setReviewWindow" | "setUSDCToken"): FunctionFragment;
+    getFunction(nameOrSignature: "allEscrows" | "canonicalTeeArbiter" | "createEscrow" | "escrowsCount" | "initialize" | "isEscrowContract" | "mutualCancelWindow" | "platformFeeBps" | "setCanonicalTeeArbiter" | "setEscrowImplementation" | "setMutualCancelWindow" | "setPlatformFeeBps" | "setReputationRegistry" | "setReviewWindow" | "setTreasury" | "setUSDCToken" | "treasury"): FunctionFragment;
 
-    getEvent(nameOrSignatureOrTopic: "EscrowCreated" | "ImplementationUpdated" | "MutualCancelWindowUpdated" | "ReputationRegistryUpdated" | "ReviewWindowUpdated" | "TokenUpdated"): EventFragment;
+    getEvent(nameOrSignatureOrTopic: "CanonicalArbiterUpdated" | "EscrowCreated" | "ImplementationUpdated" | "MutualCancelWindowUpdated" | "PlatformFeeUpdated" | "ReputationRegistryUpdated" | "ReviewWindowUpdated" | "TokenUpdated" | "TreasuryUpdated"): EventFragment;
 
     encodeFunctionData(functionFragment: 'allEscrows', values: [BigNumberish]): string;
-encodeFunctionData(functionFragment: 'createEscrow', values: [AddressLike, AddressLike, BigNumberish, BigNumberish]): string;
+encodeFunctionData(functionFragment: 'canonicalTeeArbiter', values?: undefined): string;
+encodeFunctionData(functionFragment: 'createEscrow', values: [AddressLike, BigNumberish, BigNumberish]): string;
 encodeFunctionData(functionFragment: 'escrowsCount', values?: undefined): string;
-encodeFunctionData(functionFragment: 'initialize', values: [AddressLike, AddressLike, AddressLike]): string;
+encodeFunctionData(functionFragment: 'initialize', values: [AddressLike, AddressLike, AddressLike, AddressLike, AddressLike]): string;
 encodeFunctionData(functionFragment: 'isEscrowContract', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'mutualCancelWindow', values?: undefined): string;
+encodeFunctionData(functionFragment: 'platformFeeBps', values?: undefined): string;
+encodeFunctionData(functionFragment: 'setCanonicalTeeArbiter', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'setEscrowImplementation', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'setMutualCancelWindow', values: [BigNumberish]): string;
+encodeFunctionData(functionFragment: 'setPlatformFeeBps', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'setReputationRegistry', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'setReviewWindow', values: [BigNumberish]): string;
+encodeFunctionData(functionFragment: 'setTreasury', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'setUSDCToken', values: [AddressLike]): string;
+encodeFunctionData(functionFragment: 'treasury', values?: undefined): string;
 
     decodeFunctionResult(functionFragment: 'allEscrows', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'canonicalTeeArbiter', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'createEscrow', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'escrowsCount', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'initialize', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'isEscrowContract', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'mutualCancelWindow', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'platformFeeBps', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'setCanonicalTeeArbiter', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'setEscrowImplementation', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'setMutualCancelWindow', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'setPlatformFeeBps', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'setReputationRegistry', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'setReviewWindow', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'setTreasury', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'setUSDCToken', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'treasury', data: BytesLike): Result;
   }
 
   
+    export namespace CanonicalArbiterUpdatedEvent {
+      export type InputTuple = [oldArbiter: AddressLike, newArbiter: AddressLike];
+      export type OutputTuple = [oldArbiter: string, newArbiter: string];
+      export interface OutputObject {oldArbiter: string, newArbiter: string };
+      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
+      export type Filter = TypedDeferredTopicFilter<Event>
+      export type Log = TypedEventLog<Event>
+      export type LogDescription = TypedLogDescription<Event>
+    }
+
+  
+
     export namespace EscrowCreatedEvent {
       export type InputTuple = [escrowAddress: AddressLike, client: AddressLike, freelancer: AddressLike, totalMilestones: BigNumberish];
       export type OutputTuple = [escrowAddress: string, client: string, freelancer: string, totalMilestones: bigint];
@@ -72,6 +96,18 @@ decodeFunctionResult(functionFragment: 'setUSDCToken', data: BytesLike): Result;
 
   
 
+    export namespace PlatformFeeUpdatedEvent {
+      export type InputTuple = [oldFeeBps: BigNumberish, newFeeBps: BigNumberish];
+      export type OutputTuple = [oldFeeBps: bigint, newFeeBps: bigint];
+      export interface OutputObject {oldFeeBps: bigint, newFeeBps: bigint };
+      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
+      export type Filter = TypedDeferredTopicFilter<Event>
+      export type Log = TypedEventLog<Event>
+      export type LogDescription = TypedLogDescription<Event>
+    }
+
+  
+
     export namespace ReputationRegistryUpdatedEvent {
       export type InputTuple = [oldRegistry: AddressLike, newRegistry: AddressLike];
       export type OutputTuple = [oldRegistry: string, newRegistry: string];
@@ -100,6 +136,18 @@ decodeFunctionResult(functionFragment: 'setUSDCToken', data: BytesLike): Result;
       export type InputTuple = [oldToken: AddressLike, newToken: AddressLike];
       export type OutputTuple = [oldToken: string, newToken: string];
       export interface OutputObject {oldToken: string, newToken: string };
+      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
+      export type Filter = TypedDeferredTopicFilter<Event>
+      export type Log = TypedEventLog<Event>
+      export type LogDescription = TypedLogDescription<Event>
+    }
+
+  
+
+    export namespace TreasuryUpdatedEvent {
+      export type InputTuple = [oldTreasury: AddressLike, newTreasury: AddressLike];
+      export type OutputTuple = [oldTreasury: string, newTreasury: string];
+      export interface OutputObject {oldTreasury: string, newTreasury: string };
       export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
       export type Filter = TypedDeferredTopicFilter<Event>
       export type Log = TypedEventLog<Event>
@@ -150,8 +198,16 @@ decodeFunctionResult(functionFragment: 'setUSDCToken', data: BytesLike): Result;
     
 
     
+    canonicalTeeArbiter: TypedContractMethod<
+      [],
+      [string],
+      'view'
+    >
+    
+
+    
     createEscrow: TypedContractMethod<
-      [_freelancer: AddressLike, _teeArbiter: AddressLike, _totalMilestones: BigNumberish, _customReviewWindow: BigNumberish, ],
+      [_freelancer: AddressLike, _totalMilestones: BigNumberish, _customReviewWindow: BigNumberish, ],
       [string],
       'nonpayable'
     >
@@ -167,7 +223,7 @@ decodeFunctionResult(functionFragment: 'setUSDCToken', data: BytesLike): Result;
 
     
     initialize: TypedContractMethod<
-      [_escrowImplementation: AddressLike, _reputationRegistry: AddressLike, _cUSDCToken: AddressLike, ],
+      [_escrowImplementation: AddressLike, _reputationRegistry: AddressLike, _cUSDCToken: AddressLike, _canonicalTeeArbiter: AddressLike, _treasury: AddressLike, ],
       [void],
       'nonpayable'
     >
@@ -190,6 +246,22 @@ decodeFunctionResult(functionFragment: 'setUSDCToken', data: BytesLike): Result;
     
 
     
+    platformFeeBps: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
+    
+    setCanonicalTeeArbiter: TypedContractMethod<
+      [_newArbiter: AddressLike, ],
+      [void],
+      'nonpayable'
+    >
+    
+
+    
     setEscrowImplementation: TypedContractMethod<
       [_newImplementation: AddressLike, ],
       [void],
@@ -200,6 +272,14 @@ decodeFunctionResult(functionFragment: 'setUSDCToken', data: BytesLike): Result;
     
     setMutualCancelWindow: TypedContractMethod<
       [_newMutualCancelWindow: BigNumberish, ],
+      [void],
+      'nonpayable'
+    >
+    
+
+    
+    setPlatformFeeBps: TypedContractMethod<
+      [_newFeeBps: BigNumberish, ],
       [void],
       'nonpayable'
     >
@@ -222,10 +302,26 @@ decodeFunctionResult(functionFragment: 'setUSDCToken', data: BytesLike): Result;
     
 
     
+    setTreasury: TypedContractMethod<
+      [_newTreasury: AddressLike, ],
+      [void],
+      'nonpayable'
+    >
+    
+
+    
     setUSDCToken: TypedContractMethod<
       [_newToken: AddressLike, ],
       [void],
       'nonpayable'
+    >
+    
+
+    
+    treasury: TypedContractMethod<
+      [],
+      [string],
+      'view'
     >
     
 
@@ -237,8 +333,13 @@ decodeFunctionResult(functionFragment: 'setUSDCToken', data: BytesLike): Result;
       [string],
       'view'
     >;
+getFunction(nameOrSignature: 'canonicalTeeArbiter'): TypedContractMethod<
+      [],
+      [string],
+      'view'
+    >;
 getFunction(nameOrSignature: 'createEscrow'): TypedContractMethod<
-      [_freelancer: AddressLike, _teeArbiter: AddressLike, _totalMilestones: BigNumberish, _customReviewWindow: BigNumberish, ],
+      [_freelancer: AddressLike, _totalMilestones: BigNumberish, _customReviewWindow: BigNumberish, ],
       [string],
       'nonpayable'
     >;
@@ -248,7 +349,7 @@ getFunction(nameOrSignature: 'escrowsCount'): TypedContractMethod<
       'view'
     >;
 getFunction(nameOrSignature: 'initialize'): TypedContractMethod<
-      [_escrowImplementation: AddressLike, _reputationRegistry: AddressLike, _cUSDCToken: AddressLike, ],
+      [_escrowImplementation: AddressLike, _reputationRegistry: AddressLike, _cUSDCToken: AddressLike, _canonicalTeeArbiter: AddressLike, _treasury: AddressLike, ],
       [void],
       'nonpayable'
     >;
@@ -262,6 +363,16 @@ getFunction(nameOrSignature: 'mutualCancelWindow'): TypedContractMethod<
       [bigint],
       'view'
     >;
+getFunction(nameOrSignature: 'platformFeeBps'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
+getFunction(nameOrSignature: 'setCanonicalTeeArbiter'): TypedContractMethod<
+      [_newArbiter: AddressLike, ],
+      [void],
+      'nonpayable'
+    >;
 getFunction(nameOrSignature: 'setEscrowImplementation'): TypedContractMethod<
       [_newImplementation: AddressLike, ],
       [void],
@@ -269,6 +380,11 @@ getFunction(nameOrSignature: 'setEscrowImplementation'): TypedContractMethod<
     >;
 getFunction(nameOrSignature: 'setMutualCancelWindow'): TypedContractMethod<
       [_newMutualCancelWindow: BigNumberish, ],
+      [void],
+      'nonpayable'
+    >;
+getFunction(nameOrSignature: 'setPlatformFeeBps'): TypedContractMethod<
+      [_newFeeBps: BigNumberish, ],
       [void],
       'nonpayable'
     >;
@@ -282,21 +398,38 @@ getFunction(nameOrSignature: 'setReviewWindow'): TypedContractMethod<
       [void],
       'nonpayable'
     >;
+getFunction(nameOrSignature: 'setTreasury'): TypedContractMethod<
+      [_newTreasury: AddressLike, ],
+      [void],
+      'nonpayable'
+    >;
 getFunction(nameOrSignature: 'setUSDCToken'): TypedContractMethod<
       [_newToken: AddressLike, ],
       [void],
       'nonpayable'
     >;
+getFunction(nameOrSignature: 'treasury'): TypedContractMethod<
+      [],
+      [string],
+      'view'
+    >;
 
-    getEvent(key: 'EscrowCreated'): TypedContractEvent<EscrowCreatedEvent.InputTuple, EscrowCreatedEvent.OutputTuple, EscrowCreatedEvent.OutputObject>;
+    getEvent(key: 'CanonicalArbiterUpdated'): TypedContractEvent<CanonicalArbiterUpdatedEvent.InputTuple, CanonicalArbiterUpdatedEvent.OutputTuple, CanonicalArbiterUpdatedEvent.OutputObject>;
+getEvent(key: 'EscrowCreated'): TypedContractEvent<EscrowCreatedEvent.InputTuple, EscrowCreatedEvent.OutputTuple, EscrowCreatedEvent.OutputObject>;
 getEvent(key: 'ImplementationUpdated'): TypedContractEvent<ImplementationUpdatedEvent.InputTuple, ImplementationUpdatedEvent.OutputTuple, ImplementationUpdatedEvent.OutputObject>;
 getEvent(key: 'MutualCancelWindowUpdated'): TypedContractEvent<MutualCancelWindowUpdatedEvent.InputTuple, MutualCancelWindowUpdatedEvent.OutputTuple, MutualCancelWindowUpdatedEvent.OutputObject>;
+getEvent(key: 'PlatformFeeUpdated'): TypedContractEvent<PlatformFeeUpdatedEvent.InputTuple, PlatformFeeUpdatedEvent.OutputTuple, PlatformFeeUpdatedEvent.OutputObject>;
 getEvent(key: 'ReputationRegistryUpdated'): TypedContractEvent<ReputationRegistryUpdatedEvent.InputTuple, ReputationRegistryUpdatedEvent.OutputTuple, ReputationRegistryUpdatedEvent.OutputObject>;
 getEvent(key: 'ReviewWindowUpdated'): TypedContractEvent<ReviewWindowUpdatedEvent.InputTuple, ReviewWindowUpdatedEvent.OutputTuple, ReviewWindowUpdatedEvent.OutputObject>;
 getEvent(key: 'TokenUpdated'): TypedContractEvent<TokenUpdatedEvent.InputTuple, TokenUpdatedEvent.OutputTuple, TokenUpdatedEvent.OutputObject>;
+getEvent(key: 'TreasuryUpdated'): TypedContractEvent<TreasuryUpdatedEvent.InputTuple, TreasuryUpdatedEvent.OutputTuple, TreasuryUpdatedEvent.OutputObject>;
 
     filters: {
       
+      'CanonicalArbiterUpdated(address,address)': TypedContractEvent<CanonicalArbiterUpdatedEvent.InputTuple, CanonicalArbiterUpdatedEvent.OutputTuple, CanonicalArbiterUpdatedEvent.OutputObject>;
+      CanonicalArbiterUpdated: TypedContractEvent<CanonicalArbiterUpdatedEvent.InputTuple, CanonicalArbiterUpdatedEvent.OutputTuple, CanonicalArbiterUpdatedEvent.OutputObject>;
+    
+
       'EscrowCreated(address,address,address,uint256)': TypedContractEvent<EscrowCreatedEvent.InputTuple, EscrowCreatedEvent.OutputTuple, EscrowCreatedEvent.OutputObject>;
       EscrowCreated: TypedContractEvent<EscrowCreatedEvent.InputTuple, EscrowCreatedEvent.OutputTuple, EscrowCreatedEvent.OutputObject>;
     
@@ -309,6 +442,10 @@ getEvent(key: 'TokenUpdated'): TypedContractEvent<TokenUpdatedEvent.InputTuple, 
       MutualCancelWindowUpdated: TypedContractEvent<MutualCancelWindowUpdatedEvent.InputTuple, MutualCancelWindowUpdatedEvent.OutputTuple, MutualCancelWindowUpdatedEvent.OutputObject>;
     
 
+      'PlatformFeeUpdated(uint256,uint256)': TypedContractEvent<PlatformFeeUpdatedEvent.InputTuple, PlatformFeeUpdatedEvent.OutputTuple, PlatformFeeUpdatedEvent.OutputObject>;
+      PlatformFeeUpdated: TypedContractEvent<PlatformFeeUpdatedEvent.InputTuple, PlatformFeeUpdatedEvent.OutputTuple, PlatformFeeUpdatedEvent.OutputObject>;
+    
+
       'ReputationRegistryUpdated(address,address)': TypedContractEvent<ReputationRegistryUpdatedEvent.InputTuple, ReputationRegistryUpdatedEvent.OutputTuple, ReputationRegistryUpdatedEvent.OutputObject>;
       ReputationRegistryUpdated: TypedContractEvent<ReputationRegistryUpdatedEvent.InputTuple, ReputationRegistryUpdatedEvent.OutputTuple, ReputationRegistryUpdatedEvent.OutputObject>;
     
@@ -319,6 +456,10 @@ getEvent(key: 'TokenUpdated'): TypedContractEvent<TokenUpdatedEvent.InputTuple, 
 
       'TokenUpdated(address,address)': TypedContractEvent<TokenUpdatedEvent.InputTuple, TokenUpdatedEvent.OutputTuple, TokenUpdatedEvent.OutputObject>;
       TokenUpdated: TypedContractEvent<TokenUpdatedEvent.InputTuple, TokenUpdatedEvent.OutputTuple, TokenUpdatedEvent.OutputObject>;
+    
+
+      'TreasuryUpdated(address,address)': TypedContractEvent<TreasuryUpdatedEvent.InputTuple, TreasuryUpdatedEvent.OutputTuple, TreasuryUpdatedEvent.OutputObject>;
+      TreasuryUpdated: TypedContractEvent<TreasuryUpdatedEvent.InputTuple, TreasuryUpdatedEvent.OutputTuple, TreasuryUpdatedEvent.OutputObject>;
     
     };
   }

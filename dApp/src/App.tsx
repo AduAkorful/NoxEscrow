@@ -47,38 +47,8 @@ import { ToastContainer } from './components/ToastContainer';
 import type { Toast } from './components/ToastContainer';
 import { TokenWrapper } from './components/TokenWrapper';
 
-const LOCAL_DEMO_WALLET = "0x8f2a63050b447f5b271aa9b9beb9a49b8d14e10";
-const LOCAL_DEMO_ESCROWS: EscrowContract[] = [
-  {
-    address: '0x3269bF98540b7E46D6f8e1C685ffb1744e8c10',
-    counterparty: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
-    role: 'CLIENT',
-    milestonesCompleted: 1,
-    totalMilestones: 2,
-    budget: 5000,
-    status: 'ACTIVE',
-    requirements: ['Phase 1: Database Setup', 'Phase 2: Core API Endpoints'],
-    activeMilestoneSubmitted: true
-  },
-  {
-    address: '0x8843Afecb367f032d93F642f64180aa3f6b7ea0',
-    counterparty: '0x3C44Cd353d474b1bB9b8540b7E46D6f8e1C685e1',
-    role: 'FREELANCER',
-    milestonesCompleted: 0,
-    totalMilestones: 1,
-    budget: 12500,
-    status: 'DISPUTED',
-    requirements: ['Phase 1: React + Tailwind Interface compilation'],
-    activeMilestoneSubmitted: true
-  }
-];
-
 function getErrorMessage(err: unknown, fallback: string) {
   return err instanceof Error ? err.message : fallback;
-}
-
-function isLocalDemoWallet(address: string | null) {
-  return address?.toLowerCase() === LOCAL_DEMO_WALLET.toLowerCase();
 }
 
 function App() {
@@ -102,6 +72,7 @@ function App() {
   const [isFetchingContracts, setIsFetchingContracts] = useState(false);
   const [isUnsupportedNetwork, setIsUnsupportedNetwork] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null);
 
   // --- Toast notifications state ---
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -124,12 +95,18 @@ function App() {
   const [currentUSDCToken, setCurrentUSDCToken] = useState("");
   const [currentReviewWindow, setCurrentReviewWindow] = useState("");
   const [currentMutualCancelWindow, setCurrentMutualCancelWindow] = useState("");
+  const [currentTeeArbiter, setCurrentTeeArbiter] = useState("");
+  const [currentPlatformFeeBps, setCurrentPlatformFeeBps] = useState("50");
+  const [currentTreasury, setCurrentTreasury] = useState("");
 
   const [newImplementationInput, setNewImplementationInput] = useState("");
   const [newRegistryInput, setNewRegistryInput] = useState("");
   const [newUSDCTokenInput, setNewUSDCTokenInput] = useState("");
   const [newReviewWindowInput, setNewReviewWindowInput] = useState("259200");
   const [newMutualCancelWindowInput, setNewMutualCancelWindowInput] = useState("604800");
+  const [newTeeArbiterInput, setNewTeeArbiterInput] = useState("");
+  const [newPlatformFeeBpsInput, setNewPlatformFeeBpsInput] = useState("50");
+  const [newTreasuryInput, setNewTreasuryInput] = useState("");
 
   // --- API & E2E Config Constants from Env ---
   const pinataJWT = import.meta.env.VITE_PINATA_JWT || "";
@@ -139,7 +116,6 @@ function App() {
   // --- Contract Deployment Config Constants from Env/addresses.json ---
   const factoryAddress = import.meta.env.VITE_NOX_ESCROW_FACTORY || addresses.factory || "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
   const cUSDCAddress = import.meta.env.VITE_CUSDC_TOKEN || addresses.cUSDC || "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-  const teeArbiterAddress = import.meta.env.VITE_TEE_ARBITER || addresses.teeArbiter || "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
   const gatewayUrl = import.meta.env.VITE_GATEWAY_URL || addresses.gatewayUrl || DEFAULT_NOX_GATEWAY;
   const publicUSDCAddress = import.meta.env.VITE_PUBLIC_USDC_TOKEN || "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
 
@@ -147,7 +123,7 @@ function App() {
   useEffect(() => {
     if (authenticated && connectedAddress) {
       setWalletAddress(connectedAddress);
-    } else if (!authenticated && walletAddress && walletAddress !== LOCAL_DEMO_WALLET) {
+    } else if (!authenticated && walletAddress) {
       setWalletAddress(null);
       setVaultKey(null);
     }
@@ -249,6 +225,20 @@ function App() {
     throw new Error("No web3 provider detected. Please connect your wallet via Privy or Sandbox.");
   }, [activeWallet]);
 
+  // Sync Ethers signer from connected wallet address
+  useEffect(() => {
+    if (walletAddress) {
+      getWeb3Signer()
+        .then(setSigner)
+        .catch(err => {
+          console.warn("Failed to retrieve Ethers signer:", err);
+          setSigner(null);
+        });
+    } else {
+      setSigner(null);
+    }
+  }, [walletAddress, getWeb3Signer]);
+
   // --- Wizard Drafting States ---
   const [showDraftWizard, setShowDraftWizard] = useState(false);
   const [draftFreelancer, setDraftFreelancer] = useState("");
@@ -285,7 +275,6 @@ function App() {
     setIsDeriving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
-    const win = window as any;
 
     try {
       let signature = '';
@@ -294,12 +283,15 @@ function App() {
         const ethersProvider = new ethers.BrowserProvider(provider);
         const signer = await ethersProvider.getSigner();
         signature = await signer.signMessage(SIGN_MESSAGE);
-      } else if (win.ethereum && !isLocalDemoWallet(walletAddress)) {
-        const provider = new ethers.BrowserProvider(win.ethereum);
-        const signer = await provider.getSigner();
-        signature = await signer.signMessage(SIGN_MESSAGE);
       } else {
-        signature = '0xmocked_signature_hash_bytes_for_local_nox_developer_testing_environment_stability';
+        const win = window as any;
+        if (win.ethereum) {
+          const provider = new ethers.BrowserProvider(win.ethereum);
+          const signer = await provider.getSigner();
+          signature = await signer.signMessage(SIGN_MESSAGE);
+        } else {
+          throw new Error("No wallet provider available");
+        }
       }
 
       const key = await deriveEncryptionKey(signature);
@@ -354,11 +346,6 @@ function App() {
   const checkAdminStatus = useCallback(async () => {
     if (!walletAddress) return;
 
-    if (isLocalDemoWallet(walletAddress) || walletAddress.toLowerCase() === "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266") {
-      setIsAdmin(true);
-      return;
-    }
-
     try {
       const signer = await getWeb3Signer();
       const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
@@ -379,18 +366,24 @@ function App() {
     try {
       const signer = await getWeb3Signer();
       const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
-      const [impl, reg, token, win, cancelWin] = await Promise.all([
+      const [impl, reg, token, win, cancelWin, arbiter, feeBps, treasuryAddr] = await Promise.all([
         factory.escrowImplementation(),
         factory.reputationRegistry(),
         factory.cUSDCToken(),
         factory.reviewWindow(),
-        factory.mutualCancelWindow()
+        factory.mutualCancelWindow(),
+        factory.canonicalTeeArbiter(),
+        factory.platformFeeBps(),
+        factory.treasury()
       ]);
       setCurrentImplementation(impl);
       setCurrentRegistry(reg);
       setCurrentUSDCToken(token);
       setCurrentReviewWindow(win.toString());
       setCurrentMutualCancelWindow(cancelWin.toString());
+      setCurrentTeeArbiter(arbiter);
+      setCurrentPlatformFeeBps(feeBps.toString());
+      setCurrentTreasury(treasuryAddr);
       
       // Seed inputs
       setNewImplementationInput(impl);
@@ -398,6 +391,9 @@ function App() {
       setNewUSDCTokenInput(token);
       setNewReviewWindowInput(win.toString());
       setNewMutualCancelWindowInput(cancelWin.toString());
+      setNewTeeArbiterInput(arbiter);
+      setNewPlatformFeeBpsInput(feeBps.toString());
+      setNewTreasuryInput(treasuryAddr);
     } catch (err) {
       console.warn("Could not load factory params from contract:", err);
       // Fallback
@@ -410,21 +406,17 @@ function App() {
   }, [walletAddress, factoryAddress, cUSDCAddress, getWeb3Signer]);
 
   const loadOnChainContracts = useCallback(async () => {
+    if (!walletAddress) return;
+    
     setIsFetchingContracts(true);
     setErrorMessage(null);
-
-    if (isLocalDemoWallet(walletAddress)) {
-      setContractsList(LOCAL_DEMO_ESCROWS);
-      setIsFetchingContracts(false);
-      return;
-    }
 
     try {
       const signer = await getWeb3Signer();
       const escrows = await fetchUserEscrows(
         signer,
         factoryAddress,
-        walletAddress!,
+        walletAddress,
         gatewayUrl,
         {
           pinataJWT,
@@ -434,7 +426,7 @@ function App() {
       );
       setContractsList(escrows);
     } catch (err: any) {
-      console.error("Failed to load live on-chain contracts from Sepolia:", err);
+      console.error("Failed to load live on-chain contracts:", err);
       setContractsList([]);
       setErrorMessage(err.message || "Failed to retrieve live contracts from the blockchain network.");
     } finally {
@@ -546,6 +538,63 @@ function App() {
     }
   };
 
+  const handleUpdateTeeArbiter = async (newVal: string) => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsLoading(true);
+    try {
+      const signer = await getWeb3Signer();
+      const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
+      const tx = await factory.setCanonicalTeeArbiter(newVal);
+      setSuccessMessage("Transaction submitted. Waiting for confirmation...");
+      await tx.wait();
+      setSuccessMessage("✔️ Canonical TEE Arbiter updated on-chain successfully!");
+      await loadFactoryParams();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to update canonical TEE arbiter.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdatePlatformFeeBps = async (newVal: string) => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsLoading(true);
+    try {
+      const signer = await getWeb3Signer();
+      const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
+      const tx = await factory.setPlatformFeeBps(BigInt(newVal));
+      setSuccessMessage("Transaction submitted. Waiting for confirmation...");
+      await tx.wait();
+      setSuccessMessage("✔️ Platform Fee updated on-chain successfully!");
+      await loadFactoryParams();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to update platform fee.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateTreasury = async (newVal: string) => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsLoading(true);
+    try {
+      const signer = await getWeb3Signer();
+      const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
+      const tx = await factory.setTreasury(newVal);
+      setSuccessMessage("Transaction submitted. Waiting for confirmation...");
+      await tx.wait();
+      setSuccessMessage("✔️ Protocol Treasury updated on-chain successfully!");
+      await loadFactoryParams();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to update treasury address.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // --- Escrow Lifecycle Transactions ---
   const handleDeployEscrow = async () => {
     if (!walletAddress) return;
@@ -578,7 +627,6 @@ function App() {
         signer,
         factoryAddress,
         draftFreelancer,
-        teeArbiterAddress,
         draftTotalMilestones
       );
 
@@ -771,7 +819,6 @@ function App() {
 
   const completedContracts = contractsList.filter(c => c.status === 'COMPLETED').length;
   const disputedContracts = contractsList.filter(c => c.status === 'DISPUTED').length;
-  const totalContracts = contractsList.length;
 
   const activeEscrows = contractsList.filter(c => {
     if (viewMode === 'client') return c.role === 'CLIENT';
@@ -874,6 +921,9 @@ function App() {
                       currentUSDCToken={currentUSDCToken}
                       currentReviewWindow={currentReviewWindow}
                       currentMutualCancelWindow={currentMutualCancelWindow}
+                      currentTeeArbiter={currentTeeArbiter}
+                      currentPlatformFeeBps={currentPlatformFeeBps}
+                      currentTreasury={currentTreasury}
                       newImplementationInput={newImplementationInput}
                       setNewImplementationInput={setNewImplementationInput}
                       newRegistryInput={newRegistryInput}
@@ -884,12 +934,21 @@ function App() {
                       setNewReviewWindowInput={setNewReviewWindowInput}
                       newMutualCancelWindowInput={newMutualCancelWindowInput}
                       setNewMutualCancelWindowInput={setNewMutualCancelWindowInput}
+                      newTeeArbiterInput={newTeeArbiterInput}
+                      setNewTeeArbiterInput={setNewTeeArbiterInput}
+                      newPlatformFeeBpsInput={newPlatformFeeBpsInput}
+                      setNewPlatformFeeBpsInput={setNewPlatformFeeBpsInput}
+                      newTreasuryInput={newTreasuryInput}
+                      setNewTreasuryInput={setNewTreasuryInput}
                       isLoading={isLoading}
                       handleUpdateImplementation={handleUpdateImplementation}
                       handleUpdateRegistry={handleUpdateRegistry}
                       handleUpdateUSDCToken={handleUpdateUSDCToken}
                       handleUpdateReviewWindow={handleUpdateReviewWindow}
                       handleUpdateMutualCancelWindow={handleUpdateMutualCancelWindow}
+                      handleUpdateTeeArbiter={handleUpdateTeeArbiter}
+                      handleUpdatePlatformFeeBps={handleUpdatePlatformFeeBps}
+                      handleUpdateTreasury={handleUpdateTreasury}
                       onClose={() => setShowSettings(false)}
                     />
                   </div>
@@ -958,9 +1017,12 @@ function App() {
               {/* Right Global Telemetry Widgets area (4 columns) */}
               <div className="lg:col-span-4 flex flex-col gap-6 w-full">
                 <ReputationGauge 
+                  signer={signer}
+                  reputationRegistryAddress={currentRegistry}
+                  walletAddress={walletAddress}
+                  gatewayUrl={gatewayUrl}
                   completedCount={completedContracts}
                   disputedCount={disputedContracts}
-                  totalCount={totalContracts}
                 />
                 <EventLog />
               </div>

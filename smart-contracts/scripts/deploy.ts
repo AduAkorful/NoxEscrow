@@ -61,10 +61,15 @@ async function main() {
 
   // 4. Deploy Factory Proxy (Proxied via NoxProxy for UUPS-upgradeability)
   console.log("\n🔄 Orchestrating Factory Proxy deployment...");
+  const teeArbiterAddress = process.env.TEE_ARBITER || "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
+  const treasuryAddress = deployer.address;
+
   const factoryInitData = factoryImpl.interface.encodeFunctionData("initialize", [
     escrowImplAddress,
     hardhatEthers.ZeroAddress, // Link Reputation registry after its proxy is active
-    cUSDCAddress
+    cUSDCAddress,
+    teeArbiterAddress,
+    treasuryAddress
   ]);
   const factoryProxy = await hardhatEthers.deployContract("NoxProxy", [
     factoryImplAddress,

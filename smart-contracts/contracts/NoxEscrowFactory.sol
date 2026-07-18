@@ -25,7 +25,10 @@ contract NoxEscrowFactory is
     address public reputationRegistry;
     uint256 public reviewWindow;
     uint256 public mutualCancelWindow;
-    address public cUSDCToken; // Canonical ERC-7984 Token
+    address public cUSDCToken;
+    address public canonicalTeeArbiter;
+    uint256 public platformFeeBps;
+    address public treasury;
 
     mapping(address => bool) public isEscrowContract;
     address[] public allEscrows;
@@ -37,59 +40,50 @@ contract NoxEscrowFactory is
         _disableInitializers();
     }
 
-    /**
-     * @notice Initializes the global factory parameters.
-     * @param _escrowImplementation Cloned escrow agreement base template address.
-     * @param _reputationRegistry Global reputation score keeper address.
-     * @param _cUSDCToken Address of the canonical ERC-7984 confidential wrapping token.
-     */
     function initialize(
         address _escrowImplementation,
         address _reputationRegistry,
-        address _cUSDCToken
+        address _cUSDCToken,
+        address _canonicalTeeArbiter,
+        address _treasury
     ) external override initializer {
         if (_escrowImplementation == address(0)) revert InvalidImplementation();
-        // Allow reputation registry to be address(0) initially to break the circular dependency at deploy time
+        if (_canonicalTeeArbiter == address(0)) revert InvalidArbiter();
+        if (_treasury == address(0)) revert InvalidTreasury();
 
         __Ownable_init(msg.sender);
 
         escrowImplementation = _escrowImplementation;
         reputationRegistry = _reputationRegistry;
         cUSDCToken = _cUSDCToken;
+        canonicalTeeArbiter = _canonicalTeeArbiter;
+        treasury = _treasury;
+        platformFeeBps = 50; // Default 0.5% (50 basis points)
         reviewWindow = 3 days;
         mutualCancelWindow = 7 days;
     }
 
     // ============ External Functions ============
 
-    /**
-     * @notice Deploys a new lightweight clone of the escrow agreement and initializes its state.
-     * @dev Uses factory's internal canonical cUSDCToken address, resolving the token exploit permanently.
-     * @param _freelancer Address of the hired contractor.
-     * @param _teeArbiter Address of the secure TEE AI oracle.
-     * @param _totalMilestones Number of sequential milestones in the agreement.
-     * @param _customReviewWindow Custom review window duration (0 to fall back to global default).
-     * @return The address of the newly deployed cloned contract.
-     */
     function createEscrow(
         address _freelancer,
-        address _teeArbiter,
         uint256 _totalMilestones,
         uint256 _customReviewWindow
     ) external override returns (address) {
         if (reputationRegistry == address(0)) revert InvalidRegistry();
         if (cUSDCToken == address(0)) revert InvalidToken();
+        if (canonicalTeeArbiter == address(0)) revert InvalidArbiter();
+        if (treasury == address(0)) revert InvalidTreasury();
 
         address clone = Clones.clone(escrowImplementation);
 
-        // Resolve custom review window, fallback to factory's default if 0 is passed
         uint256 finalReviewWindow = _customReviewWindow == 0 ? reviewWindow : _customReviewWindow;
         if (finalReviewWindow < 5 seconds || finalReviewWindow > 90 days) revert InvalidWindow();
 
         NoxEscrowContract(clone).initialize(
-            msg.sender, // client
+            msg.sender,
             _freelancer,
-            _teeArbiter,
+            canonicalTeeArbiter,
             cUSDCToken,
             reputationRegistry,
             _totalMilestones,
@@ -105,20 +99,12 @@ contract NoxEscrowFactory is
         return clone;
     }
 
-    /**
-     * @notice Fetch the total number of deployed escrow contracts.
-     * @return The total escrow count.
-     */
     function escrowsCount() external view override returns (uint256) {
         return allEscrows.length;
     }
 
     // ============ Configuration Functions (Only Owner) ============
 
-    /**
-     * @notice Update the template escrow implementation used for cloning.
-     * @param _newImplementation The new implementation address.
-     */
     function setEscrowImplementation(
         address _newImplementation
     ) external override onlyOwner {
@@ -128,10 +114,6 @@ contract NoxEscrowFactory is
         emit ImplementationUpdated(oldImpl, _newImplementation);
     }
 
-    /**
-     * @notice Update the global reputation registry address.
-     * @param _newRegistry The new reputation registry address.
-     */
     function setReputationRegistry(
         address _newRegistry
     ) external override onlyOwner {
@@ -141,10 +123,6 @@ contract NoxEscrowFactory is
         emit ReputationRegistryUpdated(oldRegistry, _newRegistry);
     }
 
-    /**
-     * @notice Update the global default review window.
-     * @param _newReviewWindow The new review window duration in seconds.
-     */
     function setReviewWindow(
         uint256 _newReviewWindow
     ) external override onlyOwner {
@@ -154,10 +132,6 @@ contract NoxEscrowFactory is
         emit ReviewWindowUpdated(oldWindow, _newReviewWindow);
     }
 
-    /**
-     * @notice Update the global default mutual cancellation window.
-     * @param _newMutualCancelWindow The new mutual cancellation window duration in seconds.
-     */
     function setMutualCancelWindow(
         uint256 _newMutualCancelWindow
     ) external override onlyOwner {
@@ -167,10 +141,6 @@ contract NoxEscrowFactory is
         emit MutualCancelWindowUpdated(oldWindow, _newMutualCancelWindow);
     }
 
-    /**
-     * @notice Update the canonical cUSDCToken address.
-     * @param _newToken The new token address.
-     */
     function setUSDCToken(
         address _newToken
     ) external override onlyOwner {
@@ -180,9 +150,34 @@ contract NoxEscrowFactory is
         emit TokenUpdated(oldToken, _newToken);
     }
 
-    // Required by UUPS
+    function setCanonicalTeeArbiter(
+        address _newArbiter
+    ) external override onlyOwner {
+        if (_newArbiter == address(0)) revert InvalidArbiter();
+        address oldArbiter = canonicalTeeArbiter;
+        canonicalTeeArbiter = _newArbiter;
+        emit CanonicalArbiterUpdated(oldArbiter, _newArbiter);
+    }
+
+    function setPlatformFeeBps(
+        uint256 _newFeeBps
+    ) external override onlyOwner {
+        if (_newFeeBps > 1000) revert InvalidFeeBps(); // Max 10%
+        uint256 oldFeeBps = platformFeeBps;
+        platformFeeBps = _newFeeBps;
+        emit PlatformFeeUpdated(oldFeeBps, _newFeeBps);
+    }
+
+    function setTreasury(
+        address _newTreasury
+    ) external override onlyOwner {
+        if (_newTreasury == address(0)) revert InvalidTreasury();
+        address oldTreasury = treasury;
+        treasury = _newTreasury;
+        emit TreasuryUpdated(oldTreasury, _newTreasury);
+    }
+
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    // ============ UUPS Upgrade Storage Gap ============
     uint256[50] private __gap;
 }

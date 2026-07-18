@@ -99,7 +99,9 @@ describe("NoxEscrow Full-Stack E2E Integration", function () {
     const factoryInitData = factoryImpl.interface.encodeFunctionData("initialize", [
       escrowImplAddress,
       hardhatEthers.ZeroAddress,
-      cUSDCAddress
+      cUSDCAddress,
+      teeArbiter.address,
+      client.address // use client as treasury for test
     ]);
     const factoryProxy = await hardhatEthers.deployContract("NoxProxy", [
       factoryImplAddress,
@@ -135,7 +137,6 @@ describe("NoxEscrow Full-Stack E2E Integration", function () {
     // 2. Create Escrow Agreement Clone
     const createTx = await factory.connect(client).createEscrow(
       freelancer.address,
-      teeArbiter.address,
       1n, // 1 milestone project
       0n
     );

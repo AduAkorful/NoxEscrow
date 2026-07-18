@@ -6,21 +6,31 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   
 
   export interface INoxEscrowContractInterface extends Interface {
-    getFunction(nameOrSignature: "initialize" | "initializeEscrow" | "mutualCancel" | "raiseDispute" | "releaseMilestone" | "resolveDispute" | "submitDeliverable"): FunctionFragment;
+    getFunction(nameOrSignature: "DISPUTE_TIMEOUT" | "disputeOpenTime" | "emergencyResolveDispute" | "initialize" | "initializeEscrow" | "mutualCancel" | "platformFeeBps" | "protocolTreasury" | "raiseDispute" | "releaseMilestone" | "resolveDispute" | "submitDeliverable"): FunctionFragment;
 
-    getEvent(nameOrSignatureOrTopic: "ContractInitialized" | "DeliverableSubmitted" | "DisputeOpened" | "DisputeResolved" | "MilestoneApproved" | "MutualCancellationExecuted"): EventFragment;
+    getEvent(nameOrSignatureOrTopic: "ContractInitialized" | "DeliverableSubmitted" | "DisputeOpened" | "DisputeResolved" | "EmergencyResolveTriggered" | "MilestoneApproved" | "MutualCancellationExecuted" | "PlatformFeeCollected"): EventFragment;
 
-    encodeFunctionData(functionFragment: 'initialize', values: [AddressLike, AddressLike, AddressLike, AddressLike, AddressLike, BigNumberish, BigNumberish, BigNumberish]): string;
+    encodeFunctionData(functionFragment: 'DISPUTE_TIMEOUT', values?: undefined): string;
+encodeFunctionData(functionFragment: 'disputeOpenTime', values?: undefined): string;
+encodeFunctionData(functionFragment: 'emergencyResolveDispute', values?: undefined): string;
+encodeFunctionData(functionFragment: 'initialize', values: [AddressLike, AddressLike, AddressLike, AddressLike, AddressLike, BigNumberish, BigNumberish, BigNumberish]): string;
 encodeFunctionData(functionFragment: 'initializeEscrow', values: [BytesLike[], BytesLike[], BytesLike[], BytesLike[]]): string;
 encodeFunctionData(functionFragment: 'mutualCancel', values?: undefined): string;
+encodeFunctionData(functionFragment: 'platformFeeBps', values?: undefined): string;
+encodeFunctionData(functionFragment: 'protocolTreasury', values?: undefined): string;
 encodeFunctionData(functionFragment: 'raiseDispute', values?: undefined): string;
 encodeFunctionData(functionFragment: 'releaseMilestone', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'resolveDispute', values: [boolean]): string;
 encodeFunctionData(functionFragment: 'submitDeliverable', values: [BytesLike, BytesLike]): string;
 
-    decodeFunctionResult(functionFragment: 'initialize', data: BytesLike): Result;
+    decodeFunctionResult(functionFragment: 'DISPUTE_TIMEOUT', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'disputeOpenTime', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'emergencyResolveDispute', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'initialize', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'initializeEscrow', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'mutualCancel', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'platformFeeBps', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'protocolTreasury', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'raiseDispute', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'releaseMilestone', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'resolveDispute', data: BytesLike): Result;
@@ -76,6 +86,18 @@ decodeFunctionResult(functionFragment: 'submitDeliverable', data: BytesLike): Re
 
   
 
+    export namespace EmergencyResolveTriggeredEvent {
+      export type InputTuple = [triggeredBy: AddressLike];
+      export type OutputTuple = [triggeredBy: string];
+      export interface OutputObject {triggeredBy: string };
+      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
+      export type Filter = TypedDeferredTopicFilter<Event>
+      export type Log = TypedEventLog<Event>
+      export type LogDescription = TypedLogDescription<Event>
+    }
+
+  
+
     export namespace MilestoneApprovedEvent {
       export type InputTuple = [milestoneIndex: BigNumberish];
       export type OutputTuple = [milestoneIndex: bigint];
@@ -92,6 +114,18 @@ decodeFunctionResult(functionFragment: 'submitDeliverable', data: BytesLike): Re
       export type InputTuple = [];
       export type OutputTuple = [];
       export interface OutputObject {};
+      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
+      export type Filter = TypedDeferredTopicFilter<Event>
+      export type Log = TypedEventLog<Event>
+      export type LogDescription = TypedLogDescription<Event>
+    }
+
+  
+
+    export namespace PlatformFeeCollectedEvent {
+      export type InputTuple = [milestoneIndex: BigNumberish, feeAmount: BytesLike];
+      export type OutputTuple = [milestoneIndex: bigint, feeAmount: string];
+      export interface OutputObject {milestoneIndex: bigint, feeAmount: string };
       export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
       export type Filter = TypedDeferredTopicFilter<Event>
       export type Log = TypedEventLog<Event>
@@ -134,6 +168,30 @@ decodeFunctionResult(functionFragment: 'submitDeliverable', data: BytesLike): Re
 
     
     
+    DISPUTE_TIMEOUT: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
+    
+    disputeOpenTime: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
+    
+    emergencyResolveDispute: TypedContractMethod<
+      [],
+      [void],
+      'nonpayable'
+    >
+    
+
+    
     initialize: TypedContractMethod<
       [_client: AddressLike, _freelancer: AddressLike, _teeArbiter: AddressLike, _cUSDC: AddressLike, _reputationRegistry: AddressLike, _totalMilestones: BigNumberish, _reviewWindow: BigNumberish, _mutualCancelWindow: BigNumberish, ],
       [void],
@@ -154,6 +212,22 @@ decodeFunctionResult(functionFragment: 'submitDeliverable', data: BytesLike): Re
       [],
       [void],
       'nonpayable'
+    >
+    
+
+    
+    platformFeeBps: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
+    
+    protocolTreasury: TypedContractMethod<
+      [],
+      [string],
+      'view'
     >
     
 
@@ -192,7 +266,22 @@ decodeFunctionResult(functionFragment: 'submitDeliverable', data: BytesLike): Re
 
     getFunction<T extends ContractMethod = ContractMethod>(key: string | FunctionFragment): T;
 
-    getFunction(nameOrSignature: 'initialize'): TypedContractMethod<
+    getFunction(nameOrSignature: 'DISPUTE_TIMEOUT'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
+getFunction(nameOrSignature: 'disputeOpenTime'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
+getFunction(nameOrSignature: 'emergencyResolveDispute'): TypedContractMethod<
+      [],
+      [void],
+      'nonpayable'
+    >;
+getFunction(nameOrSignature: 'initialize'): TypedContractMethod<
       [_client: AddressLike, _freelancer: AddressLike, _teeArbiter: AddressLike, _cUSDC: AddressLike, _reputationRegistry: AddressLike, _totalMilestones: BigNumberish, _reviewWindow: BigNumberish, _mutualCancelWindow: BigNumberish, ],
       [void],
       'nonpayable'
@@ -206,6 +295,16 @@ getFunction(nameOrSignature: 'mutualCancel'): TypedContractMethod<
       [],
       [void],
       'nonpayable'
+    >;
+getFunction(nameOrSignature: 'platformFeeBps'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
+getFunction(nameOrSignature: 'protocolTreasury'): TypedContractMethod<
+      [],
+      [string],
+      'view'
     >;
 getFunction(nameOrSignature: 'raiseDispute'): TypedContractMethod<
       [],
@@ -232,8 +331,10 @@ getFunction(nameOrSignature: 'submitDeliverable'): TypedContractMethod<
 getEvent(key: 'DeliverableSubmitted'): TypedContractEvent<DeliverableSubmittedEvent.InputTuple, DeliverableSubmittedEvent.OutputTuple, DeliverableSubmittedEvent.OutputObject>;
 getEvent(key: 'DisputeOpened'): TypedContractEvent<DisputeOpenedEvent.InputTuple, DisputeOpenedEvent.OutputTuple, DisputeOpenedEvent.OutputObject>;
 getEvent(key: 'DisputeResolved'): TypedContractEvent<DisputeResolvedEvent.InputTuple, DisputeResolvedEvent.OutputTuple, DisputeResolvedEvent.OutputObject>;
+getEvent(key: 'EmergencyResolveTriggered'): TypedContractEvent<EmergencyResolveTriggeredEvent.InputTuple, EmergencyResolveTriggeredEvent.OutputTuple, EmergencyResolveTriggeredEvent.OutputObject>;
 getEvent(key: 'MilestoneApproved'): TypedContractEvent<MilestoneApprovedEvent.InputTuple, MilestoneApprovedEvent.OutputTuple, MilestoneApprovedEvent.OutputObject>;
 getEvent(key: 'MutualCancellationExecuted'): TypedContractEvent<MutualCancellationExecutedEvent.InputTuple, MutualCancellationExecutedEvent.OutputTuple, MutualCancellationExecutedEvent.OutputObject>;
+getEvent(key: 'PlatformFeeCollected'): TypedContractEvent<PlatformFeeCollectedEvent.InputTuple, PlatformFeeCollectedEvent.OutputTuple, PlatformFeeCollectedEvent.OutputObject>;
 
     filters: {
       
@@ -253,12 +354,20 @@ getEvent(key: 'MutualCancellationExecuted'): TypedContractEvent<MutualCancellati
       DisputeResolved: TypedContractEvent<DisputeResolvedEvent.InputTuple, DisputeResolvedEvent.OutputTuple, DisputeResolvedEvent.OutputObject>;
     
 
+      'EmergencyResolveTriggered(address)': TypedContractEvent<EmergencyResolveTriggeredEvent.InputTuple, EmergencyResolveTriggeredEvent.OutputTuple, EmergencyResolveTriggeredEvent.OutputObject>;
+      EmergencyResolveTriggered: TypedContractEvent<EmergencyResolveTriggeredEvent.InputTuple, EmergencyResolveTriggeredEvent.OutputTuple, EmergencyResolveTriggeredEvent.OutputObject>;
+    
+
       'MilestoneApproved(uint256)': TypedContractEvent<MilestoneApprovedEvent.InputTuple, MilestoneApprovedEvent.OutputTuple, MilestoneApprovedEvent.OutputObject>;
       MilestoneApproved: TypedContractEvent<MilestoneApprovedEvent.InputTuple, MilestoneApprovedEvent.OutputTuple, MilestoneApprovedEvent.OutputObject>;
     
 
       'MutualCancellationExecuted()': TypedContractEvent<MutualCancellationExecutedEvent.InputTuple, MutualCancellationExecutedEvent.OutputTuple, MutualCancellationExecutedEvent.OutputObject>;
       MutualCancellationExecuted: TypedContractEvent<MutualCancellationExecutedEvent.InputTuple, MutualCancellationExecutedEvent.OutputTuple, MutualCancellationExecutedEvent.OutputObject>;
+    
+
+      'PlatformFeeCollected(uint256,bytes32)': TypedContractEvent<PlatformFeeCollectedEvent.InputTuple, PlatformFeeCollectedEvent.OutputTuple, PlatformFeeCollectedEvent.OutputObject>;
+      PlatformFeeCollected: TypedContractEvent<PlatformFeeCollectedEvent.InputTuple, PlatformFeeCollectedEvent.OutputTuple, PlatformFeeCollectedEvent.OutputObject>;
     
     };
   }

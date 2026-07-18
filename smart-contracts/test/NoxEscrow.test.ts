@@ -103,7 +103,9 @@ describe("NoxEscrow Core Protocol Suite", function () {
       const factoryInitData = factoryImpl.interface.encodeFunctionData("initialize", [
         escrowImplAddress,
         hardhatEthers.ZeroAddress, // Linked afterwards
-        cUSDCAddress
+        cUSDCAddress,
+        teeArbiter.address,
+        client.address
       ]);
       const factoryProxy = await hardhatEthers.deployContract("NoxProxy", [
         factoryImplAddress,
@@ -163,21 +165,10 @@ describe("NoxEscrow Core Protocol Suite", function () {
         )
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidFreelancer");
 
-      // Zero TEE arbiter
-      await expect(
-        factory.connect(client).createEscrow(
-          freelancer.address,
-          hardhatEthers.ZeroAddress,
-          1n,
-          0n
-        )
-      ).to.be.revertedWithCustomError(escrowImpl, "InvalidArbiter");
-
       // Zero total milestones
       await expect(
         factory.connect(client).createEscrow(
           freelancer.address,
-          teeArbiter.address,
           0n,
           0n
         )
@@ -187,7 +178,6 @@ describe("NoxEscrow Core Protocol Suite", function () {
     it("should prevent duplicate initialization on the same escrow contract", async function () {
       const createTx = await factory.connect(client).createEscrow(
         freelancer.address,
-        teeArbiter.address,
         1n,
         0n
       );
@@ -221,7 +211,6 @@ describe("NoxEscrow Core Protocol Suite", function () {
     it("should enforce correct array lengths in initializeEscrow", async function () {
       const createTx = await factory.connect(client).createEscrow(
         freelancer.address,
-        teeArbiter.address,
         2n, // expects 2 milestones
         0n
       );
@@ -246,7 +235,6 @@ describe("NoxEscrow Core Protocol Suite", function () {
     it("should prevent non-client from initializing the escrow details", async function () {
       const createTx = await factory.connect(client).createEscrow(
         freelancer.address,
-        teeArbiter.address,
         1n,
         0n
       );
@@ -271,7 +259,6 @@ describe("NoxEscrow Core Protocol Suite", function () {
     it("should restrict deliverable submissions strictly to the designated freelancer", async function () {
       const createTx = await factory.connect(client).createEscrow(
         freelancer.address,
-        teeArbiter.address,
         1n,
         0n
       );
@@ -301,7 +288,6 @@ describe("NoxEscrow Core Protocol Suite", function () {
     it("should prevent submitting deliverable twice for the same milestone", async function () {
       const createTx = await factory.connect(client).createEscrow(
         freelancer.address,
-        teeArbiter.address,
         1n,
         0n
       );
@@ -330,7 +316,6 @@ describe("NoxEscrow Core Protocol Suite", function () {
     it("should prevent client from releasing with invalid ratings", async function () {
       const createTx = await factory.connect(client).createEscrow(
         freelancer.address,
-        teeArbiter.address,
         1n,
         0n
       );
@@ -361,7 +346,6 @@ describe("NoxEscrow Core Protocol Suite", function () {
     it("should prevent freelancer from claiming milestone before review window has passed", async function () {
       const createTx = await factory.connect(client).createEscrow(
         freelancer.address,
-        teeArbiter.address,
         1n,
         0n
       );
@@ -387,7 +371,6 @@ describe("NoxEscrow Core Protocol Suite", function () {
     it("should prevent raising dispute after the review window has expired", async function () {
       const createTx = await factory.connect(client).createEscrow(
         freelancer.address,
-        teeArbiter.address,
         1n,
         0n
       );
@@ -417,7 +400,6 @@ describe("NoxEscrow Core Protocol Suite", function () {
     it("should enforce that only the designated TEE Arbiter address can resolve a dispute", async function () {
       const createTx = await factory.connect(client).createEscrow(
         freelancer.address,
-        teeArbiter.address,
         1n,
         0n
       );
@@ -460,7 +442,6 @@ describe("NoxEscrow Core Protocol Suite", function () {
     it("should allow a client to raise a dispute even if the freelancer is inactive (Ghosting/MIA)", async function () {
       const createTx = await factory.connect(client).createEscrow(
         freelancer.address,
-        teeArbiter.address,
         1n,
         0n
       );
@@ -491,7 +472,6 @@ describe("NoxEscrow Core Protocol Suite", function () {
     it("should allow mutual cancellation of active escrow by both parties", async function () {
       const createTx = await factory.connect(client).createEscrow(
         freelancer.address,
-        teeArbiter.address,
         1n,
         0n
       );
@@ -521,7 +501,6 @@ describe("NoxEscrow Core Protocol Suite", function () {
 
       const createTx = await factory.connect(client).createEscrow(
         freelancer.address,
-        teeArbiter.address,
         1n,
         0n
       );
@@ -574,7 +553,6 @@ describe("NoxEscrow Core Protocol Suite", function () {
       const totalMilestones = 5n;
       const createTx = await factory.connect(client).createEscrow(
         freelancer.address,
-        teeArbiter.address,
         totalMilestones,
         0n
       );
@@ -664,7 +642,6 @@ describe("NoxEscrow Core Protocol Suite", function () {
       const totalMilestones = 3n;
       const createTx = await factory.connect(client).createEscrow(
         freelancer.address,
-        teeArbiter.address,
         totalMilestones,
         0n
       );

@@ -273,19 +273,18 @@ export async function fetchUserEscrows(
 
 /**
  * Deploys a new lightweight clone of the escrow contract via the factory.
+ * The TEE arbiter is automatically set to the canonical arbiter configured in the factory.
  */
 export async function deployEscrowClone(
   signer: ethers.JsonRpcSigner,
   factoryAddress: string,
   freelancerAddress: string,
-  teeArbiterAddress: string,
   totalMilestones: number,
   reviewWindowSeconds: number = 0
 ): Promise<string> {
   const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
   const tx = await factory.createEscrow(
     freelancerAddress,
-    teeArbiterAddress,
     BigInt(totalMilestones),
     BigInt(reviewWindowSeconds)
   );
@@ -678,4 +677,124 @@ export async function getConfidentialUSDCBalance(
 
   const decrypted = await handleClient.decrypt(balanceHandle);
   return BigInt(decrypted.value);
+}
+
+/**
+ * Fetches and decrypts the freelancer's on-chain reputation score from the registry.
+ * Returns null if the reputation registry is not configured or decryption fails.
+ */
+export async function getOnChainReputation(
+  signer: ethers.JsonRpcSigner,
+  reputationRegistryAddress: string,
+  freelancerAddress: string,
+  gatewayUrl: string = DEFAULT_NOX_GATEWAY
+): Promise<bigint | null> {
+  if (!reputationRegistryAddress || reputationRegistryAddress === ethers.ZeroAddress) {
+    console.warn("Reputation registry not configured");
+    return null;
+  }
+
+  try {
+    const reputationABI = [
+      "function getReputation(address freelancer) view returns (bytes32)"
+    ];
+    const reputation = new ethers.Contract(reputationRegistryAddress, reputationABI, signer);
+    
+    const repHandle = await reputation.getReputation(freelancerAddress);
+    
+    if (repHandle === "0x0000000000000000000000000000000000000000000000000000000000000000" || !repHandle) {
+      return null;
+    }
+
+    const handleClient = await createEthersHandleClient(signer as any, {
+      smartContractAddress: NOX_CONTRACT_MANAGER,
+      gatewayUrl: gatewayUrl as any,
+      subgraphUrl: NOX_SUBGRAPH_URL,
+    });
+
+    const decrypted = await handleClient.decrypt(repHandle);
+    return BigInt(decrypted.value);
+  } catch (err) {
+    console.warn("Failed to fetch on-chain reputation:", err);
+    return null;
+  }
+}
+
+/**
+ * Fetches factory configuration including fee and treasury settings.
+ */
+export async function getFactoryConfig(
+  signer: ethers.JsonRpcSigner,
+  factoryAddress: string
+): Promise<{
+  canonicalTeeArbiter: string;
+  platformFeeBps: bigint;
+  treasury: string;
+  cUSDCToken: string;
+  reviewWindow: bigint;
+  mutualCancelWindow: bigint;
+}> {
+  const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
+  
+  const [canonicalTeeArbiter, platformFeeBps, treasury, cUSDCToken, reviewWindow, mutualCancelWindow] = 
+    await Promise.all([
+      factory.canonicalTeeArbiter(),
+      factory.platformFeeBps(),
+      factory.treasury(),
+      factory.cUSDCToken(),
+      factory.reviewWindow(),
+      factory.mutualCancelWindow()
+    ]);
+
+  return {
+    canonicalTeeArbiter,
+    platformFeeBps,
+    treasury,
+    cUSDCToken,
+    reviewWindow,
+    mutualCancelWindow
+  };
+}
+
+/**
+ * Updates factory configuration (admin only).
+ */
+export async function updateFactoryConfig(
+  signer: ethers.JsonRpcSigner,
+  factoryAddress: string,
+  config: {
+    canonicalTeeArbiter?: string;
+    platformFeeBps?: bigint;
+    treasury?: string;
+    cUSDCToken?: string;
+    reviewWindow?: bigint;
+    mutualCancelWindow?: bigint;
+  }
+): Promise<void> {
+  const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
+  
+  if (config.canonicalTeeArbiter) {
+    const tx = await factory.setCanonicalTeeArbiter(config.canonicalTeeArbiter);
+    await tx.wait();
+  }
+  if (config.platformFeeBps !== undefined) {
+    const tx = await factory.setPlatformFeeBps(config.platformFeeBps);
+    await tx.wait();
+  }
+  if (config.treasury) {
+    const tx = await factory.setTreasury(config.treasury);
+    await tx.wait();
+  }
+  if (config.cUSDCToken) {
+    const tx = await factory.setUSDCToken(config.cUSDCToken);
+    await tx.wait();
+  }
+  if (config.reviewWindow !== undefined) {
+    const tx = await factory.setReviewWindow(config.reviewWindow);
+    await tx.wait();
+  }
+  if (config.mutualCancelWindow !== undefined) {
+    const tx = await factory.setMutualCancelWindow(config.mutualCancelWindow);
+    await tx.wait();
+  }
 }

@@ -18,6 +18,11 @@
   },
   {
     "inputs": [],
+    "name": "DisputeTimeoutNotExpired",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidArbiter",
     "type": "error"
   },
@@ -58,12 +63,22 @@
   },
   {
     "inputs": [],
+    "name": "InvalidTreasury",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "LengthMismatch",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "MutualCancellationNotRequested",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ReentrancyGuardReentrantCall",
     "type": "error"
   },
   {
@@ -174,6 +189,19 @@
     "inputs": [
       {
         "indexed": true,
+        "internalType": "address",
+        "name": "triggeredBy",
+        "type": "address"
+      }
+    ],
+    "name": "EmergencyResolveTriggered",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
         "internalType": "uint256",
         "name": "milestoneIndex",
         "type": "uint256"
@@ -187,6 +215,58 @@
     "inputs": [],
     "name": "MutualCancellationExecuted",
     "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "milestoneIndex",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "euint256",
+        "name": "feeAmount",
+        "type": "bytes32"
+      }
+    ],
+    "name": "PlatformFeeCollected",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "DISPUTE_TIMEOUT",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "disputeOpenTime",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "emergencyResolveDispute",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
     "inputs": [
@@ -269,6 +349,32 @@
     "name": "mutualCancel",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "platformFeeBps",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "protocolTreasury",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {

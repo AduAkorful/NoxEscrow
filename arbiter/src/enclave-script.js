@@ -312,22 +312,48 @@ ${freelancerStatement}
       console.log("📥 Response received from Gemini:");
       console.log(responseText);
 
-      const responseJson = JSON.parse(responseText.trim());
-      adjudicationVerdict = responseJson.verdict;
-      adjudicationReasoning = responseJson.reasoning;
-      evaluationScore = responseJson.score;
+      try {
+        const responseJson = JSON.parse(responseText.trim());
+        
+        if (!responseJson.verdict || !["PAY_FREELANCER", "REFUND_CLIENT"].includes(responseJson.verdict)) {
+          throw new Error(`Invalid verdict returned by LLM: ${responseJson.verdict}`);
+        }
+        
+        if (typeof responseJson.score !== "number" || responseJson.score < 0 || responseJson.score > 100) {
+          console.warn("⚠️ Score outside bounds [0-100]. Resetting to 0.");
+          responseJson.score = 0;
+        }
 
-      console.log(`\n⚖️ Verdict: ${adjudicationVerdict} (Score: ${evaluationScore}/100)`);
-      console.log(`⚖️ Reasoning: "${adjudicationReasoning}"\n`);
+        if (!responseJson.reasoning || typeof responseJson.reasoning !== "string") {
+          responseJson.reasoning = "No reasoning provided by AI arbiter.";
+        }
+
+        adjudicationVerdict = responseJson.verdict;
+        adjudicationReasoning = responseJson.reasoning;
+        evaluationScore = Math.max(0, Math.min(100, Math.floor(responseJson.score)));
+
+        console.log(`\n⚖️ Validated Verdict: ${adjudicationVerdict} (Score: ${evaluationScore}/100)`);
+        console.log(`⚖️ Reasoning: "${adjudicationReasoning}"\n`);
+      } catch (parseError) {
+        console.error("❌ Invalid JSON or malformed format returned by Gemini:", parseError.message);
+        console.log("⚠️ Reverting to safe fallback: REFUND_CLIENT to protect client capital.");
+        adjudicationVerdict = "REFUND_CLIENT";
+        adjudicationReasoning = "Dispute resolution automatically resolved due to malformed evaluation output.";
+        evaluationScore = 0;
+      }
     } catch (aiError) {
       console.error("❌ Failed to evaluate dispute using Gemini API:", aiError.message);
-      console.log("⚠️ Falling back to default refund action to protect client capital.");
+      console.log("⚠️ Reverting to safe fallback: REFUND_CLIENT to protect client capital.");
+      adjudicationVerdict = "REFUND_CLIENT";
+      adjudicationReasoning = "Dispute resolution failed due to AI service error.";
+      evaluationScore = 0;
     }
   } else {
-    console.log("\n⚠️ GEMINI_API_KEY is missing. AI assessment skipped.");
-    console.log("⚠️ Defaulting to mock evaluation: PAY_FREELANCER (ruled true for offline tests).");
-    adjudicationVerdict = "PAY_FREELANCER";
-    adjudicationReasoning = "Mock evaluation triggered. Offline local mode.";
+    console.log("\n⚠️ GEMINI_API_KEY is missing. Production AI assessment cannot proceed.");
+    console.log("⚠️ For safety, defaulting to REFUND_CLIENT. Disputes should use emergency resolution if no AI.");
+    adjudicationVerdict = "REFUND_CLIENT";
+    adjudicationReasoning = "AI assessment unavailable - safe fallback to protect client funds.";
+    evaluationScore = 0;
   }
 
   const ruleInFavorOfFreelancer = (adjudicationVerdict === "PAY_FREELANCER");

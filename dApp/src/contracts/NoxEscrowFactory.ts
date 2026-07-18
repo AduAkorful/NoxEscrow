@@ -84,6 +84,21 @@ export const NoxEscrowFactoryABI = [
   },
   {
     "inputs": [],
+    "name": "InvalidArbiter",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidTreasury",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidFeeBps",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "NotInitializing",
     "type": "error"
   },
@@ -297,6 +312,63 @@ export const NoxEscrowFactoryABI = [
     "type": "event"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "oldArbiter",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newArbiter",
+        "type": "address"
+      }
+    ],
+    "name": "CanonicalArbiterUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "oldFeeBps",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newFeeBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "PlatformFeeUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "oldTreasury",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newTreasury",
+        "type": "address"
+      }
+    ],
+    "name": "TreasuryUpdated",
+    "type": "event"
+  },
+  {
     "inputs": [],
     "name": "UPGRADE_INTERFACE_VERSION",
     "outputs": [
@@ -342,15 +414,49 @@ export const NoxEscrowFactoryABI = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "canonicalTeeArbiter",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "platformFeeBps",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "treasury",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
         "name": "_freelancer",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "_teeArbiter",
         "type": "address"
       },
       {
@@ -416,6 +522,16 @@ export const NoxEscrowFactoryABI = [
       {
         "internalType": "address",
         "name": "_cUSDCToken",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_canonicalTeeArbiter",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_treasury",
         "type": "address"
       }
     ],
@@ -576,6 +692,45 @@ export const NoxEscrowFactoryABI = [
       }
     ],
     "name": "setUSDCToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_newArbiter",
+        "type": "address"
+      }
+    ],
+    "name": "setCanonicalTeeArbiter",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_newFeeBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "setPlatformFeeBps",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_newTreasury",
+        "type": "address"
+      }
+    ],
+    "name": "setTreasury",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
