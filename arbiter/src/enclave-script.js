@@ -259,7 +259,16 @@ async function main() {
       const model = genAI.getGenerativeModel({
         model: "gemini-2.5-flash",
         generationConfig: {
-          responseMimeType: "application/json"
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              reasoning: { type: "STRING" },
+              score: { type: "INTEGER" },
+              verdict: { type: "STRING", enum: ["PAY_FREELANCER", "REFUND_CLIENT"] }
+            },
+            required: ["reasoning", "score", "verdict"]
+          }
         }
       });
 

@@ -131,3 +131,52 @@ export async function getEscrowMetadata(
 
   return response.json();
 }
+
+export interface PendingSync {
+  id: string;
+  type: "INSERT" | "UPDATE" | "STATEMENT";
+  escrowAddress: string;
+  milestoneIndex: number;
+  data: any;
+}
+
+const STORAGE_KEY = "noxescrow_pending_metadata_sync";
+
+/**
+ * Saves a pending metadata synchronization record to localStorage.
+ */
+export function savePendingSync(sync: PendingSync): void {
+  try {
+    const current = getPendingSyncs();
+    current.push(sync);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+  } catch (err) {
+    console.error("Failed to write pending sync to localStorage:", err);
+  }
+}
+
+/**
+ * Retrieves all pending metadata synchronization records from localStorage.
+ */
+export function getPendingSyncs(): PendingSync[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    console.error("Failed to read pending syncs from localStorage:", err);
+    return [];
+  }
+}
+
+/**
+ * Removes a completed synchronization record from localStorage.
+ */
+export function removePendingSync(id: string): void {
+  try {
+    const current = getPendingSyncs();
+    const updated = current.filter(s => s.id !== id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error("Failed to remove pending sync from localStorage:", err);
+  }
+}

@@ -11,7 +11,14 @@ import {
   DEFAULT_NOX_GATEWAY,
   type EscrowContract
 } from './services/escrowService';
-import { updateEscrowStatement } from './services/metadataService';
+import { 
+  updateEscrowStatement, 
+  savePendingSync, 
+  getPendingSyncs, 
+  removePendingSync, 
+  insertEscrowMetadata, 
+  updateEscrowDeliverable 
+} from './services/metadataService';
 import { 
   AlertTriangle,
   Unlock
@@ -195,6 +202,37 @@ function App() {
       }
     }
   }, [authenticated, activeWallet, errorMessage]);
+
+  // Periodic background re-sync handler for cached metadata
+  useEffect(() => {
+    if (!walletAddress || !vaultKey || !supabaseUrl || !supabaseKey) return;
+
+    const runSync = async () => {
+      const syncs = getPendingSyncs();
+      if (syncs.length === 0) return;
+
+      console.log(`🔄 Found ${syncs.length} pending metadata records to sync...`);
+      for (const sync of syncs) {
+        try {
+          if (sync.type === "INSERT") {
+            await insertEscrowMetadata(supabaseUrl, supabaseKey, sync.data);
+          } else if (sync.type === "UPDATE") {
+            await updateEscrowDeliverable(supabaseUrl, supabaseKey, sync.escrowAddress, sync.milestoneIndex, sync.data.devsCid);
+          } else if (sync.type === "STATEMENT") {
+            await updateEscrowStatement(supabaseUrl, supabaseKey, sync.escrowAddress, sync.milestoneIndex, sync.data.role, sync.data.statement);
+          }
+          removePendingSync(sync.id);
+          console.log(`✔️ Successfully synchronized pending record: ${sync.type} for ${sync.escrowAddress} Milestone ${sync.milestoneIndex}`);
+        } catch (err) {
+          console.error(`❌ Failed to sync pending record ${sync.id}:`, err);
+        }
+      }
+    };
+
+    runSync();
+    const interval = setInterval(runSync, 30000);
+    return () => clearInterval(interval);
+  }, [walletAddress, vaultKey, supabaseUrl, supabaseKey]);
 
   // --- Dynamic Signer Resolution ---
   const getWeb3Signer = useCallback(async (): Promise<ethers.JsonRpcSigner> => {
@@ -686,7 +724,14 @@ function App() {
             disputeStatement.trim()
           );
         } catch (dbErr) {
-          console.warn("Failed to sync dispute statement to Supabase:", dbErr);
+          console.warn("Failed to sync dispute statement to Supabase, caching locally:", dbErr);
+          savePendingSync({
+            id: Math.random().toString(),
+            type: "STATEMENT",
+            escrowAddress: selectedContract.address,
+            milestoneIndex: selectedContract.milestonesCompleted,
+            data: { role, statement: disputeStatement.trim() }
+          });
         }
       }
 

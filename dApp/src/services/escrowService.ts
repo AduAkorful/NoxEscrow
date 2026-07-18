@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import { NoxEscrowFactoryABI } from "../contracts/NoxEscrowFactory";
 import { NoxEscrowContractABI } from "../contracts/NoxEscrowContract";
 import { MockERC7984ABI } from "../contracts/MockERC7984";
-import { getEscrowMetadata, insertEscrowMetadata, updateEscrowDeliverable } from "./metadataService";
+import { getEscrowMetadata, insertEscrowMetadata, updateEscrowDeliverable, savePendingSync } from "./metadataService";
 import { encryptText, decryptText, uploadToPinata, encryptAndUploadFile } from "../crypto/fileUploader";
 
 // Canonical Nox Contract Manager address on Sepolia/Local Stack Emulator
@@ -412,7 +412,18 @@ export async function initializeEscrowMilestones(
   // Sync to database ONLY after the transaction has been successfully confirmed on-chain (Gap 1 resolved)
   if (useE2E && metadataRecords.length > 0) {
     for (const record of metadataRecords) {
-      await insertEscrowMetadata(metadataConfig.supabaseUrl!, metadataConfig.supabaseKey!, record);
+      try {
+        await insertEscrowMetadata(metadataConfig.supabaseUrl!, metadataConfig.supabaseKey!, record);
+      } catch (dbErr) {
+        console.warn("Failed to sync initial escrow metadata to Supabase, caching locally:", dbErr);
+        savePendingSync({
+          id: Math.random().toString(),
+          type: "INSERT",
+          escrowAddress,
+          milestoneIndex: record.milestone_index,
+          data: record
+        });
+      }
     }
   }
 }
@@ -474,13 +485,24 @@ export async function submitMilestoneDeliverable(
 
   // Sync with database ONLY after the transaction has been successfully confirmed on-chain (Gap 1 resolved)
   if (useE2E && cacheCid) {
-    await updateEscrowDeliverable(
-      metadataConfig.supabaseUrl!,
-      metadataConfig.supabaseKey!,
-      escrowAddress,
-      milestoneIndex,
-      cacheCid
-    );
+    try {
+      await updateEscrowDeliverable(
+        metadataConfig.supabaseUrl!,
+        metadataConfig.supabaseKey!,
+        escrowAddress,
+        milestoneIndex,
+        cacheCid
+      );
+    } catch (dbErr) {
+      console.warn("Failed to sync deliverable metadata to Supabase, caching locally:", dbErr);
+      savePendingSync({
+        id: Math.random().toString(),
+        type: "UPDATE",
+        escrowAddress,
+        milestoneIndex,
+        data: { devsCid: cacheCid }
+      });
+    }
   }
 }
 
