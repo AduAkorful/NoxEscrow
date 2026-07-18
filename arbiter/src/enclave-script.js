@@ -55,6 +55,30 @@ function hexToUtf8(hex) {
   }
 }
 
+// Helper to download JSON payload from IPFS with failover gateways
+async function downloadFromIPFS(cid) {
+  const gateways = [
+    `https://gateway.pinata.cloud/ipfs/${cid}`,
+    `https://cloudflare-ipfs.com/ipfs/${cid}`,
+    `https://ipfs.io/ipfs/${cid}`
+  ];
+
+  let lastError = null;
+  for (const url of gateways) {
+    try {
+      console.log(`📥 Attempting download from IPFS: ${url}`);
+      const resp = await axios.get(url, { timeout: 10000 }); // 10 second timeout per gateway
+      if (resp.status === 200 && resp.data) {
+        return resp.data;
+      }
+    } catch (err) {
+      console.warn(`⚠️ Gateway download failed: ${url}. Error: ${err.message}`);
+      lastError = err;
+    }
+  }
+  throw new Error(`Failed to download from all IPFS gateways. Last error: ${lastError ? lastError.message : "unknown"}`);
+}
+
 async function main() {
   console.log("==========================================================");
   console.log("🤖  NoxEscrow Secure TEE AI Arbiter Enclave Script Active  🤖");
@@ -165,16 +189,11 @@ async function main() {
           console.log("✔️ Loaded requirements & deliverables plaintext directly from local JSON database.");
         } else {
           // Fall back to decryption using local keys
-          const reqsUrl = `https://gateway.pinata.cloud/ipfs/${record.reqs_cid}`;
-          const devsUrl = `https://gateway.pinata.cloud/ipfs/${record.devs_cid}`;
+          const reqsData = await downloadFromIPFS(record.reqs_cid);
+          const devsData = await downloadFromIPFS(record.devs_cid);
 
-          console.log(`📥 Downloading requirements from IPFS: ${reqsUrl}`);
-          const reqsResp = await axios.get(reqsUrl);
-          console.log(`📥 Downloading deliverables from IPFS: ${devsUrl}`);
-          const devsResp = await axios.get(devsUrl);
-
-          plaintextRequirements = decryptPayload(reqsResp.data.ciphertext, reqsHex, reqsResp.data.iv);
-          plaintextDeliverables = decryptPayload(devsResp.data.ciphertext, devsHex, devsResp.data.iv);
+          plaintextRequirements = decryptPayload(reqsData.ciphertext, reqsHex, reqsData.iv);
+          plaintextDeliverables = decryptPayload(devsData.ciphertext, devsHex, devsData.iv);
           console.log("✔️ Plaintext deliverables and requirements decrypted successfully from IPFS payload.");
         }
       }
@@ -204,17 +223,12 @@ async function main() {
         freelancerStatement = record.freelancer_statement || freelancerStatement;
 
         // Fetch encrypted payload from IPFS
-        const reqsUrl = `https://gateway.pinata.cloud/ipfs/${record.reqs_cid}`;
-        const devsUrl = `https://gateway.pinata.cloud/ipfs/${record.devs_cid}`;
-
-        console.log(`📥 Downloading requirements from IPFS: ${reqsUrl}`);
-        const reqsResp = await axios.get(reqsUrl);
-        console.log(`📥 Downloading deliverables from IPFS: ${devsUrl}`);
-        const devsResp = await axios.get(devsUrl);
+        const reqsData = await downloadFromIPFS(record.reqs_cid);
+        const devsData = await downloadFromIPFS(record.devs_cid);
 
         // Decrypt payload via AES-GCM using the decrypted keys
-        plaintextRequirements = decryptPayload(reqsResp.data.ciphertext, reqsHex, reqsResp.data.iv);
-        plaintextDeliverables = decryptPayload(devsResp.data.ciphertext, devsHex, devsResp.data.iv);
+        plaintextRequirements = decryptPayload(reqsData.ciphertext, reqsHex, reqsData.iv);
+        plaintextDeliverables = decryptPayload(devsData.ciphertext, devsHex, devsData.iv);
         console.log("✔️ Plaintext deliverables and requirements decrypted successfully from IPFS payload.");
       }
     } catch (dbError) {
@@ -224,6 +238,11 @@ async function main() {
 
   // Fallback to direct ASCII conversion if no Supabase records exist (i.e. local unit/fuzz tests)
   if (!supabaseRecordFound) {
+    if (SUPABASE_URL && SUPABASE_KEY) {
+      console.error("❌ ERROR: Metadata record not found in database in production mode!");
+      console.error("Preventing direct hex-to-ASCII recovery of AES keys to protect system integrity.");
+      process.exit(1);
+    }
     console.log("🔄 falling back to direct hex-to-ASCII string recovery (Unit Test compatibility mode)...");
     plaintextRequirements = hexToUtf8(reqsHex);
     plaintextDeliverables = hexToUtf8(devsHex);
