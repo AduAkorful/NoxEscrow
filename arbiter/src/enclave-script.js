@@ -129,7 +129,7 @@ async function main() {
 
   console.log(`🔗 Connecting to Nox Gateway: ${NOX_GATEWAY_URL}`);
   const handleClient = await createEthersHandleClient(wallet, {
-    smartContractAddress: "0x75C6AF4430cc474b1bb9b8540b7E46D6f8e1C685",
+    smartContractAddress: process.env.NOX_CONTRACT_MANAGER || "0x24ef36ec5b626d7dcd09a98f3083c2758f0f77bf",
     gatewayUrl: NOX_GATEWAY_URL,
     subgraphUrl: NOX_SUBGRAPH_URL
   });

@@ -10,45 +10,53 @@ import * as Contracts from "./index.js";
 
 declare module "@nomicfoundation/hardhat-ethers/types" {
   interface HardhatEthersHelpers extends HardhatEthersHelpersBase {
-  getContractFactory(name: 'NoxEscrowContract', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.NoxEscrowContract__factory>
+  getContractFactory(name: 'ConfidentialUSDCToken', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.ConfidentialUSDCToken__factory>
+getContractFactory(name: 'NoxEscrowContract', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.NoxEscrowContract__factory>
+getContractFactory(name: 'NoxEscrowFactory', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.NoxEscrowFactory__factory>
 getContractFactory(name: 'INoxEscrowFactory', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.INoxEscrowFactory__factory>
 getContractFactory(name: 'NoxEscrowReputation', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.NoxEscrowReputation__factory>
-getContractFactory(name: 'NoxEscrowFactory', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.NoxEscrowFactory__factory>
-getContractFactory(name: 'MockERC7984', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.MockERC7984__factory>
 getContractFactory(name: 'INoxEscrowContract', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.INoxEscrowContract__factory>
-getContractFactory(name: 'NoxProxy', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.NoxProxy__factory>
-getContractFactory(name: 'INoxEscrowReputation', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.INoxEscrowReputation__factory>
 getContractFactory(name: 'INoxEscrowFactory', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.INoxEscrowFactory__factory>
+getContractFactory(name: 'INoxEscrowReputation', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.INoxEscrowReputation__factory>
+getContractFactory(name: 'MockERC20', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.MockERC20__factory>
+getContractFactory(name: 'MockERC7984', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.MockERC7984__factory>
+getContractFactory(name: 'NoxProxy', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.NoxProxy__factory>
 
-  getContractAt(name: 'NoxEscrowContract', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.NoxEscrowContract>
+  getContractAt(name: 'ConfidentialUSDCToken', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.ConfidentialUSDCToken>
+getContractAt(name: 'NoxEscrowContract', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.NoxEscrowContract>
+getContractAt(name: 'NoxEscrowFactory', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.NoxEscrowFactory>
 getContractAt(name: 'INoxEscrowFactory', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.INoxEscrowFactory>
 getContractAt(name: 'NoxEscrowReputation', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.NoxEscrowReputation>
-getContractAt(name: 'NoxEscrowFactory', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.NoxEscrowFactory>
-getContractAt(name: 'MockERC7984', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.MockERC7984>
 getContractAt(name: 'INoxEscrowContract', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.INoxEscrowContract>
-getContractAt(name: 'NoxProxy', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.NoxProxy>
-getContractAt(name: 'INoxEscrowReputation', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.INoxEscrowReputation>
 getContractAt(name: 'INoxEscrowFactory', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.INoxEscrowFactory>
+getContractAt(name: 'INoxEscrowReputation', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.INoxEscrowReputation>
+getContractAt(name: 'MockERC20', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.MockERC20>
+getContractAt(name: 'MockERC7984', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.MockERC7984>
+getContractAt(name: 'NoxProxy', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.NoxProxy>
 
-  deployContract(name: 'NoxEscrowContract', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.NoxEscrowContract>
+  deployContract(name: 'ConfidentialUSDCToken', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.ConfidentialUSDCToken>
+deployContract(name: 'NoxEscrowContract', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.NoxEscrowContract>
+deployContract(name: 'NoxEscrowFactory', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.NoxEscrowFactory>
 deployContract(name: 'INoxEscrowFactory', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.INoxEscrowFactory>
 deployContract(name: 'NoxEscrowReputation', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.NoxEscrowReputation>
-deployContract(name: 'NoxEscrowFactory', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.NoxEscrowFactory>
-deployContract(name: 'MockERC7984', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockERC7984>
 deployContract(name: 'INoxEscrowContract', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.INoxEscrowContract>
-deployContract(name: 'NoxProxy', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.NoxProxy>
-deployContract(name: 'INoxEscrowReputation', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.INoxEscrowReputation>
 deployContract(name: 'INoxEscrowFactory', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.INoxEscrowFactory>
+deployContract(name: 'INoxEscrowReputation', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.INoxEscrowReputation>
+deployContract(name: 'MockERC20', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockERC20>
+deployContract(name: 'MockERC7984', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockERC7984>
+deployContract(name: 'NoxProxy', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.NoxProxy>
 
-  deployContract(name: 'NoxEscrowContract', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.NoxEscrowContract>
+  deployContract(name: 'ConfidentialUSDCToken', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.ConfidentialUSDCToken>
+deployContract(name: 'NoxEscrowContract', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.NoxEscrowContract>
+deployContract(name: 'NoxEscrowFactory', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.NoxEscrowFactory>
 deployContract(name: 'INoxEscrowFactory', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.INoxEscrowFactory>
 deployContract(name: 'NoxEscrowReputation', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.NoxEscrowReputation>
-deployContract(name: 'NoxEscrowFactory', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.NoxEscrowFactory>
-deployContract(name: 'MockERC7984', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockERC7984>
 deployContract(name: 'INoxEscrowContract', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.INoxEscrowContract>
-deployContract(name: 'NoxProxy', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.NoxProxy>
-deployContract(name: 'INoxEscrowReputation', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.INoxEscrowReputation>
 deployContract(name: 'INoxEscrowFactory', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.INoxEscrowFactory>
+deployContract(name: 'INoxEscrowReputation', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.INoxEscrowReputation>
+deployContract(name: 'MockERC20', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockERC20>
+deployContract(name: 'MockERC7984', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockERC7984>
+deployContract(name: 'NoxProxy', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.NoxProxy>
 
     // default types
     getContractFactory(

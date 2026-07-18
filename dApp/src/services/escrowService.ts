@@ -5,9 +5,10 @@ import { NoxEscrowContractABI } from "../contracts/NoxEscrowContract";
 import { MockERC7984ABI } from "../contracts/MockERC7984";
 import { getEscrowMetadata, insertEscrowMetadata, updateEscrowDeliverable, savePendingSync } from "./metadataService";
 import { encryptText, decryptText, uploadToPinata, encryptAndUploadFile } from "../crypto/fileUploader";
+import addresses from "../contracts/addresses.json";
 
 // Canonical Nox Contract Manager address on Sepolia/Local Stack Emulator
-export const NOX_CONTRACT_MANAGER = "0x75C6AF4430cc474b1bb9b8540b7E46D6f8e1C685";
+export const NOX_CONTRACT_MANAGER = addresses.noxContractManager || import.meta.env.VITE_NOX_CONTRACT_MANAGER || "0x24ef36ec5b626d7dcd09a98f3083c2758f0f77bf";
 
 // Default Gateway ports for Local Nox Stack
 export const DEFAULT_NOX_GATEWAY = "http://127.0.0.1:8080";

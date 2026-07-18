@@ -1,6 +1,7 @@
 {
-  "factory": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-  "cUSDC": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-  "teeArbiter": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-  "gatewayUrl": "https://gateway.iex.ec"
+  "factory": "0x0382FDF0eB7FA6d08181595ce6e03481Cc622Ba5",
+  "cUSDC": "0x041135abE59B11aFCB127b627B6e8F0284f90566",
+  "teeArbiter": "0x74B4134C8d527a8D8AE8cb9503ab2043bCfC0ffd",
+  "gatewayUrl": "https://gateway-testnets.noxprotocol.dev",
+  "noxContractManager": "0x24ef36ec5b626d7dcd09a98f3083c2758f0f77bf"
 }

@@ -4,5 +4,6 @@
 export * as noxEscrowReputationSol from './NoxEscrowReputation.sol/index.js';
 export * as interfaces from './interfaces/index.js';
 export * as mocks from './mocks/index.js';
+export { ConfidentialUSDCToken__factory } from './ConfidentialUSDCToken__factory.js';
 export { NoxEscrowContract__factory } from './NoxEscrowContract__factory.js';
 export { NoxEscrowFactory__factory } from './NoxEscrowFactory__factory.js';
