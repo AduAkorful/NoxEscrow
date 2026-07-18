@@ -105,7 +105,7 @@ describe("NoxEscrow Core Protocol Suite", function () {
         hardhatEthers.ZeroAddress, // Linked afterwards
         cUSDCAddress,
         teeArbiter.address,
-        client.address
+        attacker.address
       ]);
       const factoryProxy = await hardhatEthers.deployContract("NoxProxy", [
         factoryImplAddress,
@@ -159,7 +159,6 @@ describe("NoxEscrow Core Protocol Suite", function () {
       await expect(
         factory.connect(client).createEscrow(
           hardhatEthers.ZeroAddress,
-          teeArbiter.address,
           1n,
           0n
         )
@@ -619,8 +618,10 @@ describe("NoxEscrow Core Protocol Suite", function () {
         // Client releases with the randomized rating
         await escrow.connect(client).releaseMilestone(fuzzRatings[i]);
 
-        // Accumulate expected score
-        expectedReputation += fuzzPayouts[i] * fuzzRatings[i];
+        // Accumulate expected score (accounting for 0.5% platform fee deduction)
+        const fee = (fuzzPayouts[i] * 50n) / 10000n;
+        const netPayout = fuzzPayouts[i] - fee;
+        expectedReputation += netPayout * fuzzRatings[i];
 
         // Fetch on-chain reputation and verify differential consistency
         const repHandle = await reputation.getReputation(freelancer.address);
@@ -716,10 +717,10 @@ describe("NoxEscrow Core Protocol Suite", function () {
       const decryptedClientBalAfterM2 = await decryptBalance(client, clientBalAfterM2);
       expect(decryptedClientBalAfterM2).to.equal(999000n);
 
-      // Invariant B: Freelancer lost reputation on lost dispute (6000 after M1 - 500 penalty = 5500)
+      // Invariant B: Freelancer lost reputation on lost dispute (5975 after M1 - 500 penalty = 5475)
       const repHandle = await reputation.getReputation(freelancer.address);
       const repDecrypted = await nox.publicDecrypt(repHandle);
-      expect(repDecrypted.value).to.equal(5500n);
+      expect(repDecrypted.value).to.equal(5475n);
 
       // Final status is REFUNDED (4) since the project was terminated early on lost dispute
       expect(await escrow.status()).to.equal(4n);
