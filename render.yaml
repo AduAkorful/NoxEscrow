@@ -15,13 +15,10 @@ services:
         sync: false
         placeholder: "The deployed NoxEscrowFactory proxy address (e.g. 0x0382FDF0eB7FA6d08181595ce6e03481Cc622Ba5)"
       - key: IEXEC_RUNNER_ENDPOINT
-        sync: false
         value: "http://127.0.0.1:3000/trigger-task"
       - key: NOX_GATEWAY_URL
-        sync: false
         value: "https://gateway-testnets.noxprotocol.dev"
       - key: NOX_SUBGRAPH_URL
-        sync: false
         value: "https://thegraph.ethereum-sepolia-testnet.noxprotocol.io/api/subgraphs/id/9CsccKwvgYFo72zZeU4k4wj2NEBLdWhVE3EUandgmzgo"
       
       # Supabase Metadata Database Connection (Required for E2E Chats & Reviews)
@@ -34,13 +31,10 @@ services:
 
       # Google Cloud Vertex AI & ADC Authentication Configuration
       - key: VERTEX_PROJECT_ID
-        sync: false
         value: "project-7fba3d65-5e52-4996-b38" # Automatically set to your active project ID!
       - key: VERTEX_LOCATION
-        sync: false
         value: "us-central1"
       - key: GOOGLE_APPLICATION_CREDENTIALS
-        sync: false
         value: "/etc/secrets/gcp-key.json"
 
       # TEE Signer Gas funding wallet key
