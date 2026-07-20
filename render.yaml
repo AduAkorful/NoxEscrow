@@ -1,6 +1,7 @@
 services:
   - type: web
     name: noxescrow-webhook-listener
+    plan: free
     runtime: node
     repo: https://github.com/AduAkorful/NoxEscrow # Replace with your repository URL
     branch: main
