@@ -7,6 +7,8 @@
     "enclave": "node src/enclave-script.js"
   },
   "dependencies": {
+    "@google-cloud/vertexai": "^1.12.0",
+    "@google/genai": "^2.12.0",
     "@google/generative-ai": "^0.15.0",
     "@iexec-nox/handle": "^0.1.0-beta.13",
     "@supabase/supabase-js": "^2.43.0",

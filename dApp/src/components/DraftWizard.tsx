@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, X, Coins, Paperclip, Trash2 } from 'lucide-react';
 
 interface DraftWizardProps {
@@ -16,6 +16,11 @@ interface DraftWizardProps {
   onClose: () => void;
   draftFiles: File[];
   setDraftFiles: React.Dispatch<React.SetStateAction<File[]>>;
+}
+
+interface MilestoneItem {
+  payout: string;
+  requirements: string;
 }
 
 export function DraftWizard({
@@ -36,9 +41,74 @@ export function DraftWizard({
 }: DraftWizardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isGasless, setIsGasless] = useState(false);
-  const totalBudget = draftMilestonePayouts
-    .split(',')
-    .reduce((acc, val) => acc + Number(val.trim() || 0), 0);
+
+  // Initialize milestone items state from parent states or fallback to a default
+  const [milestoneItems, setMilestoneItems] = useState<MilestoneItem[]>(() => {
+    const payouts = draftMilestonePayouts ? draftMilestonePayouts.split(',').map(p => p.trim()) : ["1000"];
+    const reqs = draftMilestoneReqs ? draftMilestoneReqs.split(';').map(r => r.trim()) : ["Build a responsive collapsible sidebar using React."];
+    const length = Math.max(payouts.length, reqs.length, draftTotalMilestones || 1);
+    const items: MilestoneItem[] = [];
+    for (let i = 0; i < length; i++) {
+      items.push({
+        payout: payouts[i] || "1000",
+        requirements: reqs[i] || ""
+      });
+    }
+    return items;
+  });
+
+  // Synchronize internal milestoneItems array state back to parent states
+  useEffect(() => {
+    const payoutsStr = milestoneItems.map(item => item.payout.trim()).join(',');
+    const reqsStr = milestoneItems.map(item => item.requirements.trim()).join(';');
+    setDraftMilestonePayouts(payoutsStr);
+    setDraftMilestoneReqs(reqsStr);
+    setDraftTotalMilestones(milestoneItems.length);
+  }, [milestoneItems, setDraftMilestonePayouts, setDraftMilestoneReqs, setDraftTotalMilestones]);
+
+  const handleAddMilestone = () => {
+    if (milestoneItems.length >= 20) return;
+    setMilestoneItems(prev => [...prev, { payout: "1000", requirements: "" }]);
+  };
+
+  const handleRemoveMilestone = (idx: number) => {
+    if (milestoneItems.length <= 1) return;
+    setMilestoneItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleUpdateMilestone = (idx: number, field: keyof MilestoneItem, value: string) => {
+    setMilestoneItems(prev => prev.map((item, i) => {
+      if (i === idx) {
+        return { ...item, [field]: value };
+      }
+      return item;
+    }));
+  };
+
+  const totalBudget = milestoneItems.reduce((acc, item) => {
+    const val = Number(item.payout);
+    return acc + (isNaN(val) ? 0 : val);
+  }, 0);
+
+  // Validations
+  const isValidAddress = /^0x[a-fA-F0-9]{42}$/.test(draftFreelancer.trim());
+  const isMilestonesValid = milestoneItems.every(
+    item => item.payout.trim() !== "" && !isNaN(Number(item.payout)) && Number(item.payout) > 0 && item.requirements.trim().length > 0
+  );
+  const isValidCount = milestoneItems.length > 0 && milestoneItems.length <= 20;
+  const isFormValid = isValidAddress && isMilestonesValid && isValidCount;
+
+  // Compile descriptive validation errors
+  let validationError = "";
+  if (draftFreelancer.trim() && !isValidAddress) {
+    validationError = "Freelancer Address must be a valid 42-character hex (starting with 0x).";
+  } else if (!isValidAddress) {
+    validationError = "Please enter a valid Freelancer Address.";
+  } else if (!isMilestonesValid) {
+    validationError = "Every milestone must have a positive budget and non-empty requirements.";
+  } else if (!isValidCount) {
+    validationError = "You must configure between 1 and 20 milestones.";
+  }
 
   return (
     <div className="bento-card bento-card-violet p-6 md:p-8 flex flex-col gap-6 w-full animate-slide-up">
@@ -60,7 +130,7 @@ export function DraftWizard({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Inputs */}
+        {/* Inputs Column */}
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-2">
             <label className="font-mono text-[10px] text-slate-400 uppercase tracking-widest font-bold">Freelancer Address</label>
@@ -69,43 +139,70 @@ export function DraftWizard({
               placeholder="0x..." 
               value={draftFreelancer} 
               onChange={(e) => setDraftFreelancer(e.target.value)}
-              className="w-full bg-[#05070F] border border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:border-[#7F00FF]/40 focus:outline-none transition-smooth"
+              className={`w-full bg-[#05070F] border rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:outline-none transition-smooth ${
+                draftFreelancer.trim() && !isValidAddress 
+                  ? 'border-red-500/50 focus:border-red-500' 
+                  : 'border-white/5 focus:border-[#7F00FF]/40'
+              }`}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <label className="font-mono text-[10px] text-slate-400 uppercase tracking-widest font-bold">Total Milestones</label>
-              <input 
-                type="number" 
-                min="1" 
-                max="20"
-                value={draftTotalMilestones} 
-                onChange={(e) => setDraftTotalMilestones(Number(e.target.value))}
-                className="w-full bg-[#05070F] border border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:border-[#7F00FF]/40 focus:outline-none transition-smooth"
-              />
+          {/* Dynamic Milestones Section */}
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-between items-center pb-1">
+              <label className="font-mono text-[10px] text-slate-400 uppercase tracking-widest font-bold">Milestone Configurations</label>
+              <button 
+                type="button"
+                onClick={handleAddMilestone}
+                disabled={milestoneItems.length >= 20}
+                className="px-2.5 py-1 rounded-lg border border-[#7F00FF]/30 bg-[#7F00FF]/10 hover:bg-[#7F00FF]/25 font-mono text-[9px] text-[#00F2FE] uppercase tracking-wider font-bold transition-smooth flex items-center gap-1 cursor-pointer disabled:opacity-40"
+              >
+                <Plus className="w-3 h-3 text-[#00F2FE]" />
+                Add Milestone
+              </button>
             </div>
-            <div className="flex flex-col gap-2">
-              <label className="font-mono text-[10px] text-slate-400 uppercase tracking-widest font-bold">Payouts (Comma Separated)</label>
-              <input 
-                type="text" 
-                placeholder="1000, 2000" 
-                value={draftMilestonePayouts} 
-                onChange={(e) => setDraftMilestonePayouts(e.target.value)}
-                className="w-full bg-[#05070F] border border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:border-[#7F00FF]/40 focus:outline-none transition-smooth"
-              />
-            </div>
-          </div>
 
-          <div className="flex flex-col gap-2">
-            <label className="font-mono text-[10px] text-slate-400 uppercase tracking-widest font-bold">Task Requirements (Semicolon Separated)</label>
-            <textarea 
-              rows={3}
-              placeholder="Phase 1: scaffold ui ; Phase 2: compile APIs"
-              value={draftMilestoneReqs} 
-              onChange={(e) => setDraftMilestoneReqs(e.target.value)}
-              className="w-full bg-[#05070F] border border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:border-[#7F00FF]/40 focus:outline-none transition-smooth resize-none animate-none"
-            />
+            <div className="flex flex-col gap-3 max-h-[280px] overflow-y-auto pr-1 custom-scrollbar">
+              {milestoneItems.map((item, idx) => (
+                <div key={idx} className="bg-[#05070F]/60 border border-white/5 p-4 rounded-xl flex flex-col gap-3 relative hover:border-white/10 transition-smooth">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                    <span className="font-mono text-[10px] text-[#00F2FE] tracking-widest font-bold">MILESTONE_{idx + 1}</span>
+                    {milestoneItems.length > 1 && (
+                      <button 
+                        type="button"
+                        onClick={() => handleRemoveMilestone(idx)}
+                        className="text-slate-500 hover:text-red-400 transition-smooth cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="flex flex-col gap-1.5 sm:col-span-1">
+                      <label className="font-mono text-[9px] text-slate-400 uppercase tracking-wider">Payout (cUSDC)</label>
+                      <input 
+                        type="number"
+                        min="1"
+                        placeholder="1000"
+                        value={item.payout}
+                        onChange={(e) => handleUpdateMilestone(idx, 'payout', e.target.value)}
+                        className="w-full bg-[#05070F] border border-white/5 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:border-[#7F00FF]/40 focus:outline-none transition-smooth"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5 sm:col-span-2">
+                      <label className="font-mono text-[9px] text-slate-400 uppercase tracking-wider">Requirements</label>
+                      <input 
+                        type="text"
+                        placeholder="Describe deliverables..."
+                        value={item.requirements}
+                        onChange={(e) => handleUpdateMilestone(idx, 'requirements', e.target.value)}
+                        className="w-full bg-[#05070F] border border-white/5 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:border-[#7F00FF]/40 focus:outline-none transition-smooth"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Secure File Attachments Field */}
@@ -163,7 +260,7 @@ export function DraftWizard({
           </div>
         </div>
 
-        {/* Live contract preview JSON compiler */}
+        {/* Live contract preview JSON compiler Column */}
         <div className="border border-white/5 bg-white/[0.01] p-6 rounded-xl flex flex-col justify-between hover:border-white/10 transition-smooth">
           <div className="flex flex-col gap-4">
             <span className="font-mono text-[10px] uppercase tracking-widest text-[#7F00FF] font-bold block pb-2 border-b border-white/5">
@@ -172,14 +269,20 @@ export function DraftWizard({
             <div className="flex flex-col gap-3 font-mono text-[11px]">
               <div className="flex justify-between items-center">
                 <span className="text-slate-500">CLIENT:</span>
-                <span className="text-slate-300 font-bold truncate max-w-[220px] bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                <span className="text-slate-300 font-bold truncate max-w-[200px] bg-white/5 px-2 py-0.5 rounded border border-white/5">
                   {walletAddress ? `${walletAddress.slice(0, 10)}...${walletAddress.slice(-8)}` : 'DISCONNECTED'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-500">FREELANCER:</span>
-                <span className="text-slate-300 font-bold truncate max-w-[220px] bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                <span className="text-slate-300 font-bold truncate max-w-[200px] bg-white/5 px-2 py-0.5 rounded border border-white/5">
                   {draftFreelancer ? `${draftFreelancer.slice(0, 10)}...${draftFreelancer.slice(-8)}` : 'NOT_SPECIFIED'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">MILESTONES:</span>
+                <span className="text-slate-300 font-bold bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                  {milestoneItems.length}
                 </span>
               </div>
               <div className="flex justify-between items-center border-t border-white/5 pt-3">
@@ -215,13 +318,20 @@ export function DraftWizard({
                   🚀 **Relayer Gasless Mode Active**: Deployment gas fee will be sponsored. You will only sign a cryptographic EIP-712 approval signature.
                 </div>
               )}
+
+              {/* Validation Warning Panel */}
+              {validationError && (
+                <div className="bg-amber-950/15 border border-amber-900/30 p-2.5 rounded-lg text-[9px] text-amber-400 leading-normal font-sans mt-2">
+                  ⚠️ **Validation Status**: {validationError}
+                </div>
+              )}
             </div>
           </div>
 
           <button
             onClick={handleDeployEscrow}
-            disabled={isLoading || !draftFreelancer}
-            className="w-full py-4.5 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth hover:shadow-[0_0_20px_rgba(0,242,254,0.45)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2.5 rounded-xl border border-transparent"
+            disabled={isLoading || !isFormValid}
+            className="w-full py-4.5 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth hover:shadow-[0_0_20px_rgba(0,242,254,0.45)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2.5 rounded-xl border border-transparent mt-4"
           >
             <Coins className="w-4 h-4" />
             {isLoading ? "Executing transactions..." : "Deploy & Initialize (Enter)"}

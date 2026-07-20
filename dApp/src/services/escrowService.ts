@@ -28,6 +28,8 @@ export interface EscrowContract {
   requirements: string[];
   deliverables?: string[];
   activeMilestoneSubmitted?: boolean;
+  activeMilestoneSubmissionTime?: number;
+  reviewWindow?: number;
   milestoneKeys?: string[];
   deliverableKeys?: string[];
 }
@@ -123,12 +125,13 @@ export async function fetchUserEscrows(
       const escrowAddress = await factory.allEscrows(i);
       const escrow = new ethers.Contract(escrowAddress, NoxEscrowContractABI, signer);
       
-      const [client, freelancer, status, activeMilestone, totalMilestones] = await Promise.all([
+      const [client, freelancer, status, activeMilestone, totalMilestones, reviewWindow] = await Promise.all([
         escrow.client(),
         escrow.freelancer(),
         escrow.status(),
         escrow.activeMilestoneIndex(),
-        escrow.totalMilestones()
+        escrow.totalMilestones(),
+        escrow.reviewWindow()
       ]);
       
       const isClient = client.toLowerCase() === userAddress.toLowerCase();
@@ -142,6 +145,7 @@ export async function fetchUserEscrows(
         const milestoneKeys: string[] = [];
         const deliverableKeys: string[] = [];
         let activeMilestoneSubmitted = false;
+        let activeMilestoneSubmissionTime = 0;
         let accumulatedBudget = 0;
         
         const handleClient = await createEthersHandleClient(signer as any, {
@@ -157,6 +161,7 @@ export async function fetchUserEscrows(
             const milestoneInfo = await escrow.milestones(m);
             if (m === activeMilestoneIndex) {
               activeMilestoneSubmitted = Boolean(milestoneInfo.isSubmitted);
+              activeMilestoneSubmissionTime = Number(milestoneInfo.submissionTime);
             }
 
             // Decrypt real milestone budget dynamically (ZK Handle Decryption - no mock values!)
@@ -259,6 +264,8 @@ export async function fetchUserEscrows(
           requirements,
           deliverables,
           activeMilestoneSubmitted,
+          activeMilestoneSubmissionTime,
+          reviewWindow: Number(reviewWindow),
           milestoneKeys,
           deliverableKeys
         });

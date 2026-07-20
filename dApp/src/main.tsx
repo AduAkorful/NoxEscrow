@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { PrivyProvider } from '@privy-io/react-auth'
+import { BrowserRouter } from 'react-router-dom'
 import { sepolia, mainnet } from 'viem/chains'
 import './index.css'
 import App from './App.tsx'
@@ -19,7 +20,9 @@ createRoot(document.getElementById('root')!).render(
         loginMethods: ['wallet']
       }}
     >
-      <App />
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
     </PrivyProvider>
   </StrictMode>,
 )

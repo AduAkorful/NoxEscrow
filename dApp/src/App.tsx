@@ -1,19 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { deriveEncryptionKey, SIGN_MESSAGE } from './crypto/keyDerivation';
 import { 
-  deployEscrowClone, 
-  approveEscrowOperator, 
-  initializeEscrowMilestones, 
-  submitMilestoneDeliverable, 
-  releaseEscrowMilestone, 
-  raiseEscrowDispute, 
-  fetchUserEscrows,
-  DEFAULT_NOX_GATEWAY,
-  type EscrowContract
+  DEFAULT_NOX_GATEWAY
 } from './services/escrowService';
 import { 
   updateEscrowStatement, 
-  savePendingSync, 
   getPendingSyncs, 
   removePendingSync, 
   insertEscrowMetadata, 
@@ -25,7 +17,6 @@ import {
 } from 'lucide-react';
 import { ethers } from 'ethers';
 import addresses from './contracts/addresses.json';
-import { NoxEscrowFactoryABI } from './contracts/NoxEscrowFactory';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 
 // Sub-components
@@ -33,23 +24,24 @@ import { LandingPage } from './components/LandingPage';
 import { KeyDerivationGate } from './components/KeyDerivationGate';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
-import { AdminConfig } from './components/AdminConfig';
-import { DraftWizard } from './components/DraftWizard';
-import { EscrowWorkspace } from './components/EscrowWorkspace';
-import { PortfolioFeed } from './components/PortfolioFeed';
 import { ReputationGauge } from './components/ReputationGauge';
 import { EventLog } from './components/EventLog';
 import { ShortcutsHUD } from './components/ShortcutsHUD';
 import { Footer } from './components/Footer';
 import { TransactionStepper } from './components/TransactionStepper';
-import type { StepItem } from './components/TransactionStepper';
 import { ToastContainer } from './components/ToastContainer';
 import type { Toast } from './components/ToastContainer';
-import { TokenWrapper } from './components/TokenWrapper';
 
-function getErrorMessage(err: unknown, fallback: string) {
-  return err instanceof Error ? err.message : fallback;
-}
+// Custom Hooks
+import { useEscrowActions } from './hooks/useEscrowActions';
+import { useAdminConfig } from './hooks/useAdminConfig';
+
+// Pages
+import { VaultsPage } from './pages/VaultsPage';
+import { EscrowPage } from './pages/EscrowPage';
+import { DeployPage } from './pages/DeployPage';
+import { SwapPage } from './pages/SwapPage';
+import { AdminPage } from './pages/AdminPage';
 
 function App() {
   // --- Privy Hooks ---
@@ -64,14 +56,9 @@ function App() {
   const [isDeriving, setIsDeriving] = useState(false);
   const [viewMode, setViewMode] = useState<'client' | 'freelancer'>('client');
   const [showShortcutsHUD, setShowShortcutsHUD] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showTokenWrapper, setShowTokenWrapper] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isFetchingContracts, setIsFetchingContracts] = useState(false);
   const [isUnsupportedNetwork, setIsUnsupportedNetwork] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null);
 
   // --- Toast notifications state ---
@@ -83,31 +70,6 @@ function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  // --- Stepper Modal State ---
-  const [isStepperOpen, setIsStepperOpen] = useState(false);
-  const [stepperTitle, setStepperTitle] = useState("TRANSACTION_PIPELINE_STATUS");
-  const [stepperSteps, setStepperSteps] = useState<StepItem[]>([]);
-  const [stepperSubtext, setStepperSubtext] = useState("");
-
-  // --- Factory Parameters State for Admin view & on-chain modification ---
-  const [currentImplementation, setCurrentImplementation] = useState("");
-  const [currentRegistry, setCurrentRegistry] = useState("");
-  const [currentUSDCToken, setCurrentUSDCToken] = useState("");
-  const [currentReviewWindow, setCurrentReviewWindow] = useState("");
-  const [currentMutualCancelWindow, setCurrentMutualCancelWindow] = useState("");
-  const [currentTeeArbiter, setCurrentTeeArbiter] = useState("");
-  const [currentPlatformFeeBps, setCurrentPlatformFeeBps] = useState("50");
-  const [currentTreasury, setCurrentTreasury] = useState("");
-
-  const [newImplementationInput, setNewImplementationInput] = useState("");
-  const [newRegistryInput, setNewRegistryInput] = useState("");
-  const [newUSDCTokenInput, setNewUSDCTokenInput] = useState("");
-  const [newReviewWindowInput, setNewReviewWindowInput] = useState("259200");
-  const [newMutualCancelWindowInput, setNewMutualCancelWindowInput] = useState("604800");
-  const [newTeeArbiterInput, setNewTeeArbiterInput] = useState("");
-  const [newPlatformFeeBpsInput, setNewPlatformFeeBpsInput] = useState("50");
-  const [newTreasuryInput, setNewTreasuryInput] = useState("");
-
   // --- API & E2E Config Constants from Env ---
   const pinataJWT = import.meta.env.VITE_PINATA_JWT || "";
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
@@ -118,6 +80,119 @@ function App() {
   const cUSDCAddress = import.meta.env.VITE_CUSDC_TOKEN || addresses.cUSDC || "0x5FbDB2315678afecb367f032d93F642f64180aa3";
   const gatewayUrl = import.meta.env.VITE_GATEWAY_URL || addresses.gatewayUrl || DEFAULT_NOX_GATEWAY;
   const publicUSDCAddress = import.meta.env.VITE_PUBLIC_USDC_TOKEN || "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
+
+  // --- Router Navigation and Location Hooks ---
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // --- Dynamic Signer Resolution ---
+  const getWeb3Signer = useCallback(async (): Promise<ethers.JsonRpcSigner> => {
+    if (activeWallet) {
+      const provider = await activeWallet.getEthereumProvider();
+      const ethersProvider = new ethers.BrowserProvider(provider);
+      return ethersProvider.getSigner();
+    }
+    const win = window as any;
+    if (win.ethereum) {
+      const provider = new ethers.BrowserProvider(win.ethereum);
+      return provider.getSigner();
+    }
+    throw new Error("No web3 provider detected. Please connect your wallet via Privy or Sandbox.");
+  }, [activeWallet]);
+
+  // --- Initialize Custom Hooks ---
+  const {
+    contractsList,
+    isFetchingContracts,
+    deliverableInput,
+    setDeliverableInput,
+    deliverableFiles,
+    setDeliverableFiles,
+    disputeStatement,
+    setDisputeStatement,
+    ratingInput,
+    setRatingInput,
+    isLoading: isEscrowLoading,
+    
+    // Stepper State
+    isStepperOpen,
+    stepperTitle,
+    stepperSteps,
+    stepperSubtext,
+
+    // Methods
+    loadOnChainContracts,
+    handleDeployEscrow,
+    handleSubmitDeliverable,
+    handleReleaseMilestone,
+    handleRaiseDispute
+  } = useEscrowActions({
+    walletAddress,
+    getWeb3Signer,
+    supabaseUrl,
+    supabaseKey,
+    pinataJWT,
+    factoryAddress,
+    cUSDCAddress,
+    gatewayUrl,
+    addToast,
+    setErrorMessage,
+    setSuccessMessage
+  });
+
+  const {
+    isAdmin,
+    isLoading: isAdminLoading,
+    
+    // Factory Params
+    currentImplementation,
+    currentRegistry,
+    currentUSDCToken,
+    currentReviewWindow,
+    currentMutualCancelWindow,
+    currentTeeArbiter,
+    currentPlatformFeeBps,
+    currentTreasury,
+
+    // Inputs
+    newImplementationInput,
+    setNewImplementationInput,
+    newRegistryInput,
+    setNewRegistryInput,
+    newUSDCTokenInput,
+    setNewUSDCTokenInput,
+    newReviewWindowInput,
+    setNewReviewWindowInput,
+    newMutualCancelWindowInput,
+    setNewMutualCancelWindowInput,
+    newTeeArbiterInput,
+    setNewTeeArbiterInput,
+    newPlatformFeeBpsInput,
+    setNewPlatformFeeBpsInput,
+    newTreasuryInput,
+    setNewTreasuryInput,
+
+    // Methods
+    checkAdminStatus,
+    loadFactoryParams,
+    handleUpdateImplementation,
+    handleUpdateRegistry,
+    handleUpdateUSDCToken,
+    handleUpdateReviewWindow,
+    handleUpdateMutualCancelWindow,
+    handleUpdateTeeArbiter,
+    handleUpdatePlatformFeeBps,
+    handleUpdateTreasury
+  } = useAdminConfig({
+    walletAddress,
+    factoryAddress,
+    cUSDCAddress,
+    getWeb3Signer,
+    setErrorMessage,
+    setSuccessMessage
+  });
+
+  const isLoading = isEscrowLoading || isAdminLoading;
 
   // Sync Privy connection with application walletAddress state
   useEffect(() => {
@@ -210,21 +285,6 @@ function App() {
     return () => clearInterval(interval);
   }, [walletAddress, vaultKey, supabaseUrl, supabaseKey]);
 
-  // --- Dynamic Signer Resolution ---
-  const getWeb3Signer = useCallback(async (): Promise<ethers.JsonRpcSigner> => {
-    if (activeWallet) {
-      const provider = await activeWallet.getEthereumProvider();
-      const ethersProvider = new ethers.BrowserProvider(provider);
-      return ethersProvider.getSigner();
-    }
-    const win = window as any;
-    if (win.ethereum) {
-      const provider = new ethers.BrowserProvider(win.ethereum);
-      return provider.getSigner();
-    }
-    throw new Error("No web3 provider detected. Please connect your wallet via Privy or Sandbox.");
-  }, [activeWallet]);
-
   // Sync Ethers signer from connected wallet address
   useEffect(() => {
     if (walletAddress) {
@@ -239,24 +299,6 @@ function App() {
     }
   }, [walletAddress, getWeb3Signer]);
 
-  // --- Wizard Drafting States ---
-  const [showDraftWizard, setShowDraftWizard] = useState(false);
-  const [draftFreelancer, setDraftFreelancer] = useState("");
-  const [draftTotalMilestones, setDraftTotalMilestones] = useState(1);
-  const [draftMilestonePayouts, setDraftMilestonePayouts] = useState<string>("1000");
-  const [draftMilestoneReqs, setDraftMilestoneReqs] = useState<string>("Build a responsive collapsible sidebar using React.");
-  const [draftFiles, setDraftFiles] = useState<File[]>([]);
-
-  // --- Active Contract Detail Workspace ---
-  const [selectedContract, setSelectedContract] = useState<EscrowContract | null>(null);
-  const [deliverableInput, setDeliverableInput] = useState("");
-  const [deliverableFiles, setDeliverableFiles] = useState<File[]>([]);
-  const [disputeStatement, setDisputeStatement] = useState("");
-  const [ratingInput, setRatingInput] = useState(5);
-
-  // --- Stateful Live On-Chain Contracts ---
-  const [contractsList, setContractsList] = useState<EscrowContract[]>([]);
-
   // --- Actions ---
   const connectWallet = useCallback(async () => {
     setErrorMessage(null);
@@ -266,7 +308,7 @@ function App() {
     try {
       await loginPrivy();
     } catch (err: unknown) {
-      setErrorMessage(getErrorMessage(err, 'Failed to connect wallet via Privy.'));
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to connect wallet via Privy.');
     }
   }, [loginPrivy]);
 
@@ -298,7 +340,7 @@ function App() {
       setVaultKey(key);
       setSuccessMessage("Confidential key successfully derived! Environment unlocked.");
     } catch (err: unknown) {
-      setErrorMessage(getErrorMessage(err, 'Key derivation failed.'));
+      setErrorMessage(err instanceof Error ? err.message : 'Key derivation failed.');
     } finally {
       setIsDeriving(false);
     }
@@ -327,112 +369,17 @@ function App() {
         setShowShortcutsHUD(prev => !prev);
       } else if (key === 'd' && vaultKey) {
         e.preventDefault();
-        setSelectedContract(null);
-        setShowDraftWizard(false);
-        setShowTokenWrapper(false);
+        navigate('/vaults');
       } else if (key === 'escape') {
         e.preventDefault();
         setShowShortcutsHUD(false);
-        setShowDraftWizard(false);
-        setShowSettings(false);
-        setShowTokenWrapper(false);
+        navigate('/vaults');
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [walletAddress, vaultKey, connectWallet, triggerKeyDerivation]);
-
-  const checkAdminStatus = useCallback(async () => {
-    if (!walletAddress) return;
-
-    try {
-      const signer = await getWeb3Signer();
-      const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
-      const owner = await factory.owner();
-      if (owner.toLowerCase() === walletAddress.toLowerCase()) {
-        setIsAdmin(true);
-      } else {
-        setIsAdmin(false);
-      }
-    } catch (err) {
-      console.warn("Could not query factory owner from contract:", err);
-      setIsAdmin(false);
-    }
-  }, [walletAddress, factoryAddress, getWeb3Signer]);
-
-  const loadFactoryParams = useCallback(async () => {
-    if (!walletAddress) return;
-    try {
-      const signer = await getWeb3Signer();
-      const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
-      const [impl, reg, token, win, cancelWin, arbiter, feeBps, treasuryAddr] = await Promise.all([
-        factory.escrowImplementation(),
-        factory.reputationRegistry(),
-        factory.cUSDCToken(),
-        factory.reviewWindow(),
-        factory.mutualCancelWindow(),
-        factory.canonicalTeeArbiter(),
-        factory.platformFeeBps(),
-        factory.treasury()
-      ]);
-      setCurrentImplementation(impl);
-      setCurrentRegistry(reg);
-      setCurrentUSDCToken(token);
-      setCurrentReviewWindow(win.toString());
-      setCurrentMutualCancelWindow(cancelWin.toString());
-      setCurrentTeeArbiter(arbiter);
-      setCurrentPlatformFeeBps(feeBps.toString());
-      setCurrentTreasury(treasuryAddr);
-      
-      // Seed inputs
-      setNewImplementationInput(impl);
-      setNewRegistryInput(reg);
-      setNewUSDCTokenInput(token);
-      setNewReviewWindowInput(win.toString());
-      setNewMutualCancelWindowInput(cancelWin.toString());
-      setNewTeeArbiterInput(arbiter);
-      setNewPlatformFeeBpsInput(feeBps.toString());
-      setNewTreasuryInput(treasuryAddr);
-    } catch (err) {
-      console.warn("Could not load factory params from contract:", err);
-      // Fallback
-      setCurrentImplementation("");
-      setCurrentRegistry("");
-      setCurrentUSDCToken(cUSDCAddress);
-      setCurrentReviewWindow("259200");
-      setCurrentMutualCancelWindow("604800");
-    }
-  }, [walletAddress, factoryAddress, cUSDCAddress, getWeb3Signer]);
-
-  const loadOnChainContracts = useCallback(async () => {
-    if (!walletAddress) return;
-    
-    setIsFetchingContracts(true);
-    setErrorMessage(null);
-
-    try {
-      const signer = await getWeb3Signer();
-      const escrows = await fetchUserEscrows(
-        signer,
-        factoryAddress,
-        walletAddress,
-        gatewayUrl,
-        {
-          pinataJWT,
-          supabaseUrl,
-          supabaseKey
-        }
-      );
-      setContractsList(escrows);
-    } catch (err: any) {
-      console.error("Failed to load live on-chain contracts:", err);
-      setContractsList([]);
-      setErrorMessage(err.message || "Failed to retrieve live contracts from the blockchain network.");
-    } finally {
-      setIsFetchingContracts(false);
-    }
-  }, [walletAddress, factoryAddress, gatewayUrl, pinataJWT, supabaseUrl, supabaseKey, getWeb3Signer]);
+  }, [walletAddress, vaultKey, connectWallet, triggerKeyDerivation, navigate]);
 
   // --- Dynamic On-Chain Contract & Admin Fetching ---
   useEffect(() => {
@@ -442,365 +389,6 @@ function App() {
       loadFactoryParams();
     }
   }, [vaultKey, walletAddress, loadOnChainContracts, checkAdminStatus, loadFactoryParams]);
-
-  const handleUpdateImplementation = async (newVal: string) => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsLoading(true);
-    try {
-      const signer = await getWeb3Signer();
-      const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
-      const tx = await factory.setEscrowImplementation(newVal);
-      setSuccessMessage("Transaction submitted. Waiting for confirmation...");
-      await tx.wait();
-      setSuccessMessage("✔️ Escrow Implementation template updated on-chain successfully!");
-      await loadFactoryParams();
-    } catch (err: any) {
-      setErrorMessage(err.message || "Failed to update implementation address.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUpdateRegistry = async (newVal: string) => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsLoading(true);
-    try {
-      const signer = await getWeb3Signer();
-      const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
-      const tx = await factory.setReputationRegistry(newVal);
-      setSuccessMessage("Transaction submitted. Waiting for confirmation...");
-      await tx.wait();
-      setSuccessMessage("✔️ Reputation Registry updated on-chain successfully!");
-      await loadFactoryParams();
-    } catch (err: any) {
-      setErrorMessage(err.message || "Failed to update reputation registry address.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUpdateUSDCToken = async (newVal: string) => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsLoading(true);
-    try {
-      const signer = await getWeb3Signer();
-      const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
-      const tx = await factory.setUSDCToken(newVal);
-      setSuccessMessage("Transaction submitted. Waiting for confirmation...");
-      await tx.wait();
-      setSuccessMessage("✔️ Confidential cUSDC Token updated on-chain successfully!");
-      await loadFactoryParams();
-    } catch (err: any) {
-      setErrorMessage(err.message || "Failed to update USDC token address.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUpdateReviewWindow = async (newVal: string) => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsLoading(true);
-    try {
-      const signer = await getWeb3Signer();
-      const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
-      const tx = await factory.setReviewWindow(BigInt(newVal));
-      setSuccessMessage("Transaction submitted. Waiting for confirmation...");
-      await tx.wait();
-      setSuccessMessage("✔️ Default Review Window updated on-chain successfully!");
-      await loadFactoryParams();
-    } catch (err: any) {
-      setErrorMessage(err.message || "Failed to update default review window.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUpdateMutualCancelWindow = async (newVal: string) => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsLoading(true);
-    try {
-      const signer = await getWeb3Signer();
-      const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
-      const tx = await factory.setMutualCancelWindow(BigInt(newVal));
-      setSuccessMessage("Transaction submitted. Waiting for confirmation...");
-      await tx.wait();
-      setSuccessMessage("✔️ Default Mutual Cancellation Window updated on-chain successfully!");
-      await loadFactoryParams();
-    } catch (err: any) {
-      setErrorMessage(err.message || "Failed to update default mutual cancellation window.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUpdateTeeArbiter = async (newVal: string) => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsLoading(true);
-    try {
-      const signer = await getWeb3Signer();
-      const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
-      const tx = await factory.setCanonicalTeeArbiter(newVal);
-      setSuccessMessage("Transaction submitted. Waiting for confirmation...");
-      await tx.wait();
-      setSuccessMessage("✔️ Canonical TEE Arbiter updated on-chain successfully!");
-      await loadFactoryParams();
-    } catch (err: any) {
-      setErrorMessage(err.message || "Failed to update canonical TEE arbiter.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUpdatePlatformFeeBps = async (newVal: string) => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsLoading(true);
-    try {
-      const signer = await getWeb3Signer();
-      const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
-      const tx = await factory.setPlatformFeeBps(BigInt(newVal));
-      setSuccessMessage("Transaction submitted. Waiting for confirmation...");
-      await tx.wait();
-      setSuccessMessage("✔️ Platform Fee updated on-chain successfully!");
-      await loadFactoryParams();
-    } catch (err: any) {
-      setErrorMessage(err.message || "Failed to update platform fee.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUpdateTreasury = async (newVal: string) => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsLoading(true);
-    try {
-      const signer = await getWeb3Signer();
-      const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
-      const tx = await factory.setTreasury(newVal);
-      setSuccessMessage("Transaction submitted. Waiting for confirmation...");
-      await tx.wait();
-      setSuccessMessage("✔️ Protocol Treasury updated on-chain successfully!");
-      await loadFactoryParams();
-    } catch (err: any) {
-      setErrorMessage(err.message || "Failed to update treasury address.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // --- Escrow Lifecycle Transactions ---
-  const handleDeployEscrow = async () => {
-    if (!walletAddress) return;
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsLoading(true);
-
-    // Initialize Stepper
-    setIsStepperOpen(true);
-    setStepperTitle("DEPLOYING_ESCROW_PIPELINE");
-    setStepperSubtext("Please authorize the 3 consecutive transactions in your wallet to deploy and initialize the secure escrow workspace.");
-    const initSteps: StepItem[] = [
-      { label: "Deploying Lightweight Escrow Clone on-chain", status: "active" },
-      { label: "Approving Escrow Contract for cUSDC Payouts", status: "pending" },
-      { label: "Encrypting Attachments & Initializing Milestones", status: "pending" }
-    ];
-    setStepperSteps(initSteps);
-
-    try {
-      const signer = await getWeb3Signer();
-      
-      const payouts = draftMilestonePayouts.split(',').map(p => Number(p.trim()));
-      const requirements = draftMilestoneReqs.split(';').map(r => r.trim());
-
-      if (payouts.length !== draftTotalMilestones || requirements.length !== draftTotalMilestones) {
-        throw new Error("Length mismatch: Number of payouts and requirements must match total milestones count.");
-      }
-
-      const escrowAddress = await deployEscrowClone(
-        signer,
-        factoryAddress,
-        draftFreelancer,
-        draftTotalMilestones
-      );
-
-      // Transition to Step 2
-      setStepperSteps([
-        { label: "Deploying Lightweight Escrow Clone on-chain", status: "completed" },
-        { label: "Approving Escrow Contract for cUSDC Payouts", status: "active" },
-        { label: "Encrypting Attachments & Initializing Milestones", status: "pending" }
-      ]);
-
-      await approveEscrowOperator(signer, cUSDCAddress, escrowAddress);
-
-      // Transition to Step 3
-      setStepperSteps([
-        { label: "Deploying Lightweight Escrow Clone on-chain", status: "completed" },
-        { label: "Approving Escrow Contract for cUSDC Payouts", status: "completed" },
-        { label: "Encrypting Attachments & Initializing Milestones", status: "active" }
-      ]);
-
-      await initializeEscrowMilestones(
-        signer,
-        escrowAddress,
-        payouts,
-        requirements,
-        gatewayUrl,
-        {
-          pinataJWT,
-          supabaseUrl,
-          supabaseKey
-        },
-        draftFiles
-      );
-
-      const newContract: EscrowContract = {
-        address: escrowAddress,
-        counterparty: draftFreelancer,
-        role: 'CLIENT',
-        milestonesCompleted: 0,
-        totalMilestones: draftTotalMilestones,
-        budget: payouts.reduce((a, b) => a + b, 0),
-        status: 'ACTIVE',
-        requirements: requirements
-      };
-
-      setContractsList(prev => [newContract, ...prev]);
-      setDraftFiles([]);
-      setIsStepperOpen(false);
-      addToast("✔️ Escrow deployed and initialized under zero-knowledge!", "success");
-      setShowDraftWizard(false);
-    } catch (err: any) {
-      setIsStepperOpen(false);
-      const errMsg = err.message || 'Failed to deploy escrow clone.';
-      setErrorMessage(errMsg);
-      addToast(`❌ Deployment failed: ${errMsg.slice(0, 100)}`, "error");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSubmitDeliverable = async () => {
-    if (!selectedContract) return;
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsLoading(true);
-
-    try {
-      const signer = await getWeb3Signer();
-      setSuccessMessage("Encrypting and submitting milestone deliverable on-chain...");
-      await submitMilestoneDeliverable(
-        signer,
-        selectedContract.address,
-        selectedContract.milestonesCompleted,
-        deliverableInput,
-        gatewayUrl,
-        {
-          pinataJWT,
-          supabaseUrl,
-          supabaseKey
-        },
-        deliverableFiles
-      );
-      
-      setContractsList(prev => prev.map(c => {
-        if (c.address.toLowerCase() === selectedContract.address.toLowerCase()) {
-          return { 
-            ...c, 
-            milestonesCompleted: Math.min(c.milestonesCompleted + 1, c.totalMilestones),
-            activeMilestoneSubmitted: true
-          };
-        }
-        return c;
-      }));
-
-      setSuccessMessage("✔️ Deliverable submitted successfully!");
-      setDeliverableInput("");
-      setDeliverableFiles([]);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to submit deliverable.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleReleaseMilestone = async () => {
-    if (!selectedContract) return;
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsLoading(true);
-
-    try {
-      const signer = await getWeb3Signer();
-      setSuccessMessage("Releasing cUSDC milestone payout and submitting rating...");
-      await releaseEscrowMilestone(signer, selectedContract.address, ratingInput);
-      
-      setSuccessMessage("✔️ Milestone approved and released!");
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to release milestone.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleRaiseDispute = async () => {
-    if (!selectedContract) return;
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsLoading(true);
-
-    try {
-      const signer = await getWeb3Signer();
-      setSuccessMessage("Uploading dispute reasoning & statement to enclave sync...");
-      
-      const useE2E = supabaseUrl && supabaseKey;
-      if (useE2E && disputeStatement.trim()) {
-        const role = selectedContract.role === 'CLIENT' ? 'client' : 'freelancer';
-        try {
-          await updateEscrowStatement(
-            supabaseUrl,
-            supabaseKey,
-            selectedContract.address,
-            selectedContract.milestonesCompleted,
-            role,
-            disputeStatement.trim()
-          );
-        } catch (dbErr) {
-          console.warn("Failed to sync dispute statement to Supabase, caching locally:", dbErr);
-          savePendingSync({
-            id: Math.random().toString(),
-            type: "STATEMENT",
-            escrowAddress: selectedContract.address,
-            milestoneIndex: selectedContract.milestonesCompleted,
-            data: { role, statement: disputeStatement.trim() }
-          });
-        }
-      }
-
-      setSuccessMessage("Transitioning state on-chain. Granting TEE Arbiter read keys...");
-      await raiseEscrowDispute(signer, selectedContract.address);
-      
-      setContractsList(prev => prev.map(c => {
-        if (c.address.toLowerCase() === selectedContract.address.toLowerCase()) {
-          return { ...c, status: 'DISPUTED' };
-        }
-        return c;
-      }));
-
-      setSuccessMessage("⚠️ Formal Dispute Raised! Enclave AI Arbiter process initiated.");
-      setDisputeStatement("");
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to raise dispute.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const logout = async () => {
     setErrorMessage(null);
@@ -824,6 +412,17 @@ function App() {
     if (viewMode === 'client') return c.role === 'CLIENT';
     return c.role === 'FREELANCER';
   });
+
+  // --- Computed Sidebar State ---
+  const isEscrowRoute = location.pathname.startsWith('/escrow/');
+  const currentEscrowAddress = isEscrowRoute ? location.pathname.split('/').pop() : null;
+  const sidebarSelectedContract = isEscrowRoute 
+    ? (contractsList.find(c => c.address.toLowerCase() === currentEscrowAddress?.toLowerCase()) || ({} as any))
+    : null;
+
+  const showDraftWizard = location.pathname === '/deploy';
+  const showTokenWrapper = location.pathname === '/swap';
+  const showSettings = location.pathname === '/admin';
 
   // --- Sleek Initialization Loader ---
   if (!ready) {
@@ -868,15 +467,15 @@ function App() {
       ) : (
         <div className="flex flex-col min-h-screen md:pl-64 relative z-10 animate-fade-in">
           <Sidebar
-            selectedContract={selectedContract}
+            selectedContract={sidebarSelectedContract}
             showDraftWizard={showDraftWizard}
             showSettings={showSettings}
             showTokenWrapper={showTokenWrapper}
             isAdmin={isAdmin}
-            onSelectVaults={() => { setSelectedContract(null); setShowDraftWizard(false); setShowTokenWrapper(false); }}
-            onSelectDeploy={() => { setShowDraftWizard(true); setShowTokenWrapper(false); }}
-            onSelectWrapper={() => { setShowTokenWrapper(true); setShowDraftWizard(false); setSelectedContract(null); }}
-            onToggleAdminConfig={() => setShowSettings(prev => !prev)}
+            onSelectVaults={() => navigate('/vaults')}
+            onSelectDeploy={() => navigate('/deploy')}
+            onSelectWrapper={() => navigate('/swap')}
+            onToggleAdminConfig={() => navigate(showSettings ? '/vaults' : '/admin')}
             logout={logout}
             viewMode={viewMode}
             setViewMode={setViewMode}
@@ -889,7 +488,7 @@ function App() {
             supabaseKey={supabaseKey}
           />
 
-          <main className="flex-1 p-6 max-w-[1400px] w-full mx-auto flex flex-col gap-6 relative z-10">
+          <main className="flex-1 p-6 pb-24 md:pb-6 max-w-[1400px] w-full mx-auto flex flex-col gap-6 relative z-10">
             {/* Global notifications panel */}
             {(errorMessage || successMessage) && (
               <div className="space-y-2">
@@ -912,9 +511,32 @@ function App() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               {/* Left Active Workspace Workspace area (8 columns) */}
               <div className="lg:col-span-8 flex flex-col gap-6 w-full">
-                {showSettings && isAdmin && (
-                  <div className="animate-fade-in">
-                    <AdminConfig
+                <Routes>
+                  <Route path="/" element={<Navigate to="/vaults" replace />} />
+                  <Route path="/vaults" element={
+                    <VaultsPage 
+                      activeEscrows={activeEscrows} 
+                      isFetchingContracts={isFetchingContracts} 
+                    />
+                  } />
+                  <Route path="/deploy" element={
+                    <DeployPage 
+                      walletAddress={walletAddress} 
+                      isLoading={isLoading} 
+                      handleDeployEscrow={handleDeployEscrow} 
+                    />
+                  } />
+                  <Route path="/swap" element={
+                    <SwapPage 
+                      walletAddress={walletAddress} 
+                      cUSDCAddress={cUSDCAddress} 
+                      publicUSDCAddress={publicUSDCAddress} 
+                      gatewayUrl={gatewayUrl} 
+                      getWeb3Signer={getWeb3Signer} 
+                    />
+                  } />
+                  <Route path="/admin" element={
+                    <AdminPage
                       factoryAddress={factoryAddress}
                       currentImplementation={currentImplementation}
                       currentRegistry={currentRegistry}
@@ -949,44 +571,13 @@ function App() {
                       handleUpdateTeeArbiter={handleUpdateTeeArbiter}
                       handleUpdatePlatformFeeBps={handleUpdatePlatformFeeBps}
                       handleUpdateTreasury={handleUpdateTreasury}
-                      onClose={() => setShowSettings(false)}
+                      isAdmin={isAdmin}
                     />
-                  </div>
-                )}
-
-                {showTokenWrapper ? (
-                  <div className="animate-fade-in">
-                    <TokenWrapper
-                      walletAddress={walletAddress!}
-                      cUSDCAddress={cUSDCAddress}
-                      publicUSDCAddress={publicUSDCAddress}
-                      gatewayUrl={gatewayUrl}
-                      getWeb3Signer={getWeb3Signer}
-                    />
-                  </div>
-                ) : showDraftWizard ? (
-                  <div className="animate-slide-up">
-                    <DraftWizard
+                  } />
+                  <Route path="/escrow/:address" element={
+                    <EscrowPage
+                      contractsList={contractsList}
                       walletAddress={walletAddress}
-                      draftFreelancer={draftFreelancer}
-                      setDraftFreelancer={setDraftFreelancer}
-                      draftTotalMilestones={draftTotalMilestones}
-                      setDraftTotalMilestones={setDraftTotalMilestones}
-                      draftMilestonePayouts={draftMilestonePayouts}
-                      setDraftMilestonePayouts={setDraftMilestonePayouts}
-                      draftMilestoneReqs={draftMilestoneReqs}
-                      setDraftMilestoneReqs={setDraftMilestoneReqs}
-                      isLoading={isLoading}
-                      handleDeployEscrow={handleDeployEscrow}
-                      onClose={() => setShowDraftWizard(false)}
-                      draftFiles={draftFiles}
-                      setDraftFiles={setDraftFiles}
-                    />
-                  </div>
-                ) : selectedContract ? (
-                  <div className="animate-fade-in">
-                    <EscrowWorkspace
-                      selectedContract={selectedContract}
                       viewMode={viewMode}
                       disputeStatement={disputeStatement}
                       setDisputeStatement={setDisputeStatement}
@@ -998,20 +589,12 @@ function App() {
                       handleRaiseDispute={handleRaiseDispute}
                       handleSubmitDeliverable={handleSubmitDeliverable}
                       handleReleaseMilestone={handleReleaseMilestone}
-                      onBack={() => setSelectedContract(null)}
                       deliverableFiles={deliverableFiles}
                       setDeliverableFiles={setDeliverableFiles}
                     />
-                  </div>
-                ) : (
-                  <div className="animate-fade-in">
-                    <PortfolioFeed
-                      activeEscrows={activeEscrows}
-                      isFetchingContracts={isFetchingContracts}
-                      setSelectedContract={setSelectedContract}
-                    />
-                  </div>
-                )}
+                  } />
+                  <Route path="*" element={<Navigate to="/vaults" replace />} />
+                </Routes>
               </div>
 
               {/* Right Global Telemetry Widgets area (4 columns) */}
@@ -1024,14 +607,20 @@ function App() {
                   completedCount={completedContracts}
                   disputedCount={disputedContracts}
                 />
-                <EventLog />
+                <EventLog 
+                  signer={signer}
+                  factoryAddress={factoryAddress}
+                  contractsList={contractsList}
+                />
               </div>
             </div>
           </main>
 
           <Footer
             setViewMode={setViewMode}
-            setShowDraftWizard={setShowDraftWizard}
+            setShowDraftWizard={(val) => {
+              if (val) navigate('/deploy');
+            }}
             logout={logout}
             setShowShortcutsHUD={setShowShortcutsHUD}
           />

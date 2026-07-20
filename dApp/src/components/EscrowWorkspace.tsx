@@ -1,11 +1,13 @@
 import { X, Lock, AlertTriangle, ShieldCheck, Terminal, Unlock, Paperclip, Trash2, Activity, Play, Pause } from 'lucide-react';
 import { type EscrowContract } from '../services/escrowService';
-import { fetchAndDecryptFile } from '../crypto/fileUploader';
-import { useState, useEffect } from 'react';
+import { fetchAndDecryptFile, encryptText, decryptText } from '../crypto/fileUploader';
+import { useState, useEffect, useRef } from 'react';
 import { TEECourtroom } from './TEECourtroom';
+import { supabase } from '../services/supabaseClient';
 
 interface EscrowWorkspaceProps {
   selectedContract: EscrowContract;
+  walletAddress: string | null;
   viewMode: 'client' | 'freelancer';
   disputeStatement: string;
   setDisputeStatement: (val: string) => void;
@@ -24,6 +26,7 @@ interface EscrowWorkspaceProps {
 
 export function EscrowWorkspace({
   selectedContract,
+  walletAddress,
   viewMode,
   disputeStatement,
   setDisputeStatement,
@@ -46,6 +49,227 @@ export function EscrowWorkspace({
   const [isDragging, setIsDragging] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamedAmount, setStreamedAmount] = useState(0);
+  const [showDisputeConfirm, setShowDisputeConfirm] = useState(false);
+  const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
+  const [disputeConsentChecked, setDisputeConsentChecked] = useState(false);
+
+  // --- Secure E2E Chat & Reviews States ---
+  const [messages, setMessages] = useState<{ id: string; sender: string; text: string; time: string }[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewText, setReviewText] = useState("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [hasSubmittedReview, setHasSubmittedReview] = useState(false);
+  const [bothReviewsSubmitted, setBothReviewsSubmitted] = useState(false);
+  const [decryptedReviews, setDecryptedReviews] = useState<{ reviewer: string; rating: number; text: string }[]>([]);
+
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Chat Subscribe & Load
+  useEffect(() => {
+    if (!selectedContract.address || !selectedContract.milestoneKeys?.[0]) return;
+
+    const chatKey = selectedContract.milestoneKeys[0];
+    const escrowAddrClean = selectedContract.address.toLowerCase();
+
+    const loadMessages = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('escrow_messages')
+          .select('*')
+          .eq('escrow_address', escrowAddrClean)
+          .order('created_at', { ascending: true });
+
+        if (error) {
+          console.error("Error loading chat messages:", error);
+          return;
+        }
+
+        if (data) {
+          const decrypted = await Promise.all(data.map(async (msg: any) => {
+            try {
+              const plain = await decryptText(msg.ciphertext, chatKey, msg.iv);
+              return {
+                id: msg.id,
+                sender: msg.sender_address,
+                text: plain,
+                time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              };
+            } catch (decErr) {
+              console.warn("Failed to decrypt message:", decErr);
+              return {
+                id: msg.id,
+                sender: msg.sender_address,
+                text: "🔒 [Decryption failed - mismatching keys]",
+                time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              };
+            }
+          }));
+          setMessages(decrypted);
+        }
+      } catch (err) {
+        console.error("Failed to load/decrypt messages:", err);
+      }
+    };
+
+    loadMessages();
+
+    // Subscribe to realtime inserts
+    const channel = supabase
+      .channel(`chat:${escrowAddrClean}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'escrow_messages',
+          filter: `escrow_address=eq.${escrowAddrClean}`
+        },
+        async (payload) => {
+          const newMsg = payload.new;
+          try {
+            const plain = await decryptText(newMsg.ciphertext, chatKey, newMsg.iv);
+            setMessages(prev => {
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              return [...prev, {
+                id: newMsg.id,
+                sender: newMsg.sender_address,
+                text: plain,
+                time: new Date(newMsg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              }];
+            });
+          } catch (decErr) {
+            console.warn("Failed to decrypt realtime message:", decErr);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedContract.address, selectedContract.milestoneKeys]);
+
+  // Load reviews
+  const loadReviews = async () => {
+    if (!selectedContract.address || !selectedContract.milestoneKeys?.[0] || !walletAddress) return;
+    const chatKey = selectedContract.milestoneKeys[0];
+    const escrowAddrClean = selectedContract.address.toLowerCase();
+    const milestoneIndex = selectedContract.milestonesCompleted;
+
+    try {
+      const { data, error } = await supabase
+        .from('double_blind_reviews')
+        .select('*')
+        .eq('escrow_address', escrowAddrClean)
+        .eq('milestone_index', milestoneIndex);
+
+      if (error) {
+        console.error("Error fetching reviews:", error);
+        return;
+      }
+
+      if (data) {
+        const userReviewed = data.some((r: any) => r.reviewer_address.toLowerCase() === walletAddress.toLowerCase());
+        setHasSubmittedReview(userReviewed);
+
+        const hasTwoReviews = data.length >= 2;
+        const isOlderThan14Days = data.length > 0 && (Date.now() - new Date(data[0].created_at).getTime() > 14 * 24 * 60 * 60 * 1000);
+
+        if (hasTwoReviews || isOlderThan14Days) {
+          setBothReviewsSubmitted(true);
+          const decrypted = await Promise.all(data.map(async (rev: any) => {
+            try {
+              const plain = await decryptText(rev.ciphertext, chatKey, rev.iv);
+              const parsed = JSON.parse(plain);
+              return {
+                reviewer: rev.reviewer_address,
+                rating: parsed.rating || 5,
+                text: parsed.text || ""
+              };
+            } catch (decErr) {
+              console.warn("Failed to decrypt review:", decErr);
+              return {
+                reviewer: rev.reviewer_address,
+                rating: 5,
+                text: "🔒 [Failed to decrypt review]"
+              };
+            }
+          }));
+          setDecryptedReviews(decrypted);
+        } else {
+          setBothReviewsSubmitted(false);
+        }
+      }
+    } catch (err) {
+      console.error("Error in loadReviews:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadReviews();
+  }, [selectedContract.address, selectedContract.milestonesCompleted, walletAddress, selectedContract.milestoneKeys]);
+
+  const handleSendMessage = async () => {
+    const chatKey = selectedContract.milestoneKeys?.[0];
+    if (!chatKey || !walletAddress || !newMessage.trim()) return;
+    setIsSendingMessage(true);
+    try {
+      const encrypted = await encryptText(newMessage, chatKey);
+      const { error } = await supabase
+        .from('escrow_messages')
+        .insert({
+          escrow_address: selectedContract.address.toLowerCase(),
+          sender_address: walletAddress.toLowerCase(),
+          ciphertext: encrypted.ciphertext,
+          iv: encrypted.iv
+        });
+      if (error) throw error;
+      setNewMessage("");
+    } catch (err) {
+      console.error("Failed to send encrypted message:", err);
+      alert("Error sending E2E encrypted message. Please try again.");
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+
+  const handleSubmitReview = async () => {
+    const chatKey = selectedContract.milestoneKeys?.[0];
+    if (!chatKey || !walletAddress || !reviewText.trim()) return;
+    setIsSubmittingReview(true);
+    try {
+      const payload = JSON.stringify({ rating: reviewRating, text: reviewText });
+      const encrypted = await encryptText(payload, chatKey);
+      
+      const { error } = await supabase
+        .from('double_blind_reviews')
+        .insert({
+          escrow_address: selectedContract.address.toLowerCase(),
+          milestone_index: selectedContract.milestonesCompleted,
+          reviewer_address: walletAddress.toLowerCase(),
+          ciphertext: encrypted.ciphertext,
+          iv: encrypted.iv
+        });
+
+      if (error) throw error;
+
+      setReviewText("");
+      setHasSubmittedReview(true);
+      await loadReviews();
+    } catch (err) {
+      console.error("Failed to submit review:", err);
+      alert("Error submitting review. Please try again.");
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
 
   useEffect(() => {
     let interval: any;
@@ -56,6 +280,51 @@ export function EscrowWorkspace({
     }
     return () => clearInterval(interval);
   }, [isStreaming]);
+
+  const [timeLeft, setTimeLeft] = useState<{
+    days: number;
+    hours: number;
+    minutes: number;
+    seconds: number;
+    isExpired: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!selectedContract.activeMilestoneSubmitted || !selectedContract.activeMilestoneSubmissionTime || !selectedContract.reviewWindow) {
+      setTimeLeft(null);
+      return;
+    }
+
+    const submissionTime = selectedContract.activeMilestoneSubmissionTime; // in seconds
+    const reviewWindow = selectedContract.reviewWindow; // in seconds
+    const expiryTimeMs = (submissionTime + reviewWindow) * 1000;
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const difference = expiryTimeMs - now;
+
+      if (difference <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true });
+        return;
+      }
+
+      const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+      setTimeLeft({ days, hours, minutes, seconds, isExpired: false });
+    };
+
+    updateTimer();
+    const timerInterval = setInterval(updateTimer, 1000);
+
+    return () => clearInterval(timerInterval);
+  }, [
+    selectedContract.activeMilestoneSubmitted,
+    selectedContract.activeMilestoneSubmissionTime,
+    selectedContract.reviewWindow
+  ]);
 
   const handleDownloadFile = async (cid: string, keyHex: string, name: string, type: string) => {
     if (!keyHex) {
@@ -175,6 +444,56 @@ export function EscrowWorkspace({
             <div>
               <span className="font-mono text-[9px] uppercase tracking-widest text-[#7F00FF] font-bold block mb-4">Milestone Specifications</span>
               <div className="space-y-4 font-mono">
+                {timeLeft && (
+                  <div className={`p-4 border rounded-xl flex flex-col gap-2 font-mono transition-smooth ${
+                    timeLeft.isExpired 
+                      ? 'bg-emerald-950/15 border-emerald-500/20 text-emerald-400' 
+                      : (timeLeft.days === 0 && timeLeft.hours < 12)
+                        ? 'bg-red-950/15 border-red-500/20 text-red-400 animate-pulse'
+                        : 'bg-amber-950/15 border-amber-500/20 text-amber-400'
+                  }`}>
+                    <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-wider">
+                      <span className="flex items-center gap-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${timeLeft.isExpired ? 'bg-[#00E676] drop-shadow-[0_0_4px_#00E676]' : 'bg-amber-400 animate-pulse drop-shadow-[0_0_4px_rgba(245,158,11,0.5)]'}`}></span>
+                        {timeLeft.isExpired ? 'Auto-Release Window Expired' : 'Auto-Release Review Countdown'}
+                      </span>
+                      <span className="text-[9px] text-slate-500">
+                        {timeLeft.isExpired ? 'Freelancer may trigger release' : 'Auto-release pending'}
+                      </span>
+                    </div>
+                    <div className="flex gap-4 items-center justify-center py-2 border-y border-white/5">
+                      {!timeLeft.isExpired ? (
+                        <>
+                          <div className="flex flex-col items-center">
+                            <span className="text-xl font-bold font-mono">{timeLeft.days}</span>
+                            <span className="text-[8px] text-slate-500 uppercase">Days</span>
+                          </div>
+                          <span className="text-slate-600">:</span>
+                          <div className="flex flex-col items-center">
+                            <span className="text-xl font-bold font-mono">{String(timeLeft.hours).padStart(2, '0')}</span>
+                            <span className="text-[8px] text-slate-500 uppercase">Hrs</span>
+                          </div>
+                          <span className="text-slate-600">:</span>
+                          <div className="flex flex-col items-center">
+                            <span className="text-xl font-bold font-mono">{String(timeLeft.minutes).padStart(2, '0')}</span>
+                            <span className="text-[8px] text-slate-500 uppercase">Min</span>
+                          </div>
+                          <span className="text-slate-600">:</span>
+                          <div className="flex flex-col items-center">
+                            <span className="text-xl font-bold font-mono">{String(timeLeft.seconds).padStart(2, '0')}</span>
+                            <span className="text-[8px] text-slate-500 uppercase">Sec</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center py-1">
+                          <span className="text-sm font-bold font-mono tracking-wide">READY FOR RELEASE BY CONTRACTOR</span>
+                          <span className="text-[8px] text-slate-500 uppercase">No client objections were raised during the review window</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-[#070913] p-5 border border-[#7F00FF]/25 rounded-xl relative overflow-hidden shadow-[0_0_15px_rgba(127,0,255,0.05)]">
                   <Lock className="w-4 h-4 text-[#7F00FF] absolute top-3 right-3 opacity-50" />
                   <span className="text-[10px] text-slate-500 block mb-2 font-bold tracking-wider">ACTIVE TARGET REQUIREMENTS</span>
@@ -229,7 +548,7 @@ export function EscrowWorkspace({
                   className="w-full bg-[#05070F] border border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:border-red-500/40 focus:outline-none transition-smooth resize-none"
                 />
                 <button
-                  onClick={handleRaiseDispute}
+                  onClick={() => setShowDisputeConfirm(true)}
                   disabled={isLoading}
                   className="w-full py-4 bg-red-950/10 hover:bg-red-950/20 border border-red-900/25 text-[#FF1744] font-mono text-xs tracking-widest uppercase rounded-xl flex items-center justify-center gap-2.5 cursor-pointer font-bold transition-smooth hover:shadow-[0_0_15px_rgba(255,23,68,0.1)] active:scale-[0.98]"
                 >
@@ -433,7 +752,7 @@ export function EscrowWorkspace({
                         ))}
                       </div>
                       <button
-                        onClick={handleReleaseMilestone}
+                        onClick={() => setShowReleaseConfirm(true)}
                         disabled={isLoading}
                         className="w-full py-4.5 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth hover:shadow-[0_0_20px_rgba(0,242,254,0.45)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2.5 rounded-xl border border-transparent"
                       >
@@ -448,6 +767,161 @@ export function EscrowWorkspace({
           </div>
         </div>
       )}
+
+      {/* Workspace Collaboration Section (Step 3.1 & 3.2) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Secure E2E Chat Box */}
+        <div className="border border-white/5 bg-white/[0.01] p-6 rounded-xl flex flex-col gap-4 hover:border-white/10 transition-smooth">
+          <div className="flex items-center justify-between border-b border-white/5 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00F2FE] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00F2FE]"></span>
+              </span>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-[#00F2FE] font-bold">
+                Private End-to-End Chat
+              </span>
+            </div>
+            <span className="text-[9px] font-mono text-slate-500 uppercase flex items-center gap-1.5">
+              <Lock className="w-3 h-3 text-[#00F2FE]" /> AES-GCM ENCRYPTED
+            </span>
+          </div>
+
+          {/* Chat message display area */}
+          <div className="bg-[#020308] border border-white/5 p-4 rounded-xl flex flex-col gap-3 min-h-[220px] max-h-[220px] overflow-y-auto custom-scrollbar">
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center py-6">
+                <Lock className="w-8 h-8 text-slate-600 mb-2 opacity-50" />
+                <span className="font-mono text-[10px] text-slate-500 uppercase tracking-widest">No previous E2E chat found.</span>
+                <span className="font-sans text-[11px] text-slate-600 mt-1 max-w-[280px]">Your messages are encrypted client-side using derived PBKDF2 wallet keys. Only you and your counterparty can read them.</span>
+              </div>
+            ) : (
+              messages.map((msg, idx) => {
+                const isMe = msg.sender.toLowerCase() === walletAddress?.toLowerCase();
+                return (
+                  <div key={idx} className={`flex flex-col max-w-[85%] ${isMe ? 'self-end items-end' : 'self-start items-start'}`}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="font-mono text-[8px] text-[#00F2FE] font-bold uppercase tracking-wider">
+                        {isMe ? 'Me' : `${msg.sender.slice(0, 6)}...${msg.sender.slice(-4)}`}
+                      </span>
+                      <span className="text-[8px] text-slate-600 font-mono">{msg.time}</span>
+                    </div>
+                    <div className={`px-4 py-2.5 text-xs font-sans rounded-2xl ${
+                      isMe 
+                        ? 'bg-[#7F00FF]/10 text-[#E0AAFF] border border-[#7F00FF]/20 rounded-tr-none' 
+                        : 'bg-white/[0.02] text-slate-200 border border-white/5 rounded-tl-none'
+                    }`}>
+                      {msg.text}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Send message input */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Type your secure message..."
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSendMessage(); }}
+              className="flex-1 bg-[#05070F] border border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:border-[#00F2FE]/40 focus:outline-none transition-smooth"
+            />
+            <button
+              onClick={handleSendMessage}
+              disabled={!newMessage.trim() || isSendingMessage}
+              className="px-6 py-3 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-wider rounded-xl transition-smooth hover:shadow-[0_0_15px_rgba(0,242,254,0.3)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              {isSendingMessage ? "Sending..." : "Send"}
+            </button>
+          </div>
+        </div>
+
+        {/* Double-Blind Written Reviews */}
+        <div className="border border-white/5 bg-white/[0.01] p-6 rounded-xl flex flex-col gap-4 hover:border-white/10 transition-smooth">
+          <div className="flex items-center justify-between border-b border-white/5 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400 animate-pulse drop-shadow-[0_0_4px_rgba(245,158,11,0.5)]"></span>
+              </span>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-amber-400 font-bold">
+                Double-Blind Written Reviews
+              </span>
+            </div>
+            <span className="text-[9px] font-mono text-slate-500 uppercase flex items-center gap-1.5">
+              <ShieldCheck className="w-3 h-3 text-amber-400" /> PREVENTING RETALIATION
+            </span>
+          </div>
+
+          {/* Existing Reviews List / Status */}
+          {hasSubmittedReview ? (
+            <div className="bg-[#020308] border border-white/5 p-4 rounded-xl flex flex-col gap-3 flex-1 justify-center min-h-[220px]">
+              <div className="flex items-center gap-2 text-amber-400 font-mono text-[10px] uppercase font-bold tracking-wider">
+                <Lock className="w-3.5 h-3.5" />
+                <span>Your Double-Blind feedback has been submitted!</span>
+              </div>
+              {bothReviewsSubmitted ? (
+                <div className="space-y-4 border-t border-white/5 pt-3 mt-1 overflow-y-auto max-h-[140px] custom-scrollbar pr-1">
+                  {decryptedReviews.map((rev, idx) => (
+                    <div key={idx} className="flex flex-col gap-1.5 p-3 rounded-lg bg-white/[0.01] border border-white/5 font-mono text-[10px]">
+                      <div className="flex justify-between text-slate-400 border-b border-white/5 pb-1 mb-1">
+                        <span>REVIEWER: {rev.reviewer.slice(0, 6)}...{rev.reviewer.slice(-4)}</span>
+                        <span className="text-amber-400 font-bold">RATING: {rev.rating}★</span>
+                      </div>
+                      <p className="text-xs text-slate-200 font-sans leading-relaxed">{rev.text}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 bg-amber-950/15 border border-amber-500/20 rounded-xl text-amber-400 font-sans text-xs leading-relaxed">
+                  Waiting for the other party to submit their review. All reviews will remain E2E-encrypted and completely hidden until both counterparties submit, preventing retaliatory reviewing patterns.
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Review Submission Form */
+            <div className="flex flex-col gap-3 flex-1 justify-between min-h-[220px]">
+              <div>
+                <p className="text-xs text-slate-400 font-sans leading-normal mb-3">
+                  Submit honest rating feedback for this milestone escrow. Written feedback remains E2E-encrypted and will only be revealed once both parties have submitted.
+                </p>
+                <div className="flex items-center gap-2 mb-3.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => setReviewRating(star)}
+                      className={`w-9 h-9 border font-mono text-xs rounded-xl transition-smooth cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95 ${
+                        reviewRating === star 
+                          ? 'bg-amber-400 text-[#05070F] font-extrabold border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]' 
+                          : 'border-white/5 text-slate-400 hover:text-white bg-[#05070F] hover:border-white/20'
+                      }`}
+                    >
+                      {star}★
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  rows={2}
+                  placeholder="Write your E2E encrypted double-blind written review here..."
+                  value={reviewText}
+                  onChange={(e) => setReviewText(e.target.value)}
+                  className="w-full bg-[#05070F] border border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:border-amber-400/40 focus:outline-none transition-smooth resize-none"
+                />
+              </div>
+              <button
+                onClick={handleSubmitReview}
+                disabled={isSubmittingReview || !reviewText.trim()}
+                className="w-full py-3 bg-amber-400 text-[#05070F] font-mono text-xs font-bold uppercase tracking-wider rounded-xl transition-smooth hover:shadow-[0_0_15px_rgba(245,158,11,0.3)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {isSubmittingReview ? "Encrypting & Submitting..." : "Submit Double-Blind Review"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* TEE Hardware Attestation & Security Telemetry */}
       <div className="border border-white/5 bg-[#03050C]/60 backdrop-blur-md p-6 rounded-xl flex flex-col gap-4 hover:border-white/10 transition-smooth">
@@ -512,6 +986,107 @@ export function EscrowWorkspace({
           )}
         </div>
       </div>
+
+      {/* Dispute Confirmation Modal */}
+      {showDisputeConfirm && (
+        <div className="fixed inset-0 bg-[#05070F]/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0B0F19] border border-red-500/20 max-w-md w-full p-6 rounded-2xl flex flex-col gap-5 shadow-[0_0_50px_rgba(255,23,68,0.15)] animate-slide-up font-sans">
+            <div className="flex justify-between items-center border-b border-white/5 pb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-500 animate-pulse" />
+                <span className="font-mono text-xs font-extrabold tracking-widest text-red-400 uppercase">INITIATE_TEE_ARBITRATION_PROTOCOL</span>
+              </div>
+              <button 
+                onClick={() => { setShowDisputeConfirm(false); setDisputeConsentChecked(false); }}
+                className="text-slate-400 hover:text-white transition-smooth bg-transparent border-transparent border cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="text-xs text-slate-300 space-y-3 leading-relaxed">
+              <p>You are about to raise a formal dispute on **Milestone {selectedContract.milestonesCompleted + 1}**. Please review the protocol actions that will trigger immediately:</p>
+              <ul className="list-disc pl-4 space-y-1.5 font-mono text-[10px] text-slate-400">
+                <li><strong className="text-white">ON-CHAIN FREEZE</strong>: Milestone payout will be locked securely.</li>
+                <li><strong className="text-white">TEE INITIALIZATION</strong>: AMD SEV/Intel SGX isolated sandbox spins up.</li>
+                <li><strong className="text-white">AI DECISION</strong>: Google Gemini decrypts deliverables and makes a deterministic ruling.</li>
+                <li><strong className="text-white">REPUTATION PENALTY</strong>: The losing party incurs a severe -500 NERM rating drop.</li>
+              </ul>
+            </div>
+            <label className="flex items-start gap-3 bg-red-950/10 border border-red-900/20 p-3 rounded-xl cursor-pointer hover:bg-red-950/15 transition-smooth">
+              <input 
+                type="checkbox" 
+                checked={disputeConsentChecked}
+                onChange={(e) => setDisputeConsentChecked(e.target.checked)}
+                className="mt-0.5 accent-red-500 cursor-pointer w-4 h-4"
+              />
+              <span className="text-[10px] text-red-300 font-sans leading-normal">
+                I understand that TEE AI Arbitration is binding, permanent, on-chain, and irreversible.
+              </span>
+            </label>
+            <div className="flex gap-3 mt-1">
+              <button
+                onClick={() => { setShowDisputeConfirm(false); setDisputeConsentChecked(false); }}
+                className="flex-1 py-3 border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] rounded-xl font-mono text-[10px] uppercase font-bold text-slate-400 hover:text-white transition-smooth cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={!disputeConsentChecked}
+                onClick={() => {
+                  setShowDisputeConfirm(false);
+                  setDisputeConsentChecked(false);
+                  handleRaiseDispute();
+                }}
+                className="flex-1 py-3 bg-red-500 text-white hover:bg-red-600 rounded-xl font-mono text-[10px] uppercase font-bold transition-smooth cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-[0_0_15px_rgba(255,23,68,0.4)]"
+              >
+                Raise Dispute
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Release Payout Confirmation Modal */}
+      {showReleaseConfirm && (
+        <div className="fixed inset-0 bg-[#05070F]/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0B0F19] border border-[#00F2FE]/20 max-w-md w-full p-6 rounded-2xl flex flex-col gap-5 shadow-[0_0_50px_rgba(0,242,254,0.15)] animate-slide-up font-sans">
+            <div className="flex justify-between items-center border-b border-white/5 pb-3">
+              <div className="flex items-center gap-2">
+                <Unlock className="w-5 h-5 text-[#00F2FE]" />
+                <span className="font-mono text-xs font-extrabold tracking-widest text-[#00F2FE] uppercase">RELEASE_ESCROW_PAYOUT_CONFIRMATION</span>
+              </div>
+              <button 
+                onClick={() => setShowReleaseConfirm(false)}
+                className="text-slate-400 hover:text-white transition-smooth bg-transparent border-transparent border cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="text-xs text-slate-300 space-y-3 leading-relaxed">
+              <p>You are about to authorize an irreversible payout release of <strong className="text-[#00F2FE] font-mono">{milestoneBudget.toLocaleString()} cUSDC</strong> for **Milestone {selectedContract.milestonesCompleted + 1}**.</p>
+              <p>The funds will be transferred instantly from the secure escrow contract directly to the freelancer's wallet address.</p>
+              <p>Your quality satisfaction rating of <strong className="text-amber-400 font-mono">{ratingInput}★</strong> will be finalized and recorded on-chain, dynamically increasing the freelancer's NERM reputation rating.</p>
+            </div>
+            <div className="flex gap-3 mt-1">
+              <button
+                onClick={() => setShowReleaseConfirm(false)}
+                className="flex-1 py-3 border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] rounded-xl font-mono text-[10px] uppercase font-bold text-slate-400 hover:text-white transition-smooth cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowReleaseConfirm(false);
+                  handleReleaseMilestone();
+                }}
+                className="flex-1 py-3 bg-[#00F2FE] text-[#05070F] hover:bg-[#33F5FF] rounded-xl font-mono text-[10px] uppercase font-bold transition-smooth cursor-pointer hover:shadow-[0_0_15px_rgba(0,242,254,0.4)]"
+              >
+                Release Payout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { createEthersHandleClient } from "@iexec-nox/handle";
 import { createClient } from "@supabase/supabase-js";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { ethers } from "ethers";
 import axios from "axios";
 import crypto from "crypto";
@@ -271,25 +271,23 @@ async function main() {
   let adjudicationReasoning = "Automatic fallback due to model evaluation issue.";
   let evaluationScore = 0;
 
-  if (GEMINI_API_KEY) {
-    console.log("\n🤖 Initializing Google Gemini 2.5 Flash client...");
+  // --- Hybrid Google Gen AI SDK Initialization (AI Studio Key or local GCP ADC) ---
+  const useGcpADC = !GEMINI_API_KEY || !GEMINI_API_KEY.startsWith("AIzaSy");
+  
+  if (GEMINI_API_KEY || useGcpADC) {
     try {
-      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "OBJECT",
-            properties: {
-              reasoning: { type: "STRING" },
-              score: { type: "INTEGER" },
-              verdict: { type: "STRING", enum: ["PAY_FREELANCER", "REFUND_CLIENT"] }
-            },
-            required: ["reasoning", "score", "verdict"]
-          }
-        }
-      });
+      let ai;
+      if (!useGcpADC) {
+        console.log("\n🤖 Initializing Google Gemini 2.5 Flash client via Google AI Studio API Key...");
+        ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+      } else {
+        console.log("\n🤖 Initializing Google Gemini 2.5 Flash client via local Application Default Credentials (ADC) Vertex AI...");
+        ai = new GoogleGenAI({
+          vertex: true,
+          project: "project-7fba3d65-5e52-4996-b38",
+          location: "us-central1"
+        });
+      }
 
       const systemPrompt = `You are a highly analytical, objective, and expert Smart Contract and Software Engineering Auditor acting as the supreme arbiter for NoxEscrow.
 
@@ -324,9 +322,34 @@ ${clientStatement}
 ${freelancerStatement}
 `;
 
-      console.log("⏳ Sending evaluation request to Gemini API...");
-      const result = await model.generateContent([systemPrompt, userContext]);
-      const responseText = result.response.text();
+      console.log("⏳ Sending evaluation request to Gemini API (gemini-2.5-flash)...");
+      
+      const result = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: userContext }
+            ]
+          }
+        ],
+        config: {
+          systemInstruction: systemPrompt,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              reasoning: { type: "STRING" },
+              score: { type: "INTEGER" },
+              verdict: { type: "STRING", enum: ["PAY_FREELANCER", "REFUND_CLIENT"] }
+            },
+            required: ["reasoning", "score", "verdict"]
+          }
+        }
+      });
+
+      const responseText = result.text;
 
       console.log("📥 Response received from Gemini:");
       console.log(responseText);
