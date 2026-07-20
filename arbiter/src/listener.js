@@ -1,5 +1,6 @@
 import { ethers } from "ethers";
 import axios from "axios";
+import http from "http";
 
 // Environment variables with sensible defaults for local development
 const RPC_URL = process.env.RPC_URL || "http://127.0.0.1:8545";
@@ -78,9 +79,21 @@ async function main() {
     }
   });
 
+  // Simple HTTP Server for Render free-tier health checks
+  const PORT = process.env.PORT || 3000;
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("NoxEscrow Webhook Listener Active\n");
+  });
+  
+  server.listen(PORT, () => {
+    console.log(`🏥 Health Check server listening on port ${PORT}`);
+  });
+
   // Handle process shutdown cleanly
   process.on("SIGINT", () => {
     console.log("\n🛑 Shutting down listener gracefully...");
+    server.close();
     provider.removeAllListeners();
     process.exit(0);
   });

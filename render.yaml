@@ -1,5 +1,5 @@
 services:
-  - type: worker
+  - type: web
     name: noxescrow-webhook-listener
     runtime: node
     repo: https://github.com/AduAkorful/NoxEscrow # Replace with your repository URL
