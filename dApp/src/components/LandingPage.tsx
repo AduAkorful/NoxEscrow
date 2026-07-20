@@ -139,41 +139,48 @@ export function LandingPage({ connectWallet }: LandingPageProps) {
       </section>
 
       {/* Interactive Execution Flow (Workflow) */}
-      <section id="workflow" className="relative z-10 border-t border-white/5 bg-[#121626]/20 py-20">
-        <div className="max-w-5xl mx-auto px-6">
+      <section id="workflow" className="relative z-10 border-t border-white/5 bg-[#121626]/20 py-24">
+        <div className="max-w-7xl mx-auto px-6 md:px-10">
           <div className="flex flex-col items-center mb-16">
             <span className="font-mono text-xs font-bold text-[#00F2FE] tracking-widest uppercase mb-3">⚙️ Interactive Pipeline</span>
-            <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight uppercase text-center">
+            <h2 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight uppercase text-center">
               The Decrypt-To-Settle System
             </h2>
-            <p className="text-slate-400 text-xs text-center max-w-md mt-2 font-mono">
+            <p className="text-slate-400 text-sm text-center max-w-xl mt-3 font-mono">
               Trace the exact sequence of client and contractor triggers within the escrow enclave.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 xl:gap-8">
             {steps.map((step, idx) => (
               <div 
                 key={idx}
-                className="bento-card p-6 flex flex-col gap-4 relative overflow-hidden transition-smooth hover:border-[#00F2FE]/25 group"
+                className="bento-card p-7 flex flex-col justify-between relative overflow-hidden transition-smooth hover:border-[#00F2FE]/30 hover:shadow-[0_12px_40px_rgba(0,242,254,0.08)] group"
               >
-                <div className="w-10 h-10 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-center transition-smooth group-hover:bg-[#00F2FE]/5 group-hover:border-[#00F2FE]/20">
-                  {step.icon}
+                {/* Step number watermark/badge */}
+                <div className="absolute top-5 right-6 font-mono text-xs font-bold text-slate-600/60 group-hover:text-[#00F2FE] transition-colors">
+                  0{idx + 1}
                 </div>
 
-                <h3 className="font-mono text-xs font-bold text-white uppercase tracking-wider">
-                  {step.title}
-                </h3>
-
-                <div className="flex flex-col gap-3 font-mono text-[10px] mt-2">
-                  <div className="flex flex-col gap-1 border-l border-white/10 pl-2.5 py-0.5">
-                    <span className="text-[#00F2FE] font-bold tracking-widest">{step.action}</span>
-                    <span className="text-slate-400 font-sans leading-normal">{step.actionDesc}</span>
+                <div className="flex flex-col gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center transition-smooth group-hover:bg-[#00F2FE]/10 group-hover:border-[#00F2FE]/30 group-hover:scale-105">
+                    {step.icon}
                   </div>
 
-                  <div className="flex flex-col gap-1 border-l border-[#7F00FF]/30 pl-2.5 py-0.5 bg-[#7F00FF]/5 rounded-r-lg">
-                    <span className="text-[#7F00FF] font-bold tracking-widest">{step.reaction}</span>
-                    <span className="text-slate-400 font-sans leading-normal">{step.reactionDesc}</span>
+                  <h3 className="font-mono text-sm font-bold text-white uppercase tracking-wider pr-6">
+                    {step.title}
+                  </h3>
+                </div>
+
+                <div className="flex flex-col gap-3 font-mono text-xs mt-6">
+                  <div className="flex flex-col gap-1.5 border-l-2 border-[#00F2FE]/40 pl-3 py-1 bg-white/[0.01] rounded-r-lg">
+                    <span className="text-[#00F2FE] text-[11px] font-bold tracking-widest">{step.action}</span>
+                    <span className="text-slate-300 font-sans leading-relaxed text-[12px]">{step.actionDesc}</span>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 border-l-2 border-[#7F00FF]/50 pl-3 py-1 bg-[#7F00FF]/5 rounded-r-lg">
+                    <span className="text-[#7F00FF] text-[11px] font-bold tracking-widest">{step.reaction}</span>
+                    <span className="text-slate-300 font-sans leading-relaxed text-[12px]">{step.reactionDesc}</span>
                   </div>
                 </div>
               </div>
@@ -183,11 +190,11 @@ export function LandingPage({ connectWallet }: LandingPageProps) {
       </section>
 
       {/* Features Grid */}
-      <section id="features" className="relative z-10 border-t border-white/5 py-20 bg-[#05070F]">
-        <div className="max-w-5xl mx-auto px-6">
+      <section id="features" className="relative z-10 border-t border-white/5 py-24 bg-[#05070F]">
+        <div className="max-w-7xl mx-auto px-6 md:px-10">
           <div className="flex flex-col items-center mb-16">
             <span className="font-mono text-xs font-bold text-[#00F2FE] tracking-widest uppercase mb-3">🛡️ Security Core</span>
-            <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight uppercase text-center">
+            <h2 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight uppercase text-center">
               Protocol Security Pillars
             </h2>
           </div>
@@ -197,8 +204,8 @@ export function LandingPage({ connectWallet }: LandingPageProps) {
                 <Lock className="w-6 h-6 text-[#7F00FF] drop-shadow-[0_0_8px_rgba(127,0,255,0.4)]" />
               </div>
               <div>
-                <h3 className="font-mono text-sm font-bold text-white uppercase tracking-wider mb-2">iExec Nox Privacy</h3>
-                <p className="text-[13px] text-slate-400 leading-relaxed font-sans">
+                <h3 className="font-mono text-base font-bold text-white uppercase tracking-wider mb-2">iExec Nox Privacy</h3>
+                <p className="text-sm text-slate-300 leading-relaxed font-sans">
                   Every budget amount, task requirement, and code deliverable is encrypted client-side using WebCrypto and saved on-chain as a secure Nox pointer. Zero rate leakage to competitors or block explorers.
                 </p>
               </div>
@@ -208,8 +215,8 @@ export function LandingPage({ connectWallet }: LandingPageProps) {
                 <Cpu className="w-6 h-6 text-[#00F2FE] drop-shadow-[0_0_8px_rgba(0,242,254,0.4)]" />
               </div>
               <div>
-                <h3 className="font-mono text-sm font-bold text-white uppercase tracking-wider mb-2">TEE AI Arbitration</h3>
-                <p className="text-[13px] text-slate-400 leading-relaxed font-sans">
+                <h3 className="font-mono text-base font-bold text-white uppercase tracking-wider mb-2">TEE AI Arbitration</h3>
+                <p className="text-sm text-slate-300 leading-relaxed font-sans">
                   If disputes arise, an autonomous AI auditor spins up inside an Intel TDX hardware-isolated enclave. Granted temporary read access via on-chain ACLs, the AI rules unbiasedly and triggers deterministic payouts.
                 </p>
               </div>
@@ -219,8 +226,8 @@ export function LandingPage({ connectWallet }: LandingPageProps) {
                 <Fingerprint className="w-6 h-6 text-[#00E676] drop-shadow-[0_0_8px_rgba(0,230,118,0.4)]" />
               </div>
               <div>
-                <h3 className="font-mono text-sm font-bold text-white uppercase tracking-wider mb-2">On-Chain Reputation</h3>
-                <p className="text-[13px] text-slate-400 leading-relaxed font-sans">
+                <h3 className="font-mono text-base font-bold text-white uppercase tracking-wider mb-2">On-Chain Reputation</h3>
+                <p className="text-sm text-slate-300 leading-relaxed font-sans">
                   Contractors compile verified, non-falsifiable professional reputation scores (NERM) on-chain under zero-knowledge, unlocking discounted platform fees and prioritized hire status.
                 </p>
               </div>
@@ -230,20 +237,20 @@ export function LandingPage({ connectWallet }: LandingPageProps) {
       </section>
 
       {/* Protocol Metrics Section */}
-      <section id="metrics" className="relative z-10 border-t border-white/5 py-20 bg-[#121626]/20">
-        <div className="max-w-5xl mx-auto px-6">
+      <section id="metrics" className="relative z-10 border-t border-white/5 py-24 bg-[#121626]/20">
+        <div className="max-w-7xl mx-auto px-6 md:px-10">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="bento-card p-8 text-center flex flex-col justify-center items-center">
               <span className="font-mono text-4xl font-extrabold text-[#00F2FE] block mb-2 teal-glow-text">14,890+</span>
-              <span className="font-mono text-[10px] text-slate-500 uppercase tracking-widest font-bold">Confidential Agreements Deployed</span>
+              <span className="font-mono text-xs text-slate-400 uppercase tracking-widest font-bold">Confidential Agreements Deployed</span>
             </div>
             <div className="bento-card bento-card-violet p-8 text-center flex flex-col justify-center items-center">
               <span className="font-mono text-4xl font-extrabold text-[#7F00FF] block mb-2 violet-glow-text">$45.2M+</span>
-              <span className="font-mono text-[10px] text-slate-500 uppercase tracking-widest font-bold">Wrapped cUSDC Volume Secured</span>
+              <span className="font-mono text-xs text-slate-400 uppercase tracking-widest font-bold">Wrapped cUSDC Volume Secured</span>
             </div>
             <div className="bento-card p-8 text-center flex flex-col justify-center items-center">
               <span className="font-mono text-4xl font-extrabold text-[#00E676] block mb-2 drop-shadow-[0_0_10px_rgba(0,230,118,0.3)]">100%</span>
-              <span className="font-mono text-[10px] text-slate-500 uppercase tracking-widest font-bold">Unbiased TEE Resolve Rate</span>
+              <span className="font-mono text-xs text-slate-400 uppercase tracking-widest font-bold">Unbiased TEE Resolve Rate</span>
             </div>
           </div>
         </div>
