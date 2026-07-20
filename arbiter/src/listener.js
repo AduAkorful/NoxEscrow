@@ -15,9 +15,12 @@ if (!FACTORY_ADDRESS) {
 
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 
-// ABI snippet for factory verification
+// ABI snippet for factory verification and clone tracking
 const factoryABI = [
-  "function isEscrowContract(address) view returns (bool)"
+  "function isEscrowContract(address) view returns (bool)",
+  "function escrowsCount() view returns (uint256)",
+  "function allEscrows(uint256) view returns (address)",
+  "event EscrowCreated(address indexed escrowAddress, address indexed client, address indexed freelancer, uint256 totalMilestones)"
 ];
 
 // ABI snippet for escrow clone event parsing
@@ -38,9 +41,7 @@ console.log("==========================================================\n");
 // Filter to listen globally for the DisputeOpened event on any contract
 // Topic 0: Keccak256 hash of "DisputeOpened(uint256,uint256,uint256)"
 const DISPUTE_OPENED_TOPIC = ethers.id("DisputeOpened(uint256,uint256,uint256)");
-const disputeFilter = {
-  topics: [DISPUTE_OPENED_TOPIC]
-};
+const ESCROW_CREATED_TOPIC = ethers.id("EscrowCreated(address,address,address,uint256)");
 
 async function handleDisputeOpened(log) {
   try {
@@ -84,6 +85,26 @@ async function main() {
   let keepRunning = true;
   let lastProcessedBlock = null;
   let isPolling = false;
+  const escrowClones = new Set();
+
+  // On startup: load all existing escrow clones from the factory to construct initial whitelist
+  try {
+    const count = await factoryContract.escrowsCount();
+    console.log(`🔍 Initializing clone registry. Found ${count} existing escrow clones in factory.`);
+    const fetchPromises = [];
+    for (let i = 0; i < count; i++) {
+      fetchPromises.push(factoryContract.allEscrows(i));
+    }
+    const addresses = await Promise.all(fetchPromises);
+    for (const addr of addresses) {
+      escrowClones.add(addr.toLowerCase());
+    }
+    if (escrowClones.size > 0) {
+      console.log(`✔️ Loaded ${escrowClones.size} clones into active whitelist.`);
+    }
+  } catch (err) {
+    console.error("⚠️ Warning: Failed to load existing escrow clones from factory on startup:", err.message);
+  }
 
   async function pollForEvents() {
     if (isPolling) return;
@@ -103,14 +124,41 @@ async function main() {
         
         console.log(`🔍 Polling blocks ${fromBlock} to ${toBlock} (latest: ${latestBlock})...`);
         
-        const logs = await provider.getLogs({
-          ...disputeFilter,
+        // 1. Check for any newly created escrow clones from the factory
+        const escrowCreatedLogs = await provider.getLogs({
+          address: FACTORY_ADDRESS,
+          topics: [ESCROW_CREATED_TOPIC],
           fromBlock,
           toBlock
         });
 
-        for (const log of logs) {
-          await handleDisputeOpened(log);
+        for (const log of escrowCreatedLogs) {
+          try {
+            const parsed = factoryContract.interface.parseLog(log);
+            const cloneAddress = parsed.args.escrowAddress.toLowerCase();
+            if (!escrowClones.has(cloneAddress)) {
+              console.log(`➕ Dynamic registry: Registered new escrow clone: ${cloneAddress}`);
+              escrowClones.add(cloneAddress);
+            }
+          } catch (parseErr) {
+            console.error("⚠️ Failed to parse EscrowCreated log:", parseErr.message);
+          }
+        }
+
+        // 2. Check for formal disputes raised on any registered escrow clones
+        if (escrowClones.size > 0) {
+          const disputeLogs = await provider.getLogs({
+            address: Array.from(escrowClones),
+            topics: [DISPUTE_OPENED_TOPIC],
+            fromBlock,
+            toBlock
+          });
+
+          for (const log of disputeLogs) {
+            await handleDisputeOpened(log);
+          }
+        } else {
+          console.log("ℹ️ Skipping dispute polling (no active escrow clones registered).");
         }
 
         lastProcessedBlock = toBlock;
