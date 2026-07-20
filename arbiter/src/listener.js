@@ -6,6 +6,7 @@ import http from "http";
 const RPC_URL = process.env.RPC_URL || "http://127.0.0.1:8545";
 const FACTORY_ADDRESS = process.env.ESCROW_FACTORY_ADDRESS;
 const IEXEC_RUNNER_ENDPOINT = process.env.IEXEC_RUNNER_ENDPOINT || "http://127.0.0.1:3000/trigger-task";
+const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL || "15000", 10);
 
 if (!FACTORY_ADDRESS) {
   console.error("❌ ERROR: ESCROW_FACTORY_ADDRESS environment variable is required.");
@@ -31,6 +32,7 @@ console.log("🛡️  NoxEscrow Decentralized Webhook Listener Active  🛡️")
 console.log(`📡 RPC Node: ${RPC_URL}`);
 console.log(`🏭 Factory Address: ${FACTORY_ADDRESS}`);
 console.log(`🚀 iExec TEE Trigger Endpoint: ${IEXEC_RUNNER_ENDPOINT}`);
+console.log(`⏱️ Polling Interval: ${POLL_INTERVAL}ms`);
 console.log("==========================================================\n");
 
 // Filter to listen globally for the DisputeOpened event on any contract
@@ -40,44 +42,95 @@ const disputeFilter = {
   topics: [DISPUTE_OPENED_TOPIC]
 };
 
-async function main() {
-  provider.on(disputeFilter, async (log) => {
-    try {
-      const contractAddress = log.address;
-      console.log(`\n🔔 Event detected! Log address: ${contractAddress}`);
+async function handleDisputeOpened(log) {
+  try {
+    const contractAddress = log.address;
+    console.log(`\n🔔 Event detected! Log address: ${contractAddress}`);
 
-      // 1. Verify that the contract is a legitimate clone deployed by our factory
-      const isVerified = await factoryContract.isEscrowContract(contractAddress);
-      if (!isVerified) {
-        console.log(`⚠️ Ignored event from unauthorized contract: ${contractAddress}`);
+    // 1. Verify that the contract is a legitimate clone deployed by our factory
+    const isVerified = await factoryContract.isEscrowContract(contractAddress);
+    if (!isVerified) {
+      console.log(`⚠️ Ignored event from unauthorized contract: ${contractAddress}`);
+      return;
+    }
+
+    console.log(`✔️ Verified escrow contract clone: ${contractAddress}`);
+
+    // 2. Parse the DisputeOpened event parameters
+    const escrowContract = new ethers.Contract(contractAddress, escrowABI, provider);
+    const parsedLog = escrowContract.interface.parseLog(log);
+    
+    const { milestoneIndex, requirementsHash, deliverableHash } = parsedLog.args;
+    console.log(`👉 Milestone Index: ${milestoneIndex}`);
+    console.log(`👉 Requirements Handle: 0x${requirementsHash.toString(16)}`);
+    console.log(`👉 Deliverable Handle: 0x${deliverableHash.toString(16)}`);
+
+    // 3. Trigger the iExec TEE execution task
+    console.log("⏳ Forwarding dispute details to the iExec TEE task runner...");
+    const response = await axios.post(IEXEC_RUNNER_ENDPOINT, {
+      escrowAddress: contractAddress,
+      milestoneIndex: milestoneIndex.toString(),
+      reqsHandle: `0x${requirementsHash.toString(16).padStart(64, "0")}`,
+      devsHandle: `0x${deliverableHash.toString(16).padStart(64, "0")}`
+    });
+
+    console.log(`🚀 iExec TEE execution triggered successfully! Response:`, response.status === 200 ? "Success" : response.statusText);
+  } catch (error) {
+    console.error("❌ Error processing log event:", error.message);
+  }
+}
+
+async function main() {
+  let keepRunning = true;
+  let lastProcessedBlock = null;
+  let isPolling = false;
+
+  async function pollForEvents() {
+    if (isPolling) return;
+    isPolling = true;
+    try {
+      const latestBlock = await provider.getBlockNumber();
+      
+      if (lastProcessedBlock === null) {
+        lastProcessedBlock = latestBlock;
+        console.log(`📡 Block polling initialized. Starting from block: ${lastProcessedBlock}`);
         return;
       }
 
-      console.log(`✔️ Verified escrow contract clone: ${contractAddress}`);
+      if (latestBlock > lastProcessedBlock) {
+        const fromBlock = lastProcessedBlock + 1;
+        const toBlock = Math.min(latestBlock, fromBlock + 99); // Max 100 blocks per request
+        
+        console.log(`🔍 Polling blocks ${fromBlock} to ${toBlock} (latest: ${latestBlock})...`);
+        
+        const logs = await provider.getLogs({
+          ...disputeFilter,
+          fromBlock,
+          toBlock
+        });
 
-      // 2. Parse the DisputeOpened event parameters
-      const escrowContract = new ethers.Contract(contractAddress, escrowABI, provider);
-      const parsedLog = escrowContract.interface.parseLog(log);
-      
-      const { milestoneIndex, requirementsHash, deliverableHash } = parsedLog.args;
-      console.log(`👉 Milestone Index: ${milestoneIndex}`);
-      console.log(`👉 Requirements Handle: 0x${requirementsHash.toString(16)}`);
-      console.log(`👉 Deliverable Handle: 0x${deliverableHash.toString(16)}`);
+        for (const log of logs) {
+          await handleDisputeOpened(log);
+        }
 
-      // 3. Trigger the iExec TEE execution task
-      console.log("⏳ Forwarding dispute details to the iExec TEE task runner...");
-      const response = await axios.post(IEXEC_RUNNER_ENDPOINT, {
-        escrowAddress: contractAddress,
-        milestoneIndex: milestoneIndex.toString(),
-        reqsHandle: `0x${requirementsHash.toString(16).padStart(64, "0")}`,
-        devsHandle: `0x${deliverableHash.toString(16).padStart(64, "0")}`
-      });
-
-      console.log(`🚀 iExec TEE execution triggered successfully! Response:`, response.status === 200 ? "Success" : response.statusText);
+        lastProcessedBlock = toBlock;
+      }
     } catch (error) {
-      console.error("❌ Error processing log event:", error.message);
+      console.error("⚠️ Error during event polling:", error.message);
+    } finally {
+      isPolling = false;
     }
-  });
+  }
+
+  // Start polling loop
+  const pollingIntervalId = setInterval(() => {
+    if (keepRunning) {
+      pollForEvents();
+    }
+  }, POLL_INTERVAL);
+
+  // Run immediately once on start to initialize or catch up
+  pollForEvents();
 
   // Simple HTTP Server for Render free-tier health checks
   const PORT = process.env.PORT || 3000;
@@ -93,8 +146,9 @@ async function main() {
   // Handle process shutdown cleanly
   process.on("SIGINT", () => {
     console.log("\n🛑 Shutting down listener gracefully...");
+    keepRunning = false;
+    clearInterval(pollingIntervalId);
     server.close();
-    provider.removeAllListeners();
     process.exit(0);
   });
 }

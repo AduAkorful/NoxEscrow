@@ -9,7 +9,7 @@ import App from './App.tsx'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <PrivyProvider
-      appId={import.meta.env.VITE_PRIVY_APP_ID || "clpispdty00ycl80fpueukbhl"}
+      appId={import.meta.env.VITE_PRIVY_APP_ID}
       config={{
         appearance: {
           theme: 'dark',
