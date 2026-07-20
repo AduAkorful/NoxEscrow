@@ -2,7 +2,7 @@ services:
   - type: worker
     name: noxescrow-webhook-listener
     runtime: node
-    repo: https://github.com/your-username/NoxEscrow # Replace with your repository URL
+    repo: https://github.com/AduAkorful/NoxEscrow # Replace with your repository URL
     branch: main
     rootDir: arbiter
     buildCommand: npm install
@@ -10,10 +10,40 @@ services:
     envVars:
       - key: RPC_URL
         sync: false
-        placeholder: "e.g., https://opt-sepolia.g.all-that-node.com/..."
+        placeholder: "e.g., https://ethereum-sepolia-rpc.publicnode.com"
       - key: ESCROW_FACTORY_ADDRESS
         sync: false
-        placeholder: "The deployed NoxEscrowFactory proxy address"
+        placeholder: "The deployed NoxEscrowFactory proxy address (e.g. 0x0382FDF0eB7FA6d08181595ce6e03481Cc622Ba5)"
       - key: IEXEC_RUNNER_ENDPOINT
         sync: false
-        placeholder: "The endpoint to trigger the iExec TEE task"
+        value: "http://127.0.0.1:3000/trigger-task"
+      - key: NOX_GATEWAY_URL
+        sync: false
+        value: "https://gateway-testnets.noxprotocol.dev"
+      - key: NOX_SUBGRAPH_URL
+        sync: false
+        value: "https://thegraph.ethereum-sepolia-testnet.noxprotocol.io/api/subgraphs/id/9CsccKwvgYFo72zZeU4k4wj2NEBLdWhVE3EUandgmzgo"
+      
+      # Supabase Metadata Database Connection (Required for E2E Chats & Reviews)
+      - key: SUPABASE_URL
+        sync: false
+        placeholder: "Your Supabase project URL (e.g. https://your-project.supabase.co)"
+      - key: SUPABASE_KEY
+        sync: false
+        placeholder: "Your Supabase anon public key"
+
+      # Google Cloud Vertex AI & ADC Authentication Configuration
+      - key: VERTEX_PROJECT_ID
+        sync: false
+        value: "project-7fba3d65-5e52-4996-b38" # Automatically set to your active project ID!
+      - key: VERTEX_LOCATION
+        sync: false
+        value: "us-central1"
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        sync: false
+        value: "/etc/secrets/gcp-key.json"
+
+      # TEE Signer Gas funding wallet key
+      - key: TEE_ARBITER_PRIVATE_KEY
+        sync: false
+        placeholder: "Private key of the TEE Oracle wallet (0x...)"
