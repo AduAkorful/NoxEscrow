@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { 
-  ShieldCheck, 
   Wallet, 
   Sparkles, 
   Lock, 
@@ -81,32 +80,7 @@ export function LandingPage({ connectWallet, walletAddress, onLaunchApp }: Landi
   return (
     <div className="relative min-h-screen flex flex-col animate-fade-in overflow-hidden">
       
-      {/* Header Bar (Only visible if standalone, otherwise main header handles it) */}
-      {!walletAddress && (
-        <header className="border-b border-white/[0.08] bg-[#0B0E17]/80 backdrop-blur-2xl sticky top-0 z-50 transition-all">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-2xl bg-[#38BDF8]/10 border border-[#38BDF8]/30 flex items-center justify-center">
-                <ShieldCheck className="w-5 h-5 text-[#38BDF8]" />
-              </div>
-              <span className="font-bold text-lg text-white">Nox<span className="shiny-text">Escrow</span></span>
-            </div>
 
-            <nav className="hidden md:flex gap-8 text-xs font-semibold text-slate-400">
-              <a href="#features" className="hover:text-white transition-colors">Features</a>
-              <a href="#workflow" className="hover:text-white transition-colors">Workflow</a>
-              <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
-            </nav>
-
-            <button
-              onClick={connectWallet}
-              className="btn-uniswap-primary px-5 py-2.5 text-xs flex items-center gap-2 cursor-pointer shadow-lg"
-            >
-              <Wallet className="w-4 h-4" /> Connect Wallet
-            </button>
-          </div>
-        </header>
-      )}
 
       {/* Hero Section */}
       <section className="relative z-10 flex-1 max-w-5xl mx-auto px-6 pt-16 pb-20 text-center flex flex-col items-center justify-center">

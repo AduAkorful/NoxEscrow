@@ -62,10 +62,11 @@ let cachedSignerAddress: string = "";
 
 export async function getOrCreateHandleClient(
   signer: ethers.JsonRpcSigner,
-  gatewayUrl: string = DEFAULT_NOX_GATEWAY
+  gatewayUrl: string = DEFAULT_NOX_GATEWAY,
+  forceFresh: boolean = false
 ) {
   const currentAddress = await signer.getAddress();
-  if (cachedHandleClient && cachedSignerAddress.toLowerCase() === currentAddress.toLowerCase()) {
+  if (!forceFresh && cachedHandleClient && cachedSignerAddress.toLowerCase() === currentAddress.toLowerCase()) {
     return cachedHandleClient;
   }
 
@@ -133,14 +134,14 @@ export async function fetchUserEscrows(
     const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
     const count = await factory.escrowsCount();
     const total = Number(count);
-    
+
     const userEscrows: EscrowContract[] = [];
-    
+
     // Loop backwards (latest agreements first)
     for (let i = total - 1; i >= 0; i--) {
       const escrowAddress = await factory.allEscrows(i);
       const escrow = new ethers.Contract(escrowAddress, NoxEscrowContractABI, signer);
-      
+
       const [client, freelancer, status, activeMilestone, totalMilestones, reviewWindow] = await Promise.all([
         escrow.client(),
         escrow.freelancer(),
@@ -149,13 +150,13 @@ export async function fetchUserEscrows(
         escrow.totalMilestones(),
         escrow.reviewWindow()
       ]);
-      
+
       const isClient = client.toLowerCase() === userAddress.toLowerCase();
       const isFreelancer = freelancer.toLowerCase() === userAddress.toLowerCase();
-      
+
       if (isClient || isFreelancer) {
         const statusNames: EscrowContract['status'][] = ['SIGNING', 'ACTIVE', 'DISPUTED', 'COMPLETED', 'REFUNDED'];
-        
+
         const requirements: string[] = [];
         const deliverables: string[] = [];
         const milestoneKeys: string[] = [];
@@ -163,7 +164,7 @@ export async function fetchUserEscrows(
         let activeMilestoneSubmitted = false;
         let activeMilestoneSubmissionTime = 0;
         let accumulatedBudget = 0;
-        
+
         const handleClient = await createEthersHandleClient(signer as any, {
           smartContractAddress: NOX_CONTRACT_MANAGER,
           gatewayUrl: gatewayUrl as any,
@@ -197,7 +198,7 @@ export async function fetchUserEscrows(
 
             let reqText = "";
             const useE2E = metadataConfig && metadataConfig.supabaseUrl && metadataConfig.supabaseKey;
-            
+
             if (useE2E) {
               try {
                 const metadata = await getEscrowMetadata(
@@ -287,7 +288,7 @@ export async function fetchUserEscrows(
         });
       }
     }
-    
+
     return userEscrows;
   } catch (err) {
     console.error("Error fetching user escrows from blockchain:", err);
@@ -314,7 +315,7 @@ export async function deployEscrowClone(
   );
 
   const receipt = await tx.wait();
-  
+
   const event = receipt.logs
     .map((log: any) => {
       try {
@@ -360,7 +361,7 @@ export async function initializeEscrowMilestones(
   attachedFiles?: File[]
 ) {
   const escrow = new ethers.Contract(escrowAddress, NoxEscrowContractABI, signer);
-  
+
   const encryptedPayouts = [];
   const payoutProofs = [];
   const encryptedReqs = [];
@@ -464,7 +465,7 @@ export async function submitMilestoneDeliverable(
   attachedFiles?: File[]
 ) {
   const escrow = new ethers.Contract(escrowAddress, NoxEscrowContractABI, signer);
-  
+
   const useE2E = metadataConfig && metadataConfig.pinataJWT && metadataConfig.supabaseUrl && metadataConfig.supabaseKey;
   let devEnc;
   let cacheCid = "";
@@ -667,7 +668,7 @@ export async function unwrapToken(
   const handleClient = await getOrCreateHandleClient(signer, gatewayUrl);
 
   const { decryptionProof } = await handleClient.publicDecrypt(amountEnc.handle);
-  
+
   // 4. Finalize unwrap to claim public USDC tokens
   const finalizeTx = await wrapper.finalizeUnwrap(amountEnc.handle, decryptionProof);
   await finalizeTx.wait();
@@ -684,14 +685,25 @@ export async function getConfidentialUSDCBalance(
 ): Promise<bigint> {
   const token = new ethers.Contract(cUSDCAddress, MockERC7984ABI, signer);
   const balanceHandle = await token.confidentialBalanceOf(userAddress);
-  
+
   if (balanceHandle === "0x0000000000000000000000000000000000000000000000000000000000000000" || !balanceHandle) {
     return 0n;
   }
 
-  const handleClient = await getOrCreateHandleClient(signer, gatewayUrl);
-  const decrypted = await handleClient.decrypt(balanceHandle);
-  return BigInt(decrypted.value);
+  try {
+    const handleClient = await getOrCreateHandleClient(signer, gatewayUrl, false);
+    const decrypted = await handleClient.decrypt(balanceHandle);
+    const val = decrypted?.value ?? decrypted;
+    return BigInt(val);
+  } catch (err) {
+    console.warn("Cached Nox handleClient decryption failed, retrying with fresh client:", err);
+    cachedHandleClient = null;
+    cachedSignerAddress = "";
+    const freshClient = await getOrCreateHandleClient(signer, gatewayUrl, true);
+    const decrypted = await freshClient.decrypt(balanceHandle);
+    const val = decrypted?.value ?? decrypted;
+    return BigInt(val);
+  }
 }
 
 /**
@@ -714,9 +726,9 @@ export async function getOnChainReputation(
       "function getReputation(address freelancer) view returns (bytes32)"
     ];
     const reputation = new ethers.Contract(reputationRegistryAddress, reputationABI, signer);
-    
+
     const repHandle = await reputation.getReputation(freelancerAddress);
-    
+
     if (repHandle === "0x0000000000000000000000000000000000000000000000000000000000000000" || !repHandle) {
       return null;
     }
@@ -750,8 +762,8 @@ export async function getFactoryConfig(
   mutualCancelWindow: bigint;
 }> {
   const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
-  
-  const [canonicalTeeArbiter, platformFeeBps, treasury, cUSDCToken, reviewWindow, mutualCancelWindow] = 
+
+  const [canonicalTeeArbiter, platformFeeBps, treasury, cUSDCToken, reviewWindow, mutualCancelWindow] =
     await Promise.all([
       factory.canonicalTeeArbiter(),
       factory.platformFeeBps(),
@@ -787,7 +799,7 @@ export async function updateFactoryConfig(
   }
 ): Promise<void> {
   const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
-  
+
   if (config.canonicalTeeArbiter) {
     const tx = await factory.setCanonicalTeeArbiter(config.canonicalTeeArbiter);
     await tx.wait();

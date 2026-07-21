@@ -6,7 +6,8 @@ import {
   CheckCircle2, 
   AlertTriangle,
   RefreshCw,
-  Info
+  Info,
+  Eye
 } from 'lucide-react';
 import { ethers } from 'ethers';
 import { 
@@ -37,9 +38,14 @@ export function TokenWrapper({
   const [mode, setMode] = useState<'wrap' | 'unwrap'>('wrap');
   const [swapAmount, setSwapAmount] = useState('');
   
+  // Standard 6 decimals for both public USDC and confidential cUSDC wrapper
+  const USDC_DECIMALS = 6;
+
   // Balances
   const [publicBalance, setPublicBalance] = useState<bigint>(0n);
   const [cUSDCBalance, setCUSDCBalance] = useState<bigint>(0n);
+  const [isConfidentialRevealed, setIsConfidentialRevealed] = useState(false);
+  const [isDecryptingBalance, setIsDecryptingBalance] = useState(false);
   const [allowance, setAllowance] = useState<bigint>(0n);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -53,34 +59,51 @@ export function TokenWrapper({
   const [stepperSteps, setStepperSteps] = useState<StepItem[]>([]);
   const [stepperSubtext, setStepperSubtext] = useState("");
 
-  const fetchBalances = useCallback(async (showLoadingFeedback: boolean = false) => {
+  // Non-blocking public balance query (0 wallet popups on page mount)
+  const fetchPublicBalances = useCallback(async (showLoadingFeedback: boolean = false) => {
     if (!walletAddress) return;
     if (showLoadingFeedback) setIsRefreshing(true);
 
     try {
       const signer = await getWeb3Signer();
-      
-      const [pubBal, confidentialBal, currentAllowance] = await Promise.all([
+      const [pubBal, currentAllowance] = await Promise.all([
         getPublicUSDCBalance(signer, publicUSDCAddress, walletAddress),
-        getConfidentialUSDCBalance(signer, cUSDCAddress, walletAddress, gatewayUrl),
         checkPublicUSDCAllowance(signer, publicUSDCAddress, cUSDCAddress, walletAddress)
       ]);
 
       setPublicBalance(pubBal);
-      setCUSDCBalance(confidentialBal);
       setAllowance(currentAllowance);
     } catch (err: any) {
       console.error("Failed to query wrapper balances:", err);
-      setErrorMessage(err.message || "Failed to retrieve standard public USDC or cUSDC balances.");
+      setErrorMessage(err.message || "Failed to retrieve standard public USDC balances.");
     } finally {
       if (showLoadingFeedback) setIsRefreshing(false);
     }
-  }, [walletAddress, publicUSDCAddress, cUSDCAddress, gatewayUrl, getWeb3Signer]);
+  }, [walletAddress, publicUSDCAddress, cUSDCAddress, getWeb3Signer]);
 
-  // Initial load
+  // On-demand KMS decryption for confidential cUSDC balance
+  const revealConfidentialBalance = useCallback(async () => {
+    if (!walletAddress) return;
+    setIsDecryptingBalance(true);
+    setErrorMessage(null);
+
+    try {
+      const signer = await getWeb3Signer();
+      const confidentialBal = await getConfidentialUSDCBalance(signer, cUSDCAddress, walletAddress, gatewayUrl);
+      setCUSDCBalance(confidentialBal);
+      setIsConfidentialRevealed(true);
+    } catch (err: any) {
+      console.error("Failed to decrypt confidential balance:", err);
+      setErrorMessage(err.message || "Failed to decrypt confidential cUSDC balance.");
+    } finally {
+      setIsDecryptingBalance(false);
+    }
+  }, [walletAddress, cUSDCAddress, gatewayUrl, getWeb3Signer]);
+
+  // Initial load on page mount (0 signature popups!)
   useEffect(() => {
-    fetchBalances();
-  }, [fetchBalances]);
+    fetchPublicBalances();
+  }, [fetchPublicBalances]);
 
   // --- Execute Approval ---
   const handleApprove = async (amountToApprove: bigint) => {
@@ -103,7 +126,7 @@ export function TokenWrapper({
         { label: "Public USDC ERC-20 Approval (On-Chain Gas)", status: "completed" }
       ]);
       setSuccessMessage("✔️ Public USDC approval successfully confirmed on-chain!");
-      await fetchBalances();
+      await fetchPublicBalances();
     } catch (err: any) {
       setErrorMessage(err.message || "Approval transaction reverted.");
     } finally {
@@ -138,7 +161,8 @@ export function TokenWrapper({
 
       setSuccessMessage("🎉 Swap completed! Standard public USDC wrapped to confidential cUSDC.");
       setSwapAmount("");
-      await fetchBalances();
+      await fetchPublicBalances();
+      await revealConfidentialBalance();
       setStepperSteps([
         { label: "On-Chain Shielded Wrap Transaction (Gas)", status: "completed" },
         { label: "Balance Decryption Authorization (Gasless Signature)", status: "completed" }
@@ -181,7 +205,8 @@ export function TokenWrapper({
 
       setSuccessMessage("🎉 Swap completed! Confidential cUSDC successfully unwrapped to standard public USDC.");
       setSwapAmount("");
-      await fetchBalances();
+      await fetchPublicBalances();
+      await revealConfidentialBalance();
     } catch (err: any) {
       setErrorMessage(err.message || "Unwrapping transaction reverted.");
     } finally {
@@ -198,12 +223,11 @@ export function TokenWrapper({
     setSuccessMessage(null);
   };
 
-  const parsedAmount = swapAmount ? ethers.parseUnits(swapAmount, 6) : 0n;
   const isWrap = mode === 'wrap';
-  const currentMaxBalance = isWrap ? publicBalance : cUSDCBalance;
+  const parsedAmount = swapAmount ? ethers.parseUnits(swapAmount, USDC_DECIMALS) : 0n;
 
   const needsApproval = isWrap && parsedAmount > 0n && allowance < parsedAmount;
-  const hasInsufficientBalance = parsedAmount > 0n && parsedAmount > currentMaxBalance;
+  const hasInsufficientBalance = isWrap && parsedAmount > 0n && parsedAmount > publicBalance;
 
   return (
     <div className="uniswap-card p-6 md:p-8 w-full max-w-xl mx-auto flex flex-col gap-6 relative overflow-hidden animate-scale-in">
@@ -215,7 +239,7 @@ export function TokenWrapper({
             <Coins className="w-4.5 h-4.5 text-[#38BDF8]" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+            <h3 className="text-lg font-bold text-[#F8FAFC] tracking-tight flex items-center gap-2">
               Shielded Token Swap
             </h3>
             <p className="text-xs text-slate-400">
@@ -225,7 +249,7 @@ export function TokenWrapper({
         </div>
 
         <button
-          onClick={() => fetchBalances(true)}
+          onClick={() => fetchPublicBalances(true)}
           disabled={isRefreshing}
           className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-all cursor-pointer disabled:opacity-50"
           title="Refresh balances"
@@ -252,8 +276,20 @@ export function TokenWrapper({
       <div className="uniswap-input-box p-4 flex flex-col gap-3">
         <div className="flex justify-between items-center text-xs">
           <span className="text-slate-400 font-medium">You Pay</span>
-          <span className="text-slate-400 font-mono">
-            Balance: {ethers.formatUnits(currentMaxBalance, 6)} {isWrap ? 'USDC' : 'cUSDC'}
+          <span className="text-slate-400 font-mono flex items-center gap-1.5">
+            Balance: {isWrap ? (
+              `${ethers.formatUnits(publicBalance, USDC_DECIMALS)} USDC`
+            ) : isConfidentialRevealed ? (
+              `${ethers.formatUnits(cUSDCBalance, USDC_DECIMALS)} cUSDC`
+            ) : (
+              <button
+                onClick={revealConfidentialBalance}
+                disabled={isDecryptingBalance}
+                className="text-[#38BDF8] hover:underline flex items-center gap-1 font-sans cursor-pointer"
+              >
+                <Eye className="w-3 h-3" /> {isDecryptingBalance ? 'Decrypting...' : '🔒 Decrypt cUSDC'}
+              </button>
+            )}
           </span>
         </div>
 
@@ -267,9 +303,9 @@ export function TokenWrapper({
           />
 
           <div className="flex items-center gap-2">
-            {currentMaxBalance > 0n && (
+            {isWrap && publicBalance > 0n && (
               <button
-                onClick={() => setSwapAmount(ethers.formatUnits(currentMaxBalance, 6))}
+                onClick={() => setSwapAmount(ethers.formatUnits(publicBalance, USDC_DECIMALS))}
                 className="px-2.5 py-1 rounded-lg bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 text-[#38BDF8] text-[11px] font-bold cursor-pointer transition-colors"
               >
                 MAX
@@ -308,8 +344,20 @@ export function TokenWrapper({
       <div className="uniswap-input-box p-4 flex flex-col gap-3">
         <div className="flex justify-between items-center text-xs">
           <span className="text-slate-400 font-medium">You Receive</span>
-          <span className="text-slate-400 font-mono">
-            Balance: {ethers.formatUnits(isWrap ? cUSDCBalance : publicBalance, 6)} {isWrap ? 'cUSDC' : 'USDC'}
+          <span className="text-slate-400 font-mono flex items-center gap-1.5">
+            Balance: {!isWrap ? (
+              `${ethers.formatUnits(publicBalance, USDC_DECIMALS)} USDC`
+            ) : isConfidentialRevealed ? (
+              `${ethers.formatUnits(cUSDCBalance, USDC_DECIMALS)} cUSDC`
+            ) : (
+              <button
+                onClick={revealConfidentialBalance}
+                disabled={isDecryptingBalance}
+                className="text-[#38BDF8] hover:underline flex items-center gap-1 font-sans cursor-pointer"
+              >
+                <Eye className="w-3 h-3" /> {isDecryptingBalance ? 'Decrypting...' : '🔒 Decrypt cUSDC'}
+              </button>
+            )}
           </span>
         </div>
 
@@ -361,7 +409,7 @@ export function TokenWrapper({
           disabled
           className="w-full py-4 rounded-2xl bg-rose-500/10 text-rose-400 border border-rose-500/20 text-sm font-bold opacity-60 cursor-not-allowed"
         >
-          Insufficient {isWrap ? 'Public USDC' : 'cUSDC'} Balance
+          Insufficient Public USDC Balance
         </button>
       ) : needsApproval ? (
         <button
