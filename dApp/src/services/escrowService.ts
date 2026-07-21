@@ -57,6 +57,27 @@ export async function getWeb3Signer(): Promise<ethers.JsonRpcSigner> {
   return signer;
 }
 
+let cachedHandleClient: any = null;
+let cachedSignerAddress: string = "";
+
+export async function getOrCreateHandleClient(
+  signer: ethers.JsonRpcSigner,
+  gatewayUrl: string = DEFAULT_NOX_GATEWAY
+) {
+  const currentAddress = await signer.getAddress();
+  if (cachedHandleClient && cachedSignerAddress.toLowerCase() === currentAddress.toLowerCase()) {
+    return cachedHandleClient;
+  }
+
+  cachedHandleClient = await createEthersHandleClient(signer as any, {
+    smartContractAddress: NOX_CONTRACT_MANAGER as any,
+    gatewayUrl: gatewayUrl as any,
+    subgraphUrl: NOX_SUBGRAPH_URL as any,
+  });
+  cachedSignerAddress = currentAddress;
+  return cachedHandleClient;
+}
+
 /**
  * Encrypts a specific input value using the iExec Nox KMS Handle Client.
  */
@@ -67,12 +88,7 @@ export async function encryptNoxInput(
   applicationContract: string,
   gatewayUrl: string = DEFAULT_NOX_GATEWAY
 ) {
-  const handleClient = await createEthersHandleClient(signer as any, {
-    smartContractAddress: NOX_CONTRACT_MANAGER as any,
-    gatewayUrl: gatewayUrl as any,
-    subgraphUrl: NOX_SUBGRAPH_URL as any,
-  });
-
+  const handleClient = await getOrCreateHandleClient(signer, gatewayUrl);
   return handleClient.encryptInput(value, solidityType as any, applicationContract as any);
 }
 
@@ -648,11 +664,7 @@ export async function unwrapToken(
   await unwrapTx.wait();
 
   // 3. Decrypt unwrapRequestId handle via Nox KMS using publicDecrypt to get decryptionProof
-  const handleClient = await createEthersHandleClient(signer as any, {
-    smartContractAddress: NOX_CONTRACT_MANAGER,
-    gatewayUrl: gatewayUrl as any,
-    subgraphUrl: NOX_SUBGRAPH_URL,
-  });
+  const handleClient = await getOrCreateHandleClient(signer, gatewayUrl);
 
   const { decryptionProof } = await handleClient.publicDecrypt(amountEnc.handle);
   
@@ -677,12 +689,7 @@ export async function getConfidentialUSDCBalance(
     return 0n;
   }
 
-  const handleClient = await createEthersHandleClient(signer as any, {
-    smartContractAddress: NOX_CONTRACT_MANAGER,
-    gatewayUrl: gatewayUrl as any,
-    subgraphUrl: NOX_SUBGRAPH_URL,
-  });
-
+  const handleClient = await getOrCreateHandleClient(signer, gatewayUrl);
   const decrypted = await handleClient.decrypt(balanceHandle);
   return BigInt(decrypted.value);
 }

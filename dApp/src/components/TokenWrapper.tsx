@@ -1,22 +1,23 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
+  ArrowDownUp, 
+  Lock, 
   Coins, 
-  RefreshCw, 
-  AlertTriangle, 
-  CheckCircle,
-  ArrowDown,
-  Sparkles,
+  CheckCircle2, 
+  AlertTriangle,
+  RefreshCw,
   Info
 } from 'lucide-react';
 import { ethers } from 'ethers';
 import { 
-  approvePublicUSDC, 
-  checkPublicUSDCAllowance, 
   getPublicUSDCBalance, 
-  wrapToken,
-  unwrapToken,
-  getConfidentialUSDCBalance
+  getConfidentialUSDCBalance, 
+  checkPublicUSDCAllowance, 
+  approvePublicUSDC, 
+  wrapToken, 
+  unwrapToken 
 } from '../services/escrowService';
+import { TransactionStepper, type StepItem } from './TransactionStepper';
 
 interface TokenWrapperProps {
   walletAddress: string | null;
@@ -33,23 +34,28 @@ export function TokenWrapper({
   gatewayUrl,
   getWeb3Signer
 }: TokenWrapperProps) {
-  // --- Component States ---
-  const [swapDirection, setSwapDirection] = useState<'wrap' | 'unwrap'>('wrap');
+  const [mode, setMode] = useState<'wrap' | 'unwrap'>('wrap');
+  const [swapAmount, setSwapAmount] = useState('');
+  
+  // Balances
   const [publicBalance, setPublicBalance] = useState<bigint>(0n);
   const [cUSDCBalance, setCUSDCBalance] = useState<bigint>(0n);
   const [allowance, setAllowance] = useState<bigint>(0n);
-  const [swapAmount, setSwapAmount] = useState<string>("");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // --- Fetch All Balances ---
-  const fetchBalances = useCallback(async (showLoadingFeedback = false) => {
-    if (!walletAddress || !publicUSDCAddress || !cUSDCAddress) return;
-    
+  // Stepper State
+  const [isStepperOpen, setIsStepperOpen] = useState(false);
+  const [stepperTitle, setStepperTitle] = useState("SHIELDED_SWAP_PIPELINE");
+  const [stepperSteps, setStepperSteps] = useState<StepItem[]>([]);
+  const [stepperSubtext, setStepperSubtext] = useState("");
+
+  const fetchBalances = useCallback(async (showLoadingFeedback: boolean = false) => {
+    if (!walletAddress) return;
     if (showLoadingFeedback) setIsRefreshing(true);
-    setErrorMessage(null);
 
     try {
       const signer = await getWeb3Signer();
@@ -82,16 +88,27 @@ export function TokenWrapper({
     setSuccessMessage(null);
     setIsLoading(true);
 
+    setIsStepperOpen(true);
+    setStepperTitle("USDC_ALLOWANCE_PIPELINE");
+    setStepperSubtext("Authorize the public USDC allowance in your Web3 wallet.");
+    setStepperSteps([
+      { label: "Public USDC ERC-20 Approval (On-Chain Gas)", status: "active" }
+    ]);
+
     try {
       const signer = await getWeb3Signer();
       await approvePublicUSDC(signer, publicUSDCAddress, cUSDCAddress, amountToApprove);
       
+      setStepperSteps([
+        { label: "Public USDC ERC-20 Approval (On-Chain Gas)", status: "completed" }
+      ]);
       setSuccessMessage("✔️ Public USDC approval successfully confirmed on-chain!");
       await fetchBalances();
     } catch (err: any) {
       setErrorMessage(err.message || "Approval transaction reverted.");
     } finally {
       setIsLoading(false);
+      setIsStepperOpen(false);
     }
   };
 
@@ -102,17 +119,35 @@ export function TokenWrapper({
     setSuccessMessage(null);
     setIsLoading(true);
 
+    setIsStepperOpen(true);
+    setStepperTitle("SHIELDED_WRAP_PIPELINE");
+    setStepperSubtext("1) On-chain Wrap transaction locks public USDC. 2) DataAccessAuthorization grants your wallet decryption access.");
+    setStepperSteps([
+      { label: "On-Chain Shielded Wrap Transaction (Gas)", status: "active" },
+      { label: "Balance Decryption Authorization (Gasless Signature)", status: "pending" }
+    ]);
+
     try {
       const signer = await getWeb3Signer();
       await wrapToken(signer, cUSDCAddress, walletAddress, amountToWrap);
       
+      setStepperSteps([
+        { label: "On-Chain Shielded Wrap Transaction (Gas)", status: "completed" },
+        { label: "Balance Decryption Authorization (Gasless Signature)", status: "active" }
+      ]);
+
       setSuccessMessage("🎉 Swap completed! Standard public USDC wrapped to confidential cUSDC.");
       setSwapAmount("");
       await fetchBalances();
+      setStepperSteps([
+        { label: "On-Chain Shielded Wrap Transaction (Gas)", status: "completed" },
+        { label: "Balance Decryption Authorization (Gasless Signature)", status: "completed" }
+      ]);
     } catch (err: any) {
       setErrorMessage(err.message || "Wrapping transaction reverted.");
     } finally {
       setIsLoading(false);
+      setIsStepperOpen(false);
     }
   };
 
@@ -123,10 +158,27 @@ export function TokenWrapper({
     setSuccessMessage(null);
     setIsLoading(true);
 
+    setIsStepperOpen(true);
+    setStepperTitle("SHIELDED_UNWRAP_PIPELINE");
+    setStepperSubtext("1) KMS Input Encryption. 2) Burn cUSDC. 3) KMS Public Decryption. 4) Claim Public USDC.");
+    setStepperSteps([
+      { label: "Input Encryption Authorization (Gasless Signature)", status: "active" },
+      { label: "On-Chain Unwrap Initiation (Gas)", status: "pending" },
+      { label: "KMS Decryption Proof Generation", status: "pending" },
+      { label: "Finalize Unwrap & Receive USDC (Gas)", status: "pending" }
+    ]);
+
     try {
       const signer = await getWeb3Signer();
       await unwrapToken(signer, cUSDCAddress, walletAddress, amountToUnwrap, gatewayUrl);
       
+      setStepperSteps([
+        { label: "Input Encryption Authorization (Gasless Signature)", status: "completed" },
+        { label: "On-Chain Unwrap Initiation (Gas)", status: "completed" },
+        { label: "KMS Decryption Proof Generation", status: "completed" },
+        { label: "Finalize Unwrap & Receive USDC (Gas)", status: "completed" }
+      ]);
+
       setSuccessMessage("🎉 Swap completed! Confidential cUSDC successfully unwrapped to standard public USDC.");
       setSwapAmount("");
       await fetchBalances();
@@ -134,207 +186,218 @@ export function TokenWrapper({
       setErrorMessage(err.message || "Unwrapping transaction reverted.");
     } finally {
       setIsLoading(false);
+      setIsStepperOpen(false);
     }
   };
 
   // --- Toggle Swap Direction ---
-  const handleToggleDirection = () => {
-    setSwapDirection(prev => prev === 'wrap' ? 'unwrap' : 'wrap');
-    setSwapAmount("");
+  const toggleMode = () => {
+    setMode(prev => (prev === 'wrap' ? 'unwrap' : 'wrap'));
+    setSwapAmount('');
     setErrorMessage(null);
     setSuccessMessage(null);
   };
 
-  // --- Process Action Button Click ---
-  const executeSwap = async () => {
-    if (!swapAmount || isNaN(Number(swapAmount)) || Number(swapAmount) <= 0) {
-      setErrorMessage("Please enter a valid amount greater than 0.");
-      return;
-    }
+  const parsedAmount = swapAmount ? ethers.parseUnits(swapAmount, 6) : 0n;
+  const isWrap = mode === 'wrap';
+  const currentMaxBalance = isWrap ? publicBalance : cUSDCBalance;
 
-    const decimalAmount = BigInt(Math.floor(Number(swapAmount)));
-    
-    if (swapDirection === 'wrap') {
-      if (decimalAmount > publicBalance) {
-        setErrorMessage("Insufficient standard public USDC balance.");
-        return;
-      }
-
-      if (decimalAmount > allowance) {
-        await handleApprove(decimalAmount);
-      } else {
-        await handleWrap(decimalAmount);
-      }
-    } else {
-      if (decimalAmount > cUSDCBalance) {
-        setErrorMessage("Insufficient confidential cUSDC balance.");
-        return;
-      }
-
-      await handleUnwrap(decimalAmount);
-    }
-  };
-
-  const isApproved = swapAmount && !isNaN(Number(swapAmount)) && Number(swapAmount) > 0 
-    ? BigInt(Math.floor(Number(swapAmount))) <= allowance 
-    : true;
+  const needsApproval = isWrap && parsedAmount > 0n && allowance < parsedAmount;
+  const hasInsufficientBalance = parsedAmount > 0n && parsedAmount > currentMaxBalance;
 
   return (
-    <div className="uniswap-card p-6 md:p-8 flex flex-col gap-6 w-full max-w-lg mx-auto relative overflow-hidden animate-scale-in">
+    <div className="uniswap-card p-6 md:p-8 w-full max-w-xl mx-auto flex flex-col gap-6 relative overflow-hidden animate-scale-in">
       
-      {/* Top Header Row */}
-      <div className="flex items-center justify-between">
+      {/* Card Header */}
+      <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-[#38BDF8]/10 flex items-center justify-center border border-[#38BDF8]/20">
-            <Coins className="w-4 h-4 text-[#38BDF8]" />
+          <div className="w-8 h-8 rounded-xl bg-[#38BDF8]/10 flex items-center justify-center">
+            <Coins className="w-4.5 h-4.5 text-[#38BDF8]" />
           </div>
-          <span className="font-bold text-[#F8FAFC] text-base">
-            {swapDirection === 'wrap' ? 'Shielded Wrap' : 'Unshield USDC'}
-          </span>
+          <div>
+            <h3 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+              Shielded Token Swap
+            </h3>
+            <p className="text-xs text-slate-400">
+              Convert public USDC ↔ confidential zero-knowledge cUSDC.
+            </p>
+          </div>
         </div>
-        <button 
+
+        <button
           onClick={() => fetchBalances(true)}
-          disabled={isRefreshing || isLoading}
+          disabled={isRefreshing}
+          className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-all cursor-pointer disabled:opacity-50"
           title="Refresh balances"
-          className="p-2 rounded-xl bg-[#131826] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-all cursor-pointer disabled:opacity-40"
         >
-          <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin text-[#38BDF8]" : ""}`} />
+          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[#38BDF8]' : ''}`} />
         </button>
       </div>
 
-      {/* Alerts */}
-      {(errorMessage || successMessage) && (
-        <div className="space-y-2">
-          {errorMessage && (
-            <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-xs text-rose-300 flex items-center gap-2.5">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-400" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-          {successMessage && (
-            <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-xs text-emerald-300 flex items-center gap-2.5">
-              <CheckCircle className="w-4 h-4 flex-shrink-0 text-emerald-400" />
-              <span>{successMessage}</span>
-            </div>
-          )}
+      {/* Notifications */}
+      {errorMessage && (
+        <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-xs text-rose-300 flex items-center gap-2.5">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+      {successMessage && (
+        <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-xs text-emerald-300 flex items-center gap-2.5">
+          <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+          <span>{successMessage}</span>
         </div>
       )}
 
-      {/* Uniswap Swap Input Blocks Container */}
-      <div className="flex flex-col gap-2 relative">
-        
-        {/* INPUT BOX 1: FROM */}
-        <div className="uniswap-input-box p-4 flex flex-col gap-3">
-          <div className="flex justify-between items-center text-xs text-slate-400">
-            <span className="font-medium">You pay</span>
-            <div className="flex items-center gap-1.5">
-              <span>Balance: {swapDirection === 'wrap' ? publicBalance.toLocaleString() : cUSDCBalance.toLocaleString()}</span>
-              <button 
-                onClick={() => setSwapAmount(swapDirection === 'wrap' ? publicBalance.toString() : cUSDCBalance.toString())}
-                className="text-[10px] font-bold text-[#38BDF8] hover:text-[#818CF8] bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 px-2 py-0.5 rounded-full transition-colors cursor-pointer"
+      {/* Input Box 1: Paying */}
+      <div className="uniswap-input-box p-4 flex flex-col gap-3">
+        <div className="flex justify-between items-center text-xs">
+          <span className="text-slate-400 font-medium">You Pay</span>
+          <span className="text-slate-400 font-mono">
+            Balance: {ethers.formatUnits(currentMaxBalance, 6)} {isWrap ? 'USDC' : 'cUSDC'}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <input
+            type="number"
+            placeholder="0.0"
+            value={swapAmount}
+            onChange={(e) => setSwapAmount(e.target.value)}
+            className="bg-transparent text-2xl font-bold text-white placeholder:text-slate-600 focus:outline-none w-full font-mono"
+          />
+
+          <div className="flex items-center gap-2">
+            {currentMaxBalance > 0n && (
+              <button
+                onClick={() => setSwapAmount(ethers.formatUnits(currentMaxBalance, 6))}
+                className="px-2.5 py-1 rounded-lg bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 text-[#38BDF8] text-[11px] font-bold cursor-pointer transition-colors"
               >
                 MAX
               </button>
+            )}
+
+            <div className="flex items-center gap-1.5 bg-[#131826] border border-white/[0.08] px-3 py-1.5 rounded-2xl shrink-0">
+              {isWrap ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                  <span className="text-xs font-bold text-white">USDC</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="w-3.5 h-3.5 text-purple-400" />
+                  <span className="text-xs font-bold text-white">cUSDC</span>
+                </>
+              )}
             </div>
           </div>
-
-          <div className="flex items-center justify-between gap-4">
-            <input 
-              type="number" 
-              placeholder="0" 
-              value={swapAmount} 
-              onChange={(e) => setSwapAmount(e.target.value)}
-              disabled={isLoading}
-              className="bg-transparent border-0 text-3xl font-bold text-white focus:outline-none w-full p-0 placeholder-slate-600"
-            />
-            
-            {/* Token Badge */}
-            <div className="flex items-center gap-2 bg-[#131826] border border-white/[0.1] px-3 py-2 rounded-2xl shadow-sm shrink-0">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                swapDirection === 'wrap' ? 'bg-blue-500 text-white' : 'bg-purple-500 text-white'
-              }`}>
-                {swapDirection === 'wrap' ? '$' : '🔒'}
-              </div>
-              <span className="font-bold text-sm text-white">
-                {swapDirection === 'wrap' ? 'USDC' : 'cUSDC'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Direction Swap Button */}
-        <div className="flex justify-center -my-3 z-10">
-          <button 
-            onClick={handleToggleDirection}
-            disabled={isLoading}
-            className="w-10 h-10 rounded-2xl bg-[#131826] border border-white/[0.12] hover:border-[#38BDF8]/50 text-slate-300 hover:text-[#38BDF8] flex items-center justify-center shadow-lg transition-all hover:rotate-180 duration-300 cursor-pointer active:scale-95"
-          >
-            <ArrowDown className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* INPUT BOX 2: TO */}
-        <div className="uniswap-input-box p-4 flex flex-col gap-3">
-          <div className="flex justify-between items-center text-xs text-slate-400">
-            <span className="font-medium">You receive</span>
-            <span>Balance: {swapDirection === 'wrap' ? cUSDCBalance.toLocaleString() : publicBalance.toLocaleString()}</span>
-          </div>
-
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-3xl font-bold text-slate-200">
-              {swapAmount && !isNaN(Number(swapAmount)) && Number(swapAmount) > 0 ? Number(swapAmount).toLocaleString() : "0"}
-            </span>
-            
-            {/* Token Badge */}
-            <div className="flex items-center gap-2 bg-[#131826] border border-white/[0.1] px-3 py-2 rounded-2xl shadow-sm shrink-0">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                swapDirection === 'wrap' ? 'bg-purple-500 text-white' : 'bg-blue-500 text-white'
-              }`}>
-                {swapDirection === 'wrap' ? '🔒' : '$'}
-              </div>
-              <span className="font-bold text-sm text-white">
-                {swapDirection === 'wrap' ? 'cUSDC' : 'USDC'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Info Pill */}
-      <div className="bg-[#131826]/60 border border-white/[0.06] p-3.5 rounded-2xl flex flex-col gap-1.5 text-xs">
-        <div className="flex items-center justify-between text-slate-400">
-          <span className="flex items-center gap-1.5">
-            <Info className="w-3.5 h-3.5 text-[#38BDF8]" />
-            Privacy Mode
-          </span>
-          <span className="text-emerald-400 font-semibold flex items-center gap-1">
-            <Sparkles className="w-3 h-3" /> ZK-Shielded (iExec TEE)
-          </span>
-        </div>
-        <div className="flex items-center justify-between text-slate-400 text-[11px]">
-          <span>Allowance</span>
-          <span className="font-mono text-slate-200">{allowance.toLocaleString()} USDC</span>
         </div>
       </div>
 
-      {/* Primary Swap CTA Button */}
-      <button
-        onClick={executeSwap}
-        disabled={isLoading || !swapAmount || Number(swapAmount) <= 0}
-        className="btn-uniswap-primary w-full py-4 text-base flex items-center justify-center gap-2 cursor-pointer shadow-xl"
-      >
-        {isLoading ? (
-          <>
-            <RefreshCw className="w-5 h-5 animate-spin" />
-            Broadcasting Transaction...
-          </>
-        ) : swapDirection === 'wrap' ? (
-          isApproved ? 'Wrap to cUSDC' : 'Approve & Wrap USDC'
-        ) : (
-          'Unwrap to Public USDC'
-        )}
-      </button>
+      {/* Mode Switcher Button */}
+      <div className="flex justify-center -my-2 relative z-10">
+        <button
+          onClick={toggleMode}
+          className="w-10 h-10 rounded-2xl bg-[#131826] hover:bg-[#1C2333] border border-white/[0.1] text-slate-300 hover:text-[#38BDF8] flex items-center justify-center transition-all cursor-pointer shadow-lg hover:rotate-180 duration-300"
+          title="Switch swap direction"
+        >
+          <ArrowDownUp className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Input Box 2: Receiving */}
+      <div className="uniswap-input-box p-4 flex flex-col gap-3">
+        <div className="flex justify-between items-center text-xs">
+          <span className="text-slate-400 font-medium">You Receive</span>
+          <span className="text-slate-400 font-mono">
+            Balance: {ethers.formatUnits(isWrap ? cUSDCBalance : publicBalance, 6)} {isWrap ? 'cUSDC' : 'USDC'}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <input
+            type="text"
+            readOnly
+            placeholder="0.0"
+            value={swapAmount}
+            className="bg-transparent text-2xl font-bold text-white placeholder:text-slate-600 focus:outline-none w-full font-mono cursor-not-allowed"
+          />
+
+          <div className="flex items-center gap-1.5 bg-[#131826] border border-white/[0.08] px-3 py-1.5 rounded-2xl shrink-0">
+            {isWrap ? (
+              <>
+                <Lock className="w-3.5 h-3.5 text-purple-400" />
+                <span className="text-xs font-bold text-white">cUSDC</span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                <span className="text-xs font-bold text-white">USDC</span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Explanation Banner */}
+      <div className="bg-[#131826]/60 p-3.5 rounded-2xl border border-white/[0.06] flex items-start gap-2.5 text-xs text-slate-400">
+        <Info className="w-4 h-4 text-[#38BDF8] shrink-0 mt-0.5" />
+        <span>
+          {isWrap 
+            ? "1) Approval (Gas), 2) On-chain Wrap (Gas), 3) DataAccessAuthorization Signature (Gasless) to unlock confidential cUSDC." 
+            : "KMS handles unwrap requests zero-knowledge. 2 gasless signatures + 2 contract transactions required."}
+        </span>
+      </div>
+
+      {/* Action CTA Buttons */}
+      {!walletAddress ? (
+        <button
+          disabled
+          className="btn-uniswap-primary w-full py-4 text-sm opacity-50 cursor-not-allowed"
+        >
+          Connect Web3 Wallet to Swap
+        </button>
+      ) : hasInsufficientBalance ? (
+        <button
+          disabled
+          className="w-full py-4 rounded-2xl bg-rose-500/10 text-rose-400 border border-rose-500/20 text-sm font-bold opacity-60 cursor-not-allowed"
+        >
+          Insufficient {isWrap ? 'Public USDC' : 'cUSDC'} Balance
+        </button>
+      ) : needsApproval ? (
+        <button
+          onClick={() => handleApprove(parsedAmount)}
+          disabled={isLoading}
+          className="btn-uniswap-primary w-full py-4 text-sm flex items-center justify-center gap-2 cursor-pointer"
+        >
+          {isLoading ? 'Approving Public USDC...' : `Approve ${swapAmount} USDC`}
+        </button>
+      ) : (
+        <button
+          onClick={() => (isWrap ? handleWrap(parsedAmount) : handleUnwrap(parsedAmount))}
+          disabled={isLoading || parsedAmount <= 0n}
+          className="btn-uniswap-primary w-full py-4 text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isLoading ? (
+            <span>Executing Shielded Swap...</span>
+          ) : isWrap ? (
+            <>
+              <Lock className="w-4 h-4" /> Wrap USDC to cUSDC
+            </>
+          ) : (
+            <>
+              <Coins className="w-4 h-4" /> Unwrap cUSDC to USDC
+            </>
+          )}
+        </button>
+      )}
+
+      {/* Transaction Stepper Modal */}
+      <TransactionStepper
+        isOpen={isStepperOpen}
+        title={stepperTitle}
+        steps={stepperSteps}
+        subtext={stepperSubtext}
+      />
 
     </div>
   );
