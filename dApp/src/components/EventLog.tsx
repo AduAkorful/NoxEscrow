@@ -1,5 +1,5 @@
-import { Terminal } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { Activity } from 'lucide-react';
 import { ethers } from 'ethers';
 import { NoxEscrowContractABI } from '../contracts/NoxEscrowContract';
 import { NoxEscrowFactoryABI } from '../contracts/NoxEscrowFactory';
@@ -14,13 +14,12 @@ export function EventLog({ signer, factoryAddress, contractsList }: EventLogProp
   const [logs, setLogs] = useState<{ id: string; time: string; title: string; desc: string; type: 'success' | 'alert' | 'info' }[]>([]);
 
   useEffect(() => {
-    // Basic fallback initialization to keep log clean
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const fetchedLogs = [
       {
         id: 'heartbeat-init',
         time,
-        title: 'SECURE_NODE_ONLINE',
+        title: 'Secure Node Active',
         desc: 'TEE attestation monitoring session established.',
         type: 'info' as const
       }
@@ -30,7 +29,6 @@ export function EventLog({ signer, factoryAddress, contractsList }: EventLogProp
 
     if (!signer || !signer.provider) return;
 
-    // 1. Setup factory event listener
     let factoryContract: ethers.Contract | null = null;
     if (factoryAddress) {
       try {
@@ -41,7 +39,7 @@ export function EventLog({ signer, factoryAddress, contractsList }: EventLogProp
             {
               id: `${event?.transactionHash || Math.random()}-${event?.logIndex || Math.random()}`,
               time: evTime,
-              title: 'ESCROW_CLONE_CREATED',
+              title: 'Escrow Deployed',
               desc: `New contract deployed at ${escrowClone.slice(0, 6)}...${escrowClone.slice(-4)}`,
               type: 'info'
             },
@@ -53,7 +51,6 @@ export function EventLog({ signer, factoryAddress, contractsList }: EventLogProp
       }
     }
 
-    // 2. Setup escrow contract listeners
     const activeContracts: ethers.Contract[] = [];
     contractsList.forEach(c => {
       if (!c.address) return;
@@ -66,8 +63,8 @@ export function EventLog({ signer, factoryAddress, contractsList }: EventLogProp
             {
               id: `${event?.transactionHash || Math.random()}-${event?.logIndex || Math.random()}`,
               time: evTime,
-              title: 'CONTRACT_INITIALIZED',
-              desc: `Escrow initialized: ${_totalMilestones} milestones locked.`,
+              title: 'Contract Initialized',
+              desc: `Escrow initialized with ${_totalMilestones} milestones.`,
               type: 'success'
             },
             ...prev
@@ -80,8 +77,8 @@ export function EventLog({ signer, factoryAddress, contractsList }: EventLogProp
             {
               id: `${event?.transactionHash || Math.random()}-${event?.logIndex || Math.random()}`,
               time: evTime,
-              title: 'DELIVERABLE_SUBMITTED',
-              desc: `Milestone ${Number(milestoneIndex) + 1} deliverable submitted.`,
+              title: 'Deliverable Submitted',
+              desc: `Milestone ${Number(milestoneIndex) + 1} deliverable uploaded.`,
               type: 'info'
             },
             ...prev
@@ -94,8 +91,8 @@ export function EventLog({ signer, factoryAddress, contractsList }: EventLogProp
             {
               id: `${event?.transactionHash || Math.random()}-${event?.logIndex || Math.random()}`,
               time: evTime,
-              title: 'MILESTONE_APPROVED',
-              desc: `Milestone ${Number(milestoneIndex) + 1} approved & payout released.`,
+              title: 'Milestone Released',
+              desc: `Milestone ${Number(milestoneIndex) + 1} payout approved & sent.`,
               type: 'success'
             },
             ...prev
@@ -108,8 +105,8 @@ export function EventLog({ signer, factoryAddress, contractsList }: EventLogProp
             {
               id: `${event?.transactionHash || Math.random()}-${event?.logIndex || Math.random()}`,
               time: evTime,
-              title: 'DISPUTE_OPENED',
-              desc: `Dispute raised on Milestone ${Number(milestoneIndex) + 1}! TEE Arbiter alert.`,
+              title: 'Dispute Raised',
+              desc: `Dispute opened on Milestone ${Number(milestoneIndex) + 1}.`,
               type: 'alert'
             },
             ...prev
@@ -122,8 +119,8 @@ export function EventLog({ signer, factoryAddress, contractsList }: EventLogProp
             {
               id: `${event?.transactionHash || Math.random()}-${event?.logIndex || Math.random()}`,
               time: evTime,
-              title: 'DISPUTE_RESOLVED',
-              desc: `Milestone ${Number(milestoneIndex) + 1} settled: Ruled in favor of ${ruledInFavorOfFreelancer ? 'Freelancer' : 'Client'}.`,
+              title: 'Dispute Resolved',
+              desc: `Settled: Ruled in favor of ${ruledInFavorOfFreelancer ? 'Freelancer' : 'Client'} for Milestone ${Number(milestoneIndex) + 1}.`,
               type: 'success'
             },
             ...prev
@@ -151,41 +148,37 @@ export function EventLog({ signer, factoryAddress, contractsList }: EventLogProp
   }, [signer, contractsList, factoryAddress]);
 
   return (
-    <div className="bento-card p-6 flex flex-col gap-4 hover:border-[#00F2FE]/30 transition-smooth">
+    <div className="uniswap-card p-6 flex flex-col gap-4 w-full">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#00F2FE] animate-pulse drop-shadow-[0_0_5px_#00F2FE]"></span>
-          <h4 className="font-mono text-[10px] text-slate-400 uppercase tracking-widest font-bold">SECURITY_EVENT_LOG</h4>
+          <Activity className="w-5 h-5 text-[#38BDF8]" />
+          <h4 className="font-bold text-white text-base">Security Activity Stream</h4>
         </div>
-        <Terminal className="w-3.5 h-3.5 text-slate-500" />
+        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
       </div>
 
-      <div className="flex flex-col gap-2.5 custom-scrollbar max-h-[180px] overflow-y-auto pr-1">
+      <div className="flex flex-col gap-2.5 custom-scrollbar max-h-[220px] overflow-y-auto pr-1">
         {logs.map((log) => {
-          let borderClass = 'border-white/5';
-          let titleClass = 'text-slate-300 font-medium';
-          let bgClass = 'hover:bg-white/[0.01]';
+          let dotColor = 'bg-[#38BDF8]';
+          let textColor = 'text-[#38BDF8]';
           if (log.type === 'success') {
-            borderClass = 'border-[#00E676]';
-            titleClass = 'text-[#00E676] font-bold';
-            bgClass = 'bg-[#00E676]/5';
+            dotColor = 'bg-emerald-400';
+            textColor = 'text-emerald-400';
           } else if (log.type === 'alert') {
-            borderClass = 'border-[#FF1744]';
-            titleClass = 'text-[#FF1744] font-bold animate-pulse';
-            bgClass = 'bg-[#FF1744]/5';
-          } else if (log.type === 'info') {
-            borderClass = 'border-[#00F2FE]';
-            titleClass = 'text-[#00F2FE] font-bold';
-            bgClass = 'bg-[#00F2FE]/5';
+            dotColor = 'bg-rose-400';
+            textColor = 'text-rose-400';
           }
 
           return (
-            <div key={log.id} className={`flex flex-col gap-1 text-[10px] font-mono border-l-2 ${borderClass} pl-3 py-1 ${bgClass} rounded-r-lg transition-smooth`}>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500">{log.time}</span>
-                <span className={titleClass}>{log.title}</span>
+            <div key={log.id} className="p-3 bg-[#131826]/60 border border-white/[0.06] rounded-2xl flex flex-col gap-1 text-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${dotColor}`}></span>
+                  <span className={`font-semibold ${textColor}`}>{log.title}</span>
+                </div>
+                <span className="text-[10px] text-slate-500 font-mono">{log.time}</span>
               </div>
-              <span className="text-[9px] text-slate-400 pl-0">{log.desc}</span>
+              <p className="text-slate-400 text-xs pl-4 leading-relaxed">{log.desc}</p>
             </div>
           );
         })}

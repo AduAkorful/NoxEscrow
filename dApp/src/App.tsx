@@ -5,13 +5,6 @@ import {
   DEFAULT_NOX_GATEWAY
 } from './services/escrowService';
 import { 
-  updateEscrowStatement, 
-  getPendingSyncs, 
-  removePendingSync, 
-  insertEscrowMetadata, 
-  updateEscrowDeliverable 
-} from './services/metadataService';
-import { 
   AlertTriangle,
   Unlock
 } from 'lucide-react';
@@ -21,11 +14,8 @@ import { usePrivy, useWallets } from '@privy-io/react-auth';
 
 // Sub-components
 import { LandingPage } from './components/LandingPage';
-import { KeyDerivationGate } from './components/KeyDerivationGate';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
-import { ReputationGauge } from './components/ReputationGauge';
-import { EventLog } from './components/EventLog';
 import { ShortcutsHUD } from './components/ShortcutsHUD';
 import { Footer } from './components/Footer';
 import { TransactionStepper } from './components/TransactionStepper';
@@ -45,7 +35,7 @@ import { AdminPage } from './pages/AdminPage';
 
 function App() {
   // --- Privy Hooks ---
-  const { logout: privyLogout, login: loginPrivy, authenticated, user, ready } = usePrivy();
+  const { logout: privyLogout, login: loginPrivy, authenticated, user } = usePrivy();
   const { wallets } = useWallets();
   const activeWallet = wallets[0];
   const connectedAddress = activeWallet?.address || user?.wallet?.address || null;
@@ -58,7 +48,6 @@ function App() {
   const [showShortcutsHUD, setShowShortcutsHUD] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [isUnsupportedNetwork, setIsUnsupportedNetwork] = useState(false);
   const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null);
 
   // --- Toast notifications state ---
@@ -68,6 +57,21 @@ function App() {
   }, []);
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+  // --- Global Keyboard Shortcuts Listener (Cmd+K / ?) ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setShowShortcutsHUD(prev => !prev);
+      }
+      if (e.key === '?' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        setShowShortcutsHUD(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // --- API & E2E Config Constants from Env ---
@@ -125,7 +129,8 @@ function App() {
     handleDeployEscrow,
     handleSubmitDeliverable,
     handleReleaseMilestone,
-    handleRaiseDispute
+    handleRaiseDispute,
+    handleMutualCancel
   } = useEscrowActions({
     walletAddress,
     getWeb3Signer,
@@ -198,201 +203,95 @@ function App() {
   useEffect(() => {
     if (authenticated && connectedAddress) {
       setWalletAddress(connectedAddress);
-    } else if (!authenticated && walletAddress) {
+    } else {
       setWalletAddress(null);
       setVaultKey(null);
     }
-  }, [authenticated, connectedAddress, walletAddress]);
+  }, [authenticated, connectedAddress]);
 
-  // Console logging state transitions for debugging connection issues
-  useEffect(() => {
-    console.log("NoxEscrow Privy Connection Debug:", {
-      authenticated,
-      userWalletAddress: user?.wallet?.address,
-      activeWalletAddress: activeWallet?.address,
-      connectedAddress,
-      walletsCount: wallets.length,
-      walletAddressState: walletAddress,
-      vaultKey
-    });
-  }, [authenticated, user, activeWallet, connectedAddress, wallets, walletAddress, vaultKey]);
-
-  // Enforce Sepolia network for connected wallet
-  useEffect(() => {
-    if (authenticated && activeWallet) {
-      const currentChainId = activeWallet.chainId;
-      const cleanChainId = currentChainId.includes(':') 
-        ? currentChainId.split(':')[1] 
-        : currentChainId;
+  // Network Verification Check
+  const checkNetwork = useCallback(async () => {
+    try {
+      const s = await getWeb3Signer();
+      setSigner(s);
+      const network = await s.provider.getNetwork();
+      const chainIdNumber = Number(network.chainId);
       
-      const chainIdNum = cleanChainId.startsWith('0x') 
-        ? parseInt(cleanChainId, 16) 
-        : parseInt(cleanChainId, 10);
-
-      if (chainIdNum !== 11155111) {
-        setIsUnsupportedNetwork(true);
-        setErrorMessage("Please switch your wallet network to Sepolia to interact with NoxEscrow.");
-        
-        // Attempt automatic switch to Sepolia (11155111)
-        activeWallet.switchChain(11155111)
-          .then(() => {
-            setIsUnsupportedNetwork(false);
-            setErrorMessage(null);
-          })
-          .catch((err) => {
-            console.error("Failed to switch chain to Sepolia:", err);
-            setErrorMessage("Unsupported network. Please switch to Sepolia network in your wallet to continue.");
-          });
-      } else {
-        setIsUnsupportedNetwork(false);
-        // Clear unsupported network error if they switched successfully
-        if (errorMessage === "Please switch your wallet network to Sepolia to interact with NoxEscrow." || 
-            errorMessage === "Unsupported network. Please switch to Sepolia network in your wallet to continue.") {
-          setErrorMessage(null);
-        }
+      const isLocalhost = chainIdNumber === 31337 || chainIdNumber === 1337;
+      const isSepolia = chainIdNumber === 11155111;
+      
+      if (!isLocalhost && !isSepolia) {
+        setErrorMessage(`Connected to chain ID ${chainIdNumber}. Please switch your Web3 wallet network to Sepolia Testnet or Localhost 31337.`);
       }
+    } catch (e: any) {
+      console.warn("Network check error:", e);
     }
-  }, [authenticated, activeWallet, errorMessage]);
+  }, [getWeb3Signer]);
 
-  // Periodic background re-sync handler for cached metadata
-  useEffect(() => {
-    if (!walletAddress || !vaultKey || !supabaseUrl || !supabaseKey) return;
-
-    const runSync = async () => {
-      const syncs = getPendingSyncs();
-      if (syncs.length === 0) return;
-
-      console.log(`🔄 Found ${syncs.length} pending metadata records to sync...`);
-      for (const sync of syncs) {
-        try {
-          if (sync.type === "INSERT") {
-            await insertEscrowMetadata(supabaseUrl, supabaseKey, sync.data);
-          } else if (sync.type === "UPDATE") {
-            await updateEscrowDeliverable(supabaseUrl, supabaseKey, sync.escrowAddress, sync.milestoneIndex, sync.data.devsCid);
-          } else if (sync.type === "STATEMENT") {
-            await updateEscrowStatement(supabaseUrl, supabaseKey, sync.escrowAddress, sync.milestoneIndex, sync.data.role, sync.data.statement);
-          }
-          removePendingSync(sync.id);
-          console.log(`✔️ Successfully synchronized pending record: ${sync.type} for ${sync.escrowAddress} Milestone ${sync.milestoneIndex}`);
-        } catch (err) {
-          console.error(`❌ Failed to sync pending record ${sync.id}:`, err);
-        }
-      }
-    };
-
-    runSync();
-    const interval = setInterval(runSync, 30000);
-    return () => clearInterval(interval);
-  }, [walletAddress, vaultKey, supabaseUrl, supabaseKey]);
-
-  // Sync Ethers signer from connected wallet address
+  // Auto-fetch data on wallet connect (without blocking UI with KeyDerivationGate)
   useEffect(() => {
     if (walletAddress) {
-      getWeb3Signer()
-        .then(setSigner)
-        .catch(err => {
-          console.warn("Failed to retrieve Ethers signer:", err);
-          setSigner(null);
-        });
-    } else {
-      setSigner(null);
+      checkNetwork();
+      loadOnChainContracts();
+      checkAdminStatus();
+      loadFactoryParams();
     }
-  }, [walletAddress, getWeb3Signer]);
+  }, [walletAddress, checkNetwork, loadOnChainContracts, checkAdminStatus, loadFactoryParams]);
 
-  // --- Actions ---
-  const connectWallet = useCallback(async () => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsUnsupportedNetwork(false);
-
-    try {
-      await loginPrivy();
-    } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to connect wallet via Privy.');
-    }
-  }, [loginPrivy]);
-
-  const triggerKeyDerivation = useCallback(async () => {
-    if (!walletAddress) return;
+  // Derived Key check
+  const triggerKeyDerivation = useCallback(async (): Promise<string> => {
+    if (!walletAddress) throw new Error("Wallet not connected");
     setIsDeriving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      let signature = '';
-      if (activeWallet) {
-        const provider = await activeWallet.getEthereumProvider();
-        const ethersProvider = new ethers.BrowserProvider(provider);
-        const signer = await ethersProvider.getSigner();
-        signature = await signer.signMessage(SIGN_MESSAGE);
-      } else {
-        const win = window as any;
-        if (win.ethereum) {
-          const provider = new ethers.BrowserProvider(win.ethereum);
-          const signer = await provider.getSigner();
-          signature = await signer.signMessage(SIGN_MESSAGE);
-        } else {
-          throw new Error("No wallet provider available");
-        }
-      }
-
+      const s = await getWeb3Signer();
+      setSigner(s);
+      const signature = await s.signMessage(SIGN_MESSAGE);
       const key = await deriveEncryptionKey(signature);
       setVaultKey(key);
-      setSuccessMessage("Confidential key successfully derived! Environment unlocked.");
-    } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : 'Key derivation failed.');
-    } finally {
-      setIsDeriving(false);
-    }
-  }, [walletAddress, activeWallet]);
-
-  // --- Keyboard Shortcuts Listener (Linear-style) ---
-  useEffect(() => {
-    const handleKeyDown = async (e: KeyboardEvent) => {
-      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
-        return;
-      }
-
-      const key = e.key.toLowerCase();
-
-      if (key === 'c' && !walletAddress) {
-        e.preventDefault();
-        connectWallet();
-      } else if (key === 'c' && walletAddress && !vaultKey) {
-        e.preventDefault();
-        triggerKeyDerivation();
-      } else if (key === 't' && vaultKey) {
-        e.preventDefault();
-        setViewMode(prev => prev === 'client' ? 'freelancer' : 'client');
-      } else if (key === 'h') {
-        e.preventDefault();
-        setShowShortcutsHUD(prev => !prev);
-      } else if (key === 'd' && vaultKey) {
-        e.preventDefault();
-        navigate('/vaults');
-      } else if (key === 'escape') {
-        e.preventDefault();
-        setShowShortcutsHUD(false);
-        navigate('/vaults');
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [walletAddress, vaultKey, connectWallet, triggerKeyDerivation, navigate]);
-
-  // --- Dynamic On-Chain Contract & Admin Fetching ---
-  useEffect(() => {
-    if (vaultKey && walletAddress) {
+      setSuccessMessage("🔐 Cryptographic key successfully derived! Environment unlocked.");
+      
       loadOnChainContracts();
       checkAdminStatus();
       loadFactoryParams();
+      return key;
+    } catch (err: any) {
+      console.error("Key derivation failed:", err);
+      setErrorMessage("Failed to derive vault key. Please sign the authentication request in your Web3 wallet.");
+      throw err;
+    } finally {
+      setIsDeriving(false);
     }
-  }, [vaultKey, walletAddress, loadOnChainContracts, checkAdminStatus, loadFactoryParams]);
+  }, [walletAddress, getWeb3Signer, loadOnChainContracts, checkAdminStatus, loadFactoryParams]);
+
+  // Just-in-time key requirement wrapper for transactional operations
+  const withKeyRequirement = <T extends (...args: any[]) => Promise<any>>(actionFn: T): T => {
+    return (async (...args: Parameters<T>) => {
+      if (!vaultKey) {
+        try {
+          await triggerKeyDerivation();
+        } catch (e) {
+          return;
+        }
+      }
+      return actionFn(...args);
+    }) as T;
+  };
+
+  const connectWallet = async () => {
+    setErrorMessage(null);
+    try {
+      if (!authenticated) {
+        loginPrivy();
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to establish Web3 wallet connection.");
+    }
+  };
 
   const logout = async () => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
     try {
       if (authenticated) {
         await privyLogout();
@@ -405,227 +304,188 @@ function App() {
     }
   };
 
-  const completedContracts = contractsList.filter(c => c.status === 'COMPLETED').length;
-  const disputedContracts = contractsList.filter(c => c.status === 'DISPUTED').length;
-
   const activeEscrows = contractsList.filter(c => {
     if (viewMode === 'client') return c.role === 'CLIENT';
     return c.role === 'FREELANCER';
   });
 
-  // --- Computed Sidebar State ---
-  const isEscrowRoute = location.pathname.startsWith('/escrow/');
-  const currentEscrowAddress = isEscrowRoute ? location.pathname.split('/').pop() : null;
-  const sidebarSelectedContract = isEscrowRoute 
-    ? (contractsList.find(c => c.address.toLowerCase() === currentEscrowAddress?.toLowerCase()) || ({} as any))
-    : null;
 
-  const showDraftWizard = location.pathname === '/deploy';
-  const showTokenWrapper = location.pathname === '/swap';
-  const showSettings = location.pathname === '/admin';
 
-  // --- Sleek Initialization Loader ---
-  if (!ready) {
-    return (
-      <div className="bg-[#05070F] text-[#F1F5F9] min-h-screen flex items-center justify-center relative overflow-hidden font-sans cosmic-grid">
-        <div className="fixed inset-0 z-0 pointer-events-none opacity-20 overflow-hidden">
-          <div className="scanline"></div>
-        </div>
-        <div className="pulsing-aura top-[-10%] left-[-10%] z-0"></div>
-        <div className="pulsing-aura bottom-[-10%] right-[-10%] z-0 animate-[auraPulse_10s_infinite_alternate_ease-in-out_-4s]"></div>
-        <div className="flex flex-col items-center gap-4 relative z-10 animate-pulse">
-          <div className="w-12 h-12 rounded-full border-t-2 border-r-2 border-[#00F2FE] animate-spin"></div>
-          <span className="font-mono text-[10px] text-[#00F2FE] tracking-widest uppercase font-bold">Initializing Nox Gateway...</span>
-        </div>
-      </div>
-    );
-  }
+  const activeTab = (location.pathname === '/' || location.pathname === '/home')
+    ? 'home' 
+    : location.pathname.startsWith('/swap') 
+      ? 'swap' 
+      : location.pathname.startsWith('/deploy') 
+        ? 'deploy' 
+        : location.pathname.startsWith('/admin') 
+          ? 'admin' 
+          : 'vaults';
 
   return (
-    <div className="bg-[#05070F] text-[#F1F5F9] selection:bg-[#00F2FE]/20 selection:text-[#00F2FE] min-h-screen relative overflow-hidden font-sans cosmic-grid">
-      {/* Background scanline & ambient effects */}
-      <div className="fixed inset-0 z-0 pointer-events-none opacity-20 overflow-hidden">
-        <div className="scanline"></div>
-      </div>
-      <div className="pulsing-aura top-[-10%] left-[-10%] z-0"></div>
-      <div className="pulsing-aura bottom-[-10%] right-[-10%] z-0 animate-[auraPulse_10s_infinite_alternate_ease-in-out_-4s]"></div>
+    <div className="bg-[#0B0E17] text-[#F8FAFC] selection:bg-[#38BDF8]/20 selection:text-[#38BDF8] min-h-screen relative overflow-hidden font-sans">
+      {/* Uniswap / ReactBits Ambient Glowing Background Orbs */}
+      <div className="ambient-orb-1"></div>
+      <div className="ambient-orb-2"></div>
+      <div className="ambient-orb-3"></div>
 
-      {!walletAddress ? (
-        <LandingPage 
-          connectWallet={connectWallet} 
-        />
-      ) : !vaultKey ? (
-        <KeyDerivationGate
+      <div className="flex flex-col min-h-screen relative z-10 animate-fade-in pb-16 md:pb-0">
+        <Header
           walletAddress={walletAddress}
-          errorMessage={errorMessage}
-          successMessage={successMessage}
-          isUnsupportedNetwork={isUnsupportedNetwork}
-          isDeriving={isDeriving}
-          connectWallet={connectWallet}
-          triggerKeyDerivation={triggerKeyDerivation}
+          pinataJWT={pinataJWT}
+          supabaseUrl={supabaseUrl}
+          supabaseKey={supabaseKey}
+          activeTab={activeTab}
+          isAdmin={isAdmin}
+          onSelectHome={() => navigate('/')}
+          onSelectVaults={() => navigate('/vaults')}
+          onSelectDeploy={() => navigate('/deploy')}
+          onSelectWrapper={() => navigate('/swap')}
+          onToggleAdminConfig={() => navigate(activeTab === 'admin' ? '/vaults' : '/admin')}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          onLogin={loginPrivy}
+          onLogout={logout}
+          vaultKey={vaultKey}
+          onDeriveKey={triggerKeyDerivation}
+          isDerivingKey={isDeriving}
         />
-      ) : (
-        <div className="flex flex-col min-h-screen md:pl-64 relative z-10 animate-fade-in">
-          <Sidebar
-            selectedContract={sidebarSelectedContract}
-            showDraftWizard={showDraftWizard}
-            showSettings={showSettings}
-            showTokenWrapper={showTokenWrapper}
-            isAdmin={isAdmin}
-            onSelectVaults={() => navigate('/vaults')}
-            onSelectDeploy={() => navigate('/deploy')}
-            onSelectWrapper={() => navigate('/swap')}
-            onToggleAdminConfig={() => navigate(showSettings ? '/vaults' : '/admin')}
-            logout={logout}
-            viewMode={viewMode}
-            setViewMode={setViewMode}
-          />
 
-          <Header
-            walletAddress={walletAddress}
-            pinataJWT={pinataJWT}
-            supabaseUrl={supabaseUrl}
-            supabaseKey={supabaseKey}
-          />
+        <Sidebar
+          activeTab={activeTab}
+          isAdmin={isAdmin}
+          onSelectVaults={() => navigate('/vaults')}
+          onSelectDeploy={() => navigate('/deploy')}
+          onSelectWrapper={() => navigate('/swap')}
+          onToggleAdminConfig={() => navigate(activeTab === 'admin' ? '/vaults' : '/admin')}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+        />
 
-          <main className="flex-1 p-6 pb-24 md:pb-6 max-w-[1400px] w-full mx-auto flex flex-col gap-6 relative z-10">
-            {/* Global notifications panel */}
-            {(errorMessage || successMessage) && (
-              <div className="space-y-2">
-                {errorMessage && (
-                  <div className="p-3 bg-red-950/40 border border-red-900/50 rounded-lg text-xs text-[#FF1744] flex items-center gap-3 font-mono">
-                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                    <span>{errorMessage}</span>
-                  </div>
-                )}
-                {successMessage && (
-                  <div className="p-3 bg-emerald-950/40 border border-emerald-900/50 rounded-lg text-xs text-[#00E676] flex items-center gap-3 font-mono">
-                    <Unlock className="w-4 h-4 flex-shrink-0 animate-bounce" />
-                    <span>{successMessage}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Asymmetric Bento Layout Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              {/* Left Active Workspace Workspace area (8 columns) */}
-              <div className="lg:col-span-8 flex flex-col gap-6 w-full">
-                <Routes>
-                  <Route path="/" element={<Navigate to="/vaults" replace />} />
-                  <Route path="/vaults" element={
-                    <VaultsPage 
-                      activeEscrows={activeEscrows} 
-                      isFetchingContracts={isFetchingContracts} 
-                    />
-                  } />
-                  <Route path="/deploy" element={
-                    <DeployPage 
-                      walletAddress={walletAddress} 
-                      isLoading={isLoading} 
-                      handleDeployEscrow={handleDeployEscrow} 
-                    />
-                  } />
-                  <Route path="/swap" element={
-                    <SwapPage 
-                      walletAddress={walletAddress} 
-                      cUSDCAddress={cUSDCAddress} 
-                      publicUSDCAddress={publicUSDCAddress} 
-                      gatewayUrl={gatewayUrl} 
-                      getWeb3Signer={getWeb3Signer} 
-                    />
-                  } />
-                  <Route path="/admin" element={
-                    <AdminPage
-                      factoryAddress={factoryAddress}
-                      currentImplementation={currentImplementation}
-                      currentRegistry={currentRegistry}
-                      currentUSDCToken={currentUSDCToken}
-                      currentReviewWindow={currentReviewWindow}
-                      currentMutualCancelWindow={currentMutualCancelWindow}
-                      currentTeeArbiter={currentTeeArbiter}
-                      currentPlatformFeeBps={currentPlatformFeeBps}
-                      currentTreasury={currentTreasury}
-                      newImplementationInput={newImplementationInput}
-                      setNewImplementationInput={setNewImplementationInput}
-                      newRegistryInput={newRegistryInput}
-                      setNewRegistryInput={setNewRegistryInput}
-                      newUSDCTokenInput={newUSDCTokenInput}
-                      setNewUSDCTokenInput={setNewUSDCTokenInput}
-                      newReviewWindowInput={newReviewWindowInput}
-                      setNewReviewWindowInput={setNewReviewWindowInput}
-                      newMutualCancelWindowInput={newMutualCancelWindowInput}
-                      setNewMutualCancelWindowInput={setNewMutualCancelWindowInput}
-                      newTeeArbiterInput={newTeeArbiterInput}
-                      setNewTeeArbiterInput={setNewTeeArbiterInput}
-                      newPlatformFeeBpsInput={newPlatformFeeBpsInput}
-                      setNewPlatformFeeBpsInput={setNewPlatformFeeBpsInput}
-                      newTreasuryInput={newTreasuryInput}
-                      setNewTreasuryInput={setNewTreasuryInput}
-                      isLoading={isLoading}
-                      handleUpdateImplementation={handleUpdateImplementation}
-                      handleUpdateRegistry={handleUpdateRegistry}
-                      handleUpdateUSDCToken={handleUpdateUSDCToken}
-                      handleUpdateReviewWindow={handleUpdateReviewWindow}
-                      handleUpdateMutualCancelWindow={handleUpdateMutualCancelWindow}
-                      handleUpdateTeeArbiter={handleUpdateTeeArbiter}
-                      handleUpdatePlatformFeeBps={handleUpdatePlatformFeeBps}
-                      handleUpdateTreasury={handleUpdateTreasury}
-                      isAdmin={isAdmin}
-                    />
-                  } />
-                  <Route path="/escrow/:address" element={
-                    <EscrowPage
-                      contractsList={contractsList}
-                      walletAddress={walletAddress}
-                      viewMode={viewMode}
-                      disputeStatement={disputeStatement}
-                      setDisputeStatement={setDisputeStatement}
-                      deliverableInput={deliverableInput}
-                      setDeliverableInput={setDeliverableInput}
-                      ratingInput={ratingInput}
-                      setRatingInput={setRatingInput}
-                      isLoading={isLoading}
-                      handleRaiseDispute={handleRaiseDispute}
-                      handleSubmitDeliverable={handleSubmitDeliverable}
-                      handleReleaseMilestone={handleReleaseMilestone}
-                      deliverableFiles={deliverableFiles}
-                      setDeliverableFiles={setDeliverableFiles}
-                    />
-                  } />
-                  <Route path="*" element={<Navigate to="/vaults" replace />} />
-                </Routes>
-              </div>
-
-              {/* Right Global Telemetry Widgets area (4 columns) */}
-              <div className="lg:col-span-4 flex flex-col gap-6 w-full">
-                <ReputationGauge 
-                  signer={signer}
-                  reputationRegistryAddress={currentRegistry}
-                  walletAddress={walletAddress}
-                  gatewayUrl={gatewayUrl}
-                  completedCount={completedContracts}
-                  disputedCount={disputedContracts}
-                />
-                <EventLog 
-                  signer={signer}
-                  factoryAddress={factoryAddress}
-                  contractsList={contractsList}
-                />
-              </div>
+        <main className="flex-1 px-4 sm:px-6 py-8 max-w-7xl w-full mx-auto relative z-10">
+          {/* Global notifications panel */}
+          {(errorMessage || successMessage) && (
+            <div className="space-y-2 mb-6">
+              {errorMessage && (
+                <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-xs text-rose-300 flex items-center gap-3">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+                  <span>{errorMessage}</span>
+                </div>
+              )}
+              {successMessage && (
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-xs text-emerald-300 flex items-center gap-3">
+                  <Unlock className="w-4 h-4 flex-shrink-0 text-emerald-400 animate-bounce" />
+                  <span>{successMessage}</span>
+                </div>
+              )}
             </div>
-          </main>
+          )}
 
-          <Footer
-            setViewMode={setViewMode}
-            setShowDraftWizard={(val) => {
-              if (val) navigate('/deploy');
-            }}
-            logout={logout}
-            setShowShortcutsHUD={setShowShortcutsHUD}
-          />
-        </div>
-      )}
+          <Routes>
+            <Route path="/" element={
+              <LandingPage 
+                connectWallet={connectWallet} 
+                walletAddress={walletAddress} 
+                onLaunchApp={() => navigate('/vaults')} 
+              />
+            } />
+            <Route path="/vaults" element={
+              <VaultsPage 
+                activeEscrows={activeEscrows} 
+                isFetchingContracts={isFetchingContracts} 
+              />
+            } />
+            <Route path="/deploy" element={
+              <DeployPage 
+                walletAddress={walletAddress} 
+                isLoading={isLoading} 
+                handleDeployEscrow={withKeyRequirement(handleDeployEscrow)} 
+              />
+            } />
+            <Route path="/swap" element={
+              <SwapPage 
+                walletAddress={walletAddress} 
+                cUSDCAddress={cUSDCAddress} 
+                publicUSDCAddress={publicUSDCAddress} 
+                gatewayUrl={gatewayUrl} 
+                getWeb3Signer={getWeb3Signer}
+                signer={signer}
+                reputationRegistryAddress={currentRegistry}
+                factoryAddress={factoryAddress}
+                contractsList={contractsList}
+              />
+            } />
+            <Route path="/admin" element={
+              <AdminPage
+                factoryAddress={factoryAddress}
+                currentImplementation={currentImplementation}
+                currentRegistry={currentRegistry}
+                currentUSDCToken={currentUSDCToken}
+                currentReviewWindow={currentReviewWindow}
+                currentMutualCancelWindow={currentMutualCancelWindow}
+                currentTeeArbiter={currentTeeArbiter}
+                currentPlatformFeeBps={currentPlatformFeeBps}
+                currentTreasury={currentTreasury}
+                newImplementationInput={newImplementationInput}
+                setNewImplementationInput={setNewImplementationInput}
+                newRegistryInput={newRegistryInput}
+                setNewRegistryInput={setNewRegistryInput}
+                newUSDCTokenInput={newUSDCTokenInput}
+                setNewUSDCTokenInput={setNewUSDCTokenInput}
+                newReviewWindowInput={newReviewWindowInput}
+                setNewReviewWindowInput={setNewReviewWindowInput}
+                newMutualCancelWindowInput={newMutualCancelWindowInput}
+                setNewMutualCancelWindowInput={setNewMutualCancelWindowInput}
+                newTeeArbiterInput={newTeeArbiterInput}
+                setNewTeeArbiterInput={setNewTeeArbiterInput}
+                newPlatformFeeBpsInput={newPlatformFeeBpsInput}
+                setNewPlatformFeeBpsInput={setNewPlatformFeeBpsInput}
+                newTreasuryInput={newTreasuryInput}
+                setNewTreasuryInput={setNewTreasuryInput}
+                isLoading={isLoading}
+                handleUpdateImplementation={withKeyRequirement(handleUpdateImplementation)}
+                handleUpdateRegistry={withKeyRequirement(handleUpdateRegistry)}
+                handleUpdateUSDCToken={withKeyRequirement(handleUpdateUSDCToken)}
+                handleUpdateReviewWindow={withKeyRequirement(handleUpdateReviewWindow)}
+                handleUpdateMutualCancelWindow={withKeyRequirement(handleUpdateMutualCancelWindow)}
+                handleUpdateTeeArbiter={withKeyRequirement(handleUpdateTeeArbiter)}
+                handleUpdatePlatformFeeBps={withKeyRequirement(handleUpdatePlatformFeeBps)}
+                handleUpdateTreasury={withKeyRequirement(handleUpdateTreasury)}
+                isAdmin={isAdmin}
+              />
+            } />
+            <Route path="/escrow/:address" element={
+              <EscrowPage
+                contractsList={contractsList}
+                walletAddress={walletAddress}
+                viewMode={viewMode}
+                disputeStatement={disputeStatement}
+                setDisputeStatement={setDisputeStatement}
+                deliverableInput={deliverableInput}
+                setDeliverableInput={setDeliverableInput}
+                ratingInput={ratingInput}
+                setRatingInput={setRatingInput}
+                isLoading={isLoading}
+                handleRaiseDispute={withKeyRequirement(handleRaiseDispute)}
+                handleSubmitDeliverable={withKeyRequirement(handleSubmitDeliverable)}
+                handleReleaseMilestone={withKeyRequirement(handleReleaseMilestone)}
+                handleMutualCancel={withKeyRequirement(handleMutualCancel)}
+                deliverableFiles={deliverableFiles}
+                setDeliverableFiles={setDeliverableFiles}
+              />
+            } />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+
+        <Footer
+          setViewMode={setViewMode}
+          setShowDraftWizard={(val) => {
+            if (val) navigate('/deploy');
+          }}
+          logout={logout}
+          setShowShortcutsHUD={setShowShortcutsHUD}
+        />
+      </div>
 
       {showShortcutsHUD && (
         <ShortcutsHUD onClose={() => setShowShortcutsHUD(false)} />

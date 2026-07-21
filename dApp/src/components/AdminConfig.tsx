@@ -1,4 +1,4 @@
-import { Settings, X, Shield, Percent, Wallet } from 'lucide-react';
+import { Settings, X } from 'lucide-react';
 
 interface AdminConfigProps {
   factoryAddress: string;
@@ -77,215 +77,130 @@ export function AdminConfig({
   handleUpdateTreasury,
   onClose
 }: AdminConfigProps) {
+  const adminFields = [
+    {
+      title: "1. Escrow Implementation Template",
+      current: currentImplementation,
+      value: newImplementationInput,
+      onChange: setNewImplementationInput,
+      onUpdate: () => handleUpdateImplementation(newImplementationInput),
+      placeholder: "New implementation address (0x...)"
+    },
+    {
+      title: "2. Reputation Registry",
+      current: currentRegistry,
+      value: newRegistryInput,
+      onChange: setNewRegistryInput,
+      onUpdate: () => handleUpdateRegistry(newRegistryInput),
+      placeholder: "New reputation registry address (0x...)"
+    },
+    {
+      title: "3. Wrapped Token (cUSDC)",
+      current: currentUSDCToken,
+      value: newUSDCTokenInput,
+      onChange: setNewUSDCTokenInput,
+      onUpdate: () => handleUpdateUSDCToken(newUSDCTokenInput),
+      placeholder: "New cUSDC address (0x...)"
+    },
+    {
+      title: "4. Review Window (Seconds)",
+      current: currentReviewWindow,
+      value: newReviewWindowInput,
+      onChange: setNewReviewWindowInput,
+      onUpdate: () => handleUpdateReviewWindow(newReviewWindowInput),
+      placeholder: "New review window in seconds"
+    },
+    {
+      title: "5. Mutual Cancel Window (Seconds)",
+      current: currentMutualCancelWindow,
+      value: newMutualCancelWindowInput,
+      onChange: setNewMutualCancelWindowInput,
+      onUpdate: () => handleUpdateMutualCancelWindow(newMutualCancelWindowInput),
+      placeholder: "New mutual cancel window in seconds"
+    },
+    {
+      title: "6. TEE Arbiter Address",
+      current: currentTeeArbiter,
+      value: newTeeArbiterInput,
+      onChange: setNewTeeArbiterInput,
+      onUpdate: () => handleUpdateTeeArbiter(newTeeArbiterInput),
+      placeholder: "New TEE Arbiter address (0x...)"
+    },
+    {
+      title: "7. Platform Fee Basis Points (BPS)",
+      current: currentPlatformFeeBps,
+      value: newPlatformFeeBpsInput,
+      onChange: setNewPlatformFeeBpsInput,
+      onUpdate: () => handleUpdatePlatformFeeBps(newPlatformFeeBpsInput),
+      placeholder: "New BPS (e.g. 50 = 0.5%)"
+    },
+    {
+      title: "8. Platform Treasury Address",
+      current: currentTreasury,
+      value: newTreasuryInput,
+      onChange: setNewTreasuryInput,
+      onUpdate: () => handleUpdateTreasury(newTreasuryInput),
+      placeholder: "New treasury address (0x...)"
+    }
+  ];
+
   return (
-    <div className="glass-panel p-5 border border-[#1E293B] rounded-lg flex flex-col gap-4 bg-[#161F30]/90">
-      <div className="flex justify-between items-center border-b border-[#1E293B] pb-2">
-        <h3 className="font-mono text-xs uppercase tracking-widest text-[#FF1744] font-bold flex items-center gap-2">
-          <Settings className="w-4 h-4 animate-spin" /> Protocol Admin Configuration
-        </h3>
-        <button onClick={onClose} className="text-slate-400 hover:text-white">
-          <X className="w-4 h-4" />
+    <div className="uniswap-card p-6 md:p-8 flex flex-col gap-6 w-full max-w-4xl mx-auto animate-scale-in">
+      
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-white/[0.08] pb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center">
+            <Settings className="w-5 h-5 text-purple-400" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white tracking-tight">
+              Protocol Admin Configuration
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Factory Contract: <span className="font-mono text-purple-300">{factoryAddress}</span>
+            </p>
+          </div>
+        </div>
+        <button 
+          onClick={onClose} 
+          className="p-2 rounded-xl bg-[#131826] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-all cursor-pointer"
+        >
+          <X className="w-5 h-5" />
         </button>
       </div>
-      
-      <p className="text-[10px] text-slate-400 font-sans leading-relaxed">
-        As the protocol administrator, you can modify global escrow configurations. Submitting any change will initiate an on-chain transaction to the <span className="font-mono text-white">{factoryAddress}</span> factory contract.
-      </p>
 
-      <div className="space-y-6 pt-2">
-        <div className="border border-[#1E293B] bg-[#0B0F19]/40 rounded p-4 space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-[#00F2FE] font-bold">1. Escrow Implementation Template</span>
-            <span className="text-[9px] text-slate-500 font-mono truncate max-w-[180px]">{currentImplementation || "Not Loaded"}</span>
-          </div>
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              placeholder="New implementation address (0x...)"
-              value={newImplementationInput} 
-              onChange={(e) => setNewImplementationInput(e.target.value)}
-              className="flex-1 bg-[#0B0F19] border border-[#1E293B] rounded px-3 py-2 text-xs font-mono text-[#dce4e4] focus:border-[#00F2FE] focus:outline-none"
-            />
-            <button 
-              onClick={() => handleUpdateImplementation(newImplementationInput)}
-              disabled={isLoading}
-              className="px-4 py-2 bg-[#00F2FE]/10 hover:bg-[#00F2FE]/20 text-[#00F2FE] border border-[#00F2FE]/30 font-mono text-[10px] tracking-wider uppercase rounded transition-colors font-bold"
-            >
-              Update
-            </button>
-          </div>
-        </div>
+      {/* Grid of config fields */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {adminFields.map((field, idx) => (
+          <div key={idx} className="uniswap-input-box p-4 flex flex-col gap-3">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-bold text-white">{field.title}</span>
+              <span className="font-mono text-[11px] text-slate-400 truncate max-w-[140px]">
+                {field.current || "Default"}
+              </span>
+            </div>
 
-        <div className="border border-[#1E293B] bg-[#0B0F19]/40 rounded p-4 space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-[#00F2FE] font-bold">2. Reputation Registry</span>
-            <span className="text-[9px] text-slate-500 font-mono truncate max-w-[180px]">{currentRegistry || "Not Loaded"}</span>
+            <div className="flex items-center gap-2">
+              <input 
+                type="text" 
+                placeholder={field.placeholder}
+                value={field.value} 
+                onChange={(e) => field.onChange(e.target.value)}
+                className="bg-transparent border-0 text-xs font-mono text-white focus:outline-none w-full p-0"
+              />
+              <button
+                onClick={field.onUpdate}
+                disabled={isLoading || !field.value.trim()}
+                className="btn-uniswap-secondary px-3 py-1.5 text-xs font-semibold shrink-0 cursor-pointer disabled:opacity-40"
+              >
+                Update
+              </button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              placeholder="New reputation registry address (0x...)"
-              value={newRegistryInput} 
-              onChange={(e) => setNewRegistryInput(e.target.value)}
-              className="flex-1 bg-[#0B0F19] border border-[#1E293B] rounded px-3 py-2 text-xs font-mono text-[#dce4e4] focus:border-[#00F2FE] focus:outline-none"
-            />
-            <button 
-              onClick={() => handleUpdateRegistry(newRegistryInput)}
-              disabled={isLoading}
-              className="px-4 py-2 bg-[#00F2FE]/10 hover:bg-[#00F2FE]/20 text-[#00F2FE] border border-[#00F2FE]/30 font-mono text-[10px] tracking-wider uppercase rounded transition-colors font-bold"
-            >
-              Update
-            </button>
-          </div>
-        </div>
-
-        <div className="border border-[#1E293B] bg-[#0B0F19]/40 rounded p-4 space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-[#00F2FE] font-bold">3. Wrapped Token (cUSDC)</span>
-            <span className="text-[9px] text-slate-500 font-mono truncate max-w-[180px]">{currentUSDCToken || "Not Loaded"}</span>
-          </div>
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              placeholder="New cUSDC address (0x...)"
-              value={newUSDCTokenInput} 
-              onChange={(e) => setNewUSDCTokenInput(e.target.value)}
-              className="flex-1 bg-[#0B0F19] border border-[#1E293B] rounded px-3 py-2 text-xs font-mono text-[#dce4e4] focus:border-[#00F2FE] focus:outline-none"
-            />
-            <button 
-              onClick={() => handleUpdateUSDCToken(newUSDCTokenInput)}
-              disabled={isLoading}
-              className="px-4 py-2 bg-[#00F2FE]/10 hover:bg-[#00F2FE]/20 text-[#00F2FE] border border-[#00F2FE]/30 font-mono text-[10px] tracking-wider uppercase rounded transition-colors font-bold"
-            >
-              Update
-            </button>
-          </div>
-        </div>
-
-        <div className="border border-[#7F00FF]/30 bg-[#7F00FF]/5 rounded p-4 space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-[#7F00FF] font-bold flex items-center gap-2">
-              <Shield className="w-3 h-3" /> 4. Canonical TEE Arbiter
-            </span>
-            <span className="text-[9px] text-slate-500 font-mono truncate max-w-[180px]">{currentTeeArbiter || "Not Loaded"}</span>
-          </div>
-          <p className="text-[9px] text-slate-500">The trusted arbiter address that resolves disputes. Only this address can call resolveDispute on escrows.</p>
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              placeholder="New arbiter address (0x...)"
-              value={newTeeArbiterInput} 
-              onChange={(e) => setNewTeeArbiterInput(e.target.value)}
-              className="flex-1 bg-[#0B0F19] border border-[#1E293B] rounded px-3 py-2 text-xs font-mono text-[#dce4e4] focus:border-[#7F00FF] focus:outline-none"
-            />
-            <button 
-              onClick={() => handleUpdateTeeArbiter(newTeeArbiterInput)}
-              disabled={isLoading}
-              className="px-4 py-2 bg-[#7F00FF]/10 hover:bg-[#7F00FF]/20 text-[#7F00FF] border border-[#7F00FF]/30 font-mono text-[10px] tracking-wider uppercase rounded transition-colors font-bold"
-            >
-              Update
-            </button>
-          </div>
-        </div>
-
-        <div className="border border-[#00E676]/30 bg-[#00E676]/5 rounded p-4 space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-[#00E676] font-bold flex items-center gap-2">
-              <Percent className="w-3 h-3" /> 5. Platform Fee (Basis Points)
-            </span>
-            <span className="text-[9px] text-slate-500 font-mono">{currentPlatformFeeBps || "0"} bps ({Number(currentPlatformFeeBps || 0) / 100}%)</span>
-          </div>
-          <p className="text-[9px] text-slate-500">Fee collected on successful payouts. 50 bps = 0.5%. Max 1000 bps (10%).</p>
-          <div className="flex gap-2">
-            <input 
-              type="number" 
-              placeholder="Fee in basis points (0-1000)"
-              value={newPlatformFeeBpsInput} 
-              onChange={(e) => setNewPlatformFeeBpsInput(e.target.value)}
-              className="flex-1 bg-[#0B0F19] border border-[#1E293B] rounded px-3 py-2 text-xs font-mono text-[#dce4e4] focus:border-[#00E676] focus:outline-none"
-            />
-            <button 
-              onClick={() => handleUpdatePlatformFeeBps(newPlatformFeeBpsInput)}
-              disabled={isLoading}
-              className="px-4 py-2 bg-[#00E676]/10 hover:bg-[#00E676]/20 text-[#00E676] border border-[#00E676]/30 font-mono text-[10px] tracking-wider uppercase rounded transition-colors font-bold"
-            >
-              Update
-            </button>
-          </div>
-        </div>
-
-        <div className="border border-[#00E676]/30 bg-[#00E676]/5 rounded p-4 space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-[#00E676] font-bold flex items-center gap-2">
-              <Wallet className="w-3 h-3" /> 6. Protocol Treasury
-            </span>
-            <span className="text-[9px] text-slate-500 font-mono truncate max-w-[180px]">{currentTreasury || "Not Loaded"}</span>
-          </div>
-          <p className="text-[9px] text-slate-500">Address that receives platform fees from successful escrow completions.</p>
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              placeholder="New treasury address (0x...)"
-              value={newTreasuryInput} 
-              onChange={(e) => setNewTreasuryInput(e.target.value)}
-              className="flex-1 bg-[#0B0F19] border border-[#1E293B] rounded px-3 py-2 text-xs font-mono text-[#dce4e4] focus:border-[#00E676] focus:outline-none"
-            />
-            <button 
-              onClick={() => handleUpdateTreasury(newTreasuryInput)}
-              disabled={isLoading}
-              className="px-4 py-2 bg-[#00E676]/10 hover:bg-[#00E676]/20 text-[#00E676] border border-[#00E676]/30 font-mono text-[10px] tracking-wider uppercase rounded transition-colors font-bold"
-            >
-              Update
-            </button>
-          </div>
-        </div>
-
-        <div className="border border-[#1E293B] bg-[#0B0F19]/40 rounded p-4 space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-[#00F2FE] font-bold">7. Default Review Window (seconds)</span>
-            <span className="text-[9px] text-slate-500 font-mono">{currentReviewWindow || "Not Loaded"}s</span>
-          </div>
-          <div className="flex gap-2">
-            <input 
-              type="number" 
-              placeholder="New review window in seconds"
-              value={newReviewWindowInput} 
-              onChange={(e) => setNewReviewWindowInput(e.target.value)}
-              className="flex-1 bg-[#0B0F19] border border-[#1E293B] rounded px-3 py-2 text-xs font-mono text-[#dce4e4] focus:border-[#00F2FE] focus:outline-none"
-            />
-            <button 
-              onClick={() => handleUpdateReviewWindow(newReviewWindowInput)}
-              disabled={isLoading}
-              className="px-4 py-2 bg-[#00F2FE]/10 hover:bg-[#00F2FE]/20 text-[#00F2FE] border border-[#00F2FE]/30 font-mono text-[10px] tracking-wider uppercase rounded transition-colors font-bold"
-            >
-              Update
-            </button>
-          </div>
-        </div>
-
-        <div className="border border-[#1E293B] bg-[#0B0F19]/40 rounded p-4 space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-[#00F2FE] font-bold">8. Mutual Cancellation Window (seconds)</span>
-            <span className="text-[9px] text-slate-500 font-mono">{currentMutualCancelWindow || "Not Loaded"}s</span>
-          </div>
-          <div className="flex gap-2">
-            <input 
-              type="number" 
-              placeholder="New cancellation window in seconds"
-              value={newMutualCancelWindowInput} 
-              onChange={(e) => setNewMutualCancelWindowInput(e.target.value)}
-              className="flex-1 bg-[#0B0F19] border border-[#1E293B] rounded px-3 py-2 text-xs font-mono text-[#dce4e4] focus:border-[#00F2FE] focus:outline-none"
-            />
-            <button 
-              onClick={() => handleUpdateMutualCancelWindow(newMutualCancelWindowInput)}
-              disabled={isLoading}
-              className="px-4 py-2 bg-[#00F2FE]/10 hover:bg-[#00F2FE]/20 text-[#00F2FE] border border-[#00F2FE]/30 font-mono text-[10px] tracking-wider uppercase rounded transition-colors font-bold"
-            >
-              Update
-            </button>
-          </div>
-        </div>
+        ))}
       </div>
+
     </div>
   );
 }

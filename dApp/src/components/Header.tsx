@@ -1,53 +1,210 @@
-import { ShieldCheck, Unlock } from 'lucide-react';
+import React from 'react';
+import { 
+  ShieldCheck, 
+  KeyRound, 
+  UserCheck, 
+  Briefcase, 
+  LogOut,
+  Wallet,
+  Unlock
+} from 'lucide-react';
 
 interface HeaderProps {
   walletAddress: string | null;
   pinataJWT: string;
   supabaseUrl: string;
   supabaseKey: string;
+  activeTab: 'home' | 'swap' | 'vaults' | 'deploy' | 'admin';
+  isAdmin: boolean;
+  onSelectHome: () => void;
+  onSelectVaults: () => void;
+  onSelectDeploy: () => void;
+  onSelectWrapper: () => void;
+  onToggleAdminConfig: () => void;
+  viewMode: 'client' | 'freelancer';
+  setViewMode: React.Dispatch<React.SetStateAction<'client' | 'freelancer'>>;
+  onLogin: () => void;
+  onLogout: () => Promise<void>;
+  vaultKey: string | null;
+  onDeriveKey: () => void;
+  isDerivingKey: boolean;
 }
 
 export function Header({
   walletAddress,
   pinataJWT,
   supabaseUrl,
-  supabaseKey
+  supabaseKey,
+  activeTab,
+  isAdmin,
+  onSelectHome,
+  onSelectVaults,
+  onSelectDeploy,
+  onSelectWrapper,
+  onToggleAdminConfig,
+  viewMode,
+  setViewMode,
+  onLogin,
+  onLogout,
+  vaultKey,
+  onDeriveKey,
+  isDerivingKey
 }: HeaderProps) {
+  const isCloudEncrypted = Boolean(pinataJWT && supabaseUrl && supabaseKey);
+
   return (
-    <header className="w-full top-0 sticky z-50 bg-[#05070F]/75 backdrop-blur-xl border-b border-white/5 transition-smooth">
-      <div className="flex justify-between items-center px-6 py-4 max-w-[1400px] mx-auto w-full">
-        <div className="flex items-center gap-3 group">
-          <div className="w-8 h-8 rounded-lg bg-[#00F2FE]/5 border border-[#00F2FE]/20 flex items-center justify-center transition-smooth group-hover:border-[#00F2FE]/45 group-hover:bg-[#00F2FE]/10">
-            <ShieldCheck className="w-4 h-4 text-[#00F2FE] drop-shadow-[0_0_8px_rgba(0,242,254,0.3)]" />
-          </div>
-          <h1 className="font-mono text-xs tracking-widest text-[#00F2FE] font-bold uppercase">NOX_ESCROW_CORE</h1>
-        </div>
-
-        <div className="flex items-center gap-6">
-          <div className="hidden sm:flex flex-col items-end gap-1">
-            <div className="flex items-center gap-2 font-mono text-[10px] text-slate-400">
-              <span className="text-[9px] tracking-wider opacity-60">ADDRESS:</span>
-              <span className="text-[#00F2FE] bg-[#00F2FE]/5 border border-[#00F2FE]/10 px-2 py-0.5 rounded font-semibold">
-                {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'DISCONNECTED'}
-              </span>
+    <header className="sticky top-0 z-50 w-full bg-[#0B0E17]/90 backdrop-blur-2xl border-b border-white/[0.08] transition-all">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-6">
+        
+        {/* Left Section: Brand Logo (Navigates to Home) + Uniswap-style Flat Left Navigation Links */}
+        <div className="flex items-center gap-8">
+          
+          {/* NoxEscrow Logo -> Leads to Home / Landing */}
+          <div 
+            onClick={onSelectHome}
+            className="flex items-center gap-2.5 cursor-pointer group shrink-0"
+            title="Go to Home"
+          >
+            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-[#38BDF8]/20 via-[#818CF8]/20 to-[#C084FC]/20 border border-[#38BDF8]/30 flex items-center justify-center transition-all group-hover:scale-105 group-hover:border-[#38BDF8]/60 shadow-[0_0_20px_rgba(56,189,248,0.2)]">
+              <ShieldCheck className="w-5 h-5 text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.5)]" />
             </div>
-            <div className="flex items-center gap-2 font-mono text-[10px] text-slate-400">
-              <span className="text-[9px] tracking-wider opacity-60">SECURITY:</span>
-              <span className={`font-semibold ${
-                (pinataJWT && supabaseUrl && supabaseKey) 
-                  ? 'text-[#00E676]' 
-                  : 'text-[#00F2FE]'
-              }`}>
-                {(pinataJWT && supabaseUrl && supabaseKey) ? '🔒 CLOUD SYNC ENCRYPTED' : '🔒 LOCAL VAULT ENCRYPTED'}
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-lg tracking-tight text-white group-hover:text-[#38BDF8] transition-colors">
+                Nox<span className="shiny-text">Escrow</span>
               </span>
             </div>
           </div>
 
-          <div className="px-3.5 py-1.5 border border-[#00F2FE]/20 bg-[#00F2FE]/5 rounded-lg flex items-center gap-2 shadow-[0_0_15px_rgba(0,242,254,0.02)] transition-smooth hover:border-[#00F2FE]/40">
-            <Unlock className="w-3.5 h-3.5 text-[#00F2FE] drop-shadow-[0_0_5px_rgba(0,242,254,0.3)] animate-pulse" />
-            <span className="font-mono text-[9px] text-[#00F2FE] tracking-widest uppercase font-bold">[ VAULT DECRYPTED ]</span>
-          </div>
+          {/* Uniswap Flat Left Navigation Links (No Home button) */}
+          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold">
+            <button
+              onClick={onSelectWrapper}
+              className={`transition-colors cursor-pointer ${
+                activeTab === 'swap'
+                  ? 'text-white font-bold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Shielded Swap
+            </button>
+
+            <button
+              onClick={onSelectVaults}
+              className={`transition-colors cursor-pointer ${
+                activeTab === 'vaults'
+                  ? 'text-white font-bold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Escrow Vaults
+            </button>
+
+            <button
+              onClick={onSelectDeploy}
+              className={`transition-colors cursor-pointer ${
+                activeTab === 'deploy'
+                  ? 'text-white font-bold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Deploy Escrow
+            </button>
+
+            {isAdmin && (
+              <button
+                onClick={onToggleAdminConfig}
+                className={`transition-colors cursor-pointer ${
+                  activeTab === 'admin'
+                    ? 'text-purple-400 font-bold'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Admin
+              </button>
+            )}
+          </nav>
         </div>
+
+        {/* Right Section */}
+        <div className="flex items-center gap-3">
+          
+          {/* Client / Freelancer Switcher */}
+          <div className="hidden lg:flex items-center bg-[#131826]/80 p-1 rounded-xl border border-white/[0.08]">
+            <button
+              onClick={() => setViewMode('client')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                viewMode === 'client'
+                  ? 'bg-[#38BDF8] text-[#0B0E17] shadow-sm font-bold'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              Client
+            </button>
+            <button
+              onClick={() => setViewMode('freelancer')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                viewMode === 'freelancer'
+                  ? 'bg-[#C084FC] text-[#0B0E17] shadow-sm font-bold'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Briefcase className="w-3.5 h-3.5" />
+              Freelancer
+            </button>
+          </div>
+
+          {/* Key Derivation Status Pill */}
+          {walletAddress && (
+            <div className="hidden sm:flex items-center">
+              {vaultKey ? (
+                <div 
+                  title={isCloudEncrypted ? "Cloud Sync Encrypted Vault Key Active" : "Local Vault Encrypted"}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono"
+                >
+                  <Unlock className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
+                  <span className="font-semibold hidden xl:inline">Key Unlocked</span>
+                </div>
+              ) : (
+                <button
+                  onClick={onDeriveKey}
+                  disabled={isDerivingKey}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold transition-all cursor-pointer"
+                >
+                  <KeyRound className={`w-3.5 h-3.5 ${isDerivingKey ? 'animate-spin' : ''}`} />
+                  <span>{isDerivingKey ? 'Deriving Key...' : 'Unlock Vault Key'}</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Privy Wallet Button */}
+          {walletAddress ? (
+            <div className="flex items-center gap-2 bg-[#131826] border border-white/[0.1] px-3.5 py-2 rounded-2xl shadow-sm hover:border-[#38BDF8]/40 transition-all">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+              <span className="font-mono text-xs text-white font-semibold">
+                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+              </span>
+              <button
+                onClick={onLogout}
+                title="Disconnect Wallet"
+                className="ml-1 p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={onLogin}
+              className="btn-uniswap-primary px-5 py-2.5 text-sm flex items-center gap-2 cursor-pointer shadow-lg"
+            >
+              <Wallet className="w-4 h-4" />
+              Connect Wallet
+            </button>
+          )}
+
+        </div>
+
       </div>
     </header>
   );

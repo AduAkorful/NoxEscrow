@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   Coins, 
-  ShieldCheck, 
   RefreshCw, 
   AlertTriangle, 
   CheckCircle,
-  Wallet,
-  Lock,
-  ArrowUpDown
+  ArrowDown,
+  Sparkles,
+  Info
 } from 'lucide-react';
 import { ethers } from 'ethers';
 import { 
@@ -20,7 +19,7 @@ import {
 } from '../services/escrowService';
 
 interface TokenWrapperProps {
-  walletAddress: string;
+  walletAddress: string | null;
   cUSDCAddress: string;
   publicUSDCAddress: string;
   gatewayUrl: string;
@@ -98,6 +97,7 @@ export function TokenWrapper({
 
   // --- Execute Wrapping ---
   const handleWrap = async (amountToWrap: bigint) => {
+    if (!walletAddress) return;
     setErrorMessage(null);
     setSuccessMessage(null);
     setIsLoading(true);
@@ -118,6 +118,7 @@ export function TokenWrapper({
 
   // --- Execute Unwrapping ---
   const handleUnwrap = async (amountToUnwrap: bigint) => {
+    if (!walletAddress) return;
     setErrorMessage(null);
     setSuccessMessage(null);
     setIsLoading(true);
@@ -160,14 +161,11 @@ export function TokenWrapper({
       }
 
       if (decimalAmount > allowance) {
-        // Step 1: Approve
         await handleApprove(decimalAmount);
       } else {
-        // Step 2: Wrap
         await handleWrap(decimalAmount);
       }
     } else {
-      // Unwrap path
       if (decimalAmount > cUSDCBalance) {
         setErrorMessage("Insufficient confidential cUSDC balance.");
         return;
@@ -182,219 +180,162 @@ export function TokenWrapper({
     : true;
 
   return (
-    <div className="bento-card p-6 md:p-8 flex flex-col gap-6 w-full animate-slide-up">
-      {/* Title */}
-      <div className="flex justify-between items-center border-b border-white/5 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#00F2FE]/5 border border-[#00F2FE]/20 flex items-center justify-center">
-            <Coins className="w-4 h-4 text-[#00F2FE] drop-shadow-[0_0_8px_rgba(0,242,254,0.3)]" />
+    <div className="uniswap-card p-6 md:p-8 flex flex-col gap-6 w-full max-w-lg mx-auto relative overflow-hidden animate-scale-in">
+      
+      {/* Top Header Row */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-[#38BDF8]/10 flex items-center justify-center border border-[#38BDF8]/20">
+            <Coins className="w-4 h-4 text-[#38BDF8]" />
           </div>
-          <h2 className="font-mono text-sm tracking-widest text-slate-200 font-bold uppercase">
-            CONFIDENTIAL_TOKEN_WRAPPER
-          </h2>
+          <span className="font-bold text-[#F8FAFC] text-base">
+            {swapDirection === 'wrap' ? 'Shielded Wrap' : 'Unshield USDC'}
+          </span>
         </div>
         <button 
           onClick={() => fetchBalances(true)}
           disabled={isRefreshing || isLoading}
-          className="w-8 h-8 rounded-lg border border-white/5 hover:border-[#00F2FE]/40 flex items-center justify-center text-slate-400 hover:text-[#00F2FE] transition-smooth cursor-pointer hover:bg-[#00F2FE]/5 disabled:opacity-45"
+          title="Refresh balances"
+          className="p-2 rounded-xl bg-[#131826] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-all cursor-pointer disabled:opacity-40"
         >
-          <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin text-[#00F2FE]" : ""}`} />
+          <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin text-[#38BDF8]" : ""}`} />
         </button>
       </div>
 
-      {/* Description */}
-      <p className="text-xs text-slate-400 leading-relaxed font-sans">
-        {swapDirection === 'wrap' 
-          ? "Swap your standard public USDC for confidential cUSDC. Wrapping shields your volumes, token balances, and transactions under iExec Nox's zero-knowledge computational layer."
-          : "Swap your confidential cUSDC back into standard public USDC. Unwrapping releases your locked public stablecoin tokens back into your standard wallet."
-        }
-      </p>
-
-      {/* Notification panel */}
+      {/* Alerts */}
       {(errorMessage || successMessage) && (
         <div className="space-y-2">
           {errorMessage && (
-            <div className="p-3 bg-red-950/40 border border-red-900/50 rounded-lg text-xs text-[#FF1744] flex items-center gap-3 font-mono">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-xs text-rose-300 flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-400" />
               <span>{errorMessage}</span>
             </div>
           )}
           {successMessage && (
-            <div className="p-3 bg-emerald-950/40 border border-emerald-900/50 rounded-lg text-xs text-[#00E676] flex items-center gap-3 font-mono">
-              <CheckCircle className="w-4 h-4 flex-shrink-0" />
+            <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-xs text-emerald-300 flex items-center gap-2.5">
+              <CheckCircle className="w-4 h-4 flex-shrink-0 text-emerald-400" />
               <span>{successMessage}</span>
             </div>
           )}
         </div>
       )}
 
-      {/* Input Swap Grid */}
-      <div className="flex flex-col gap-4 relative">
-        {swapDirection === 'wrap' ? (
-          <>
-            {/* Box A: Public USDC */}
-            <div className="bg-[#05070F] border border-white/5 p-4.5 rounded-xl flex flex-col gap-2.5">
-              <div className="flex justify-between items-center">
-                <span className="font-mono text-[9px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1.5">
-                  <Wallet className="w-3.5 h-3.5 text-slate-500" /> From: public USDC (Standard)
-                </span>
-                <span className="font-mono text-[9px] text-slate-400 flex items-center gap-1">
-                  Balance: <span className="text-slate-200 font-bold">{publicBalance.toLocaleString()}</span>
-                  <button 
-                    onClick={() => setSwapAmount(publicBalance.toString())}
-                    className="ml-1 text-[8px] uppercase tracking-wider text-[#00F2FE] hover:underline bg-transparent border-0 cursor-pointer font-extrabold"
-                  >
-                    [Max]
-                  </button>
-                </span>
-              </div>
-              <div className="flex justify-between items-center gap-4">
-                <input 
-                  type="number" 
-                  placeholder="0.0" 
-                  value={swapAmount} 
-                  onChange={(e) => setSwapAmount(e.target.value)}
-                  disabled={isLoading}
-                  className="bg-transparent border-0 text-lg font-mono font-bold text-slate-100 focus:outline-none w-full p-0"
-                />
-                <span className="font-mono text-[10px] text-slate-400 bg-white/5 px-2.5 py-1 rounded border border-white/5">USDC</span>
-              </div>
+      {/* Uniswap Swap Input Blocks Container */}
+      <div className="flex flex-col gap-2 relative">
+        
+        {/* INPUT BOX 1: FROM */}
+        <div className="uniswap-input-box p-4 flex flex-col gap-3">
+          <div className="flex justify-between items-center text-xs text-slate-400">
+            <span className="font-medium">You pay</span>
+            <div className="flex items-center gap-1.5">
+              <span>Balance: {swapDirection === 'wrap' ? publicBalance.toLocaleString() : cUSDCBalance.toLocaleString()}</span>
+              <button 
+                onClick={() => setSwapAmount(swapDirection === 'wrap' ? publicBalance.toString() : cUSDCBalance.toString())}
+                className="text-[10px] font-bold text-[#38BDF8] hover:text-[#818CF8] bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 px-2 py-0.5 rounded-full transition-colors cursor-pointer"
+              >
+                MAX
+              </button>
             </div>
+          </div>
 
-            {/* Arrow Divider / Direction Switcher */}
-            <button 
-              onClick={handleToggleDirection}
+          <div className="flex items-center justify-between gap-4">
+            <input 
+              type="number" 
+              placeholder="0" 
+              value={swapAmount} 
+              onChange={(e) => setSwapAmount(e.target.value)}
               disabled={isLoading}
-              className="absolute left-[calc(50%-18px)] top-[calc(50%-18px)] w-9 h-9 rounded-full bg-[#05070F] border border-white/5 hover:border-[#00F2FE]/40 flex items-center justify-center z-10 shadow-[0_0_15px_rgba(0,0,0,0.4)] transition-smooth hover:scale-105 active:scale-95 cursor-pointer hover:bg-[#00F2FE]/5"
-            >
-              <ArrowUpDown className="w-4 h-4 text-[#00F2FE]" />
-            </button>
-
-            {/* Box B: Confidential cUSDC */}
-            <div className="bg-[#05070F] border border-[#7F00FF]/10 p-4.5 rounded-xl flex flex-col gap-2.5 shadow-[0_0_15px_rgba(127,0,255,0.01)] hover:border-[#7F00FF]/25 transition-smooth">
-              <div className="flex justify-between items-center">
-                <span className="font-mono text-[9px] text-purple-400 font-bold uppercase tracking-widest flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-purple-500" /> To: confidential cUSDC (Nox)
-                </span>
-                <span className="font-mono text-[9px] text-purple-400">
-                  Shielded: <span className="text-[#00F2FE] font-bold text-shadow-[#7F00FF]">{cUSDCBalance.toLocaleString()}</span>
-                </span>
+              className="bg-transparent border-0 text-3xl font-bold text-white focus:outline-none w-full p-0 placeholder-slate-600"
+            />
+            
+            {/* Token Badge */}
+            <div className="flex items-center gap-2 bg-[#131826] border border-white/[0.1] px-3 py-2 rounded-2xl shadow-sm shrink-0">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                swapDirection === 'wrap' ? 'bg-blue-500 text-white' : 'bg-purple-500 text-white'
+              }`}>
+                {swapDirection === 'wrap' ? '$' : '🔒'}
               </div>
-              <div className="flex justify-between items-center gap-4">
-                <span className="font-mono text-lg font-bold text-slate-300">
-                  {swapAmount && !isNaN(Number(swapAmount)) && Number(swapAmount) > 0 ? Number(swapAmount).toLocaleString() : "0.0"}
-                </span>
-                <span className="font-mono text-[10px] text-purple-400 bg-purple-950/10 px-2.5 py-1 rounded border border-[#7F00FF]/20 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#00F2FE]" /> cUSDC
-                </span>
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Box A: Confidential cUSDC (From) */}
-            <div className="bg-[#05070F] border border-[#7F00FF]/15 p-4.5 rounded-xl flex flex-col gap-2.5 shadow-[0_0_15px_rgba(127,0,255,0.01)] hover:border-[#7F00FF]/30 transition-smooth">
-              <div className="flex justify-between items-center">
-                <span className="font-mono text-[9px] text-purple-400 font-bold uppercase tracking-widest flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-purple-500" /> From: confidential cUSDC (Nox)
-                </span>
-                <span className="font-mono text-[9px] text-purple-400 flex items-center gap-1">
-                  Shielded: <span className="text-[#00F2FE] font-bold text-shadow-[#7F00FF]">{cUSDCBalance.toLocaleString()}</span>
-                  <button 
-                    onClick={() => setSwapAmount(cUSDCBalance.toString())}
-                    className="ml-1 text-[8px] uppercase tracking-wider text-[#00F2FE] hover:underline bg-transparent border-0 cursor-pointer font-extrabold font-mono"
-                  >
-                    [Max]
-                  </button>
-                </span>
-              </div>
-              <div className="flex justify-between items-center gap-4">
-                <input 
-                  type="number" 
-                  placeholder="0.0" 
-                  value={swapAmount} 
-                  onChange={(e) => setSwapAmount(e.target.value)}
-                  disabled={isLoading}
-                  className="bg-transparent border-0 text-lg font-mono font-bold text-slate-100 focus:outline-none w-full p-0"
-                />
-                <span className="font-mono text-[10px] text-purple-400 bg-purple-950/10 px-2.5 py-1 rounded border border-[#7F00FF]/20 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#00F2FE]" /> cUSDC
-                </span>
-              </div>
-            </div>
-
-            {/* Arrow Divider / Direction Switcher */}
-            <button 
-              onClick={handleToggleDirection}
-              disabled={isLoading}
-              className="absolute left-[calc(50%-18px)] top-[calc(50%-18px)] w-9 h-9 rounded-full bg-[#05070F] border border-white/5 hover:border-[#00F2FE]/40 flex items-center justify-center z-10 shadow-[0_0_15px_rgba(0,0,0,0.4)] transition-smooth hover:scale-105 active:scale-95 cursor-pointer hover:bg-[#00F2FE]/5"
-            >
-              <ArrowUpDown className="w-4 h-4 text-[#00F2FE]" />
-            </button>
-
-            {/* Box B: Public USDC (To) */}
-            <div className="bg-[#05070F] border border-white/5 p-4.5 rounded-xl flex flex-col gap-2.5">
-              <div className="flex justify-between items-center">
-                <span className="font-mono text-[9px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1.5">
-                  <Wallet className="w-3.5 h-3.5 text-slate-500" /> To: public USDC (Standard)
-                </span>
-                <span className="font-mono text-[9px] text-slate-400">
-                  Balance: <span className="text-slate-200 font-bold">{publicBalance.toLocaleString()}</span>
-                </span>
-              </div>
-              <div className="flex justify-between items-center gap-4">
-                <span className="font-mono text-lg font-bold text-slate-300">
-                  {swapAmount && !isNaN(Number(swapAmount)) && Number(swapAmount) > 0 ? Number(swapAmount).toLocaleString() : "0.0"}
-                </span>
-                <span className="font-mono text-[10px] text-slate-400 bg-white/5 px-2.5 py-1 rounded border border-white/5">USDC</span>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Allowance / Gas info */}
-      <div className="bg-[#05070F]/50 border border-white/5 p-4 rounded-xl flex flex-col gap-2">
-        {swapDirection === 'wrap' ? (
-          <>
-            <div className="flex justify-between items-center text-[10px] font-mono leading-none text-slate-400">
-              <span>USDC Contract Allowance:</span>
-              <span className="text-slate-200">{allowance.toLocaleString()} USDC</span>
-            </div>
-            <div className="flex justify-between items-center text-[10px] font-mono leading-none text-slate-400">
-              <span>Active Swap Pathway:</span>
-              <span className={isApproved ? "text-[#00E676]" : "text-[#7F00FF]"}>
-                {isApproved ? "DIRECT_WRAP" : "REQUIRES_USDC_APPROVAL_FIRST"}
+              <span className="font-bold text-sm text-white">
+                {swapDirection === 'wrap' ? 'USDC' : 'cUSDC'}
               </span>
             </div>
-          </>
-        ) : (
-          <div className="flex justify-between items-center text-[10px] font-mono leading-none text-slate-400">
-            <span>Active Swap Pathway:</span>
-            <span className="text-[#00E676]">
-              DIRECT_UNWRAP (2-STEP ON-CHAIN SHIELDED EXIT)
-            </span>
           </div>
-        )}
+        </div>
+
+        {/* Direction Swap Button */}
+        <div className="flex justify-center -my-3 z-10">
+          <button 
+            onClick={handleToggleDirection}
+            disabled={isLoading}
+            className="w-10 h-10 rounded-2xl bg-[#131826] border border-white/[0.12] hover:border-[#38BDF8]/50 text-slate-300 hover:text-[#38BDF8] flex items-center justify-center shadow-lg transition-all hover:rotate-180 duration-300 cursor-pointer active:scale-95"
+          >
+            <ArrowDown className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* INPUT BOX 2: TO */}
+        <div className="uniswap-input-box p-4 flex flex-col gap-3">
+          <div className="flex justify-between items-center text-xs text-slate-400">
+            <span className="font-medium">You receive</span>
+            <span>Balance: {swapDirection === 'wrap' ? cUSDCBalance.toLocaleString() : publicBalance.toLocaleString()}</span>
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-3xl font-bold text-slate-200">
+              {swapAmount && !isNaN(Number(swapAmount)) && Number(swapAmount) > 0 ? Number(swapAmount).toLocaleString() : "0"}
+            </span>
+            
+            {/* Token Badge */}
+            <div className="flex items-center gap-2 bg-[#131826] border border-white/[0.1] px-3 py-2 rounded-2xl shadow-sm shrink-0">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                swapDirection === 'wrap' ? 'bg-purple-500 text-white' : 'bg-blue-500 text-white'
+              }`}>
+                {swapDirection === 'wrap' ? '🔒' : '$'}
+              </div>
+              <span className="font-bold text-sm text-white">
+                {swapDirection === 'wrap' ? 'cUSDC' : 'USDC'}
+              </span>
+            </div>
+          </div>
+        </div>
+
       </div>
 
-      {/* Swap Actions Row */}
-      <div className="flex flex-col gap-4">
-        {/* Core Swap Button */}
-        <button
-          onClick={executeSwap}
-          disabled={isLoading || !swapAmount || Number(swapAmount) <= 0}
-          className="w-full py-4.5 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth hover:shadow-[0_0_20px_rgba(0,242,254,0.45)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2 rounded-xl border border-transparent"
-        >
-          <ArrowUpDown className="w-4 h-4" />
-          {isLoading 
-            ? "Broadcasting..." 
-            : swapDirection === 'wrap' 
-              ? (isApproved ? "Wrap to cUSDC" : "Approve & Wrap")
-              : "Unwrap to USDC"
-          }
-        </button>
+      {/* Info Pill */}
+      <div className="bg-[#131826]/60 border border-white/[0.06] p-3.5 rounded-2xl flex flex-col gap-1.5 text-xs">
+        <div className="flex items-center justify-between text-slate-400">
+          <span className="flex items-center gap-1.5">
+            <Info className="w-3.5 h-3.5 text-[#38BDF8]" />
+            Privacy Mode
+          </span>
+          <span className="text-emerald-400 font-semibold flex items-center gap-1">
+            <Sparkles className="w-3 h-3" /> ZK-Shielded (iExec TEE)
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-slate-400 text-[11px]">
+          <span>Allowance</span>
+          <span className="font-mono text-slate-200">{allowance.toLocaleString()} USDC</span>
+        </div>
       </div>
+
+      {/* Primary Swap CTA Button */}
+      <button
+        onClick={executeSwap}
+        disabled={isLoading || !swapAmount || Number(swapAmount) <= 0}
+        className="btn-uniswap-primary w-full py-4 text-base flex items-center justify-center gap-2 cursor-pointer shadow-xl"
+      >
+        {isLoading ? (
+          <>
+            <RefreshCw className="w-5 h-5 animate-spin" />
+            Broadcasting Transaction...
+          </>
+        ) : swapDirection === 'wrap' ? (
+          isApproved ? 'Wrap to cUSDC' : 'Approve & Wrap USDC'
+        ) : (
+          'Unwrap to Public USDC'
+        )}
+      </button>
+
     </div>
   );
 }

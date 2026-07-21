@@ -1,188 +1,78 @@
-import { ShieldCheck, Fingerprint, Database, Plus, Settings, LogOut, Coins } from 'lucide-react';
-import { type EscrowContract } from '../services/escrowService';
+import React from 'react';
+import { Database, Coins, Plus, Settings, UserCheck, Briefcase } from 'lucide-react';
 
 interface SidebarProps {
-  selectedContract: EscrowContract | null;
-  showDraftWizard: boolean;
-  showSettings: boolean;
-  showTokenWrapper: boolean;
+  activeTab: 'home' | 'swap' | 'vaults' | 'deploy' | 'admin';
   isAdmin: boolean;
   onSelectVaults: () => void;
   onSelectDeploy: () => void;
   onSelectWrapper: () => void;
   onToggleAdminConfig: () => void;
-  logout: () => Promise<void>;
   viewMode: 'client' | 'freelancer';
   setViewMode: React.Dispatch<React.SetStateAction<'client' | 'freelancer'>>;
 }
 
 export function Sidebar({
-  selectedContract,
-  showDraftWizard,
-  showSettings,
-  showTokenWrapper,
+  activeTab,
   isAdmin,
   onSelectVaults,
   onSelectDeploy,
   onSelectWrapper,
   onToggleAdminConfig,
-  logout,
   viewMode,
   setViewMode
 }: SidebarProps) {
   return (
-    <>
-      {/* Desktop Sidebar (visible on medium/large viewports) */}
-      <aside className="hidden md:flex flex-col h-screen left-0 fixed w-64 bg-[#05070F]/65 backdrop-blur-xl border-r border-white/5 z-40 transition-smooth">
-        <div className="p-6 flex flex-col gap-4 h-full">
-          <div className="flex items-center gap-3 mb-6 group cursor-pointer">
-            <div className="w-8 h-8 rounded-lg bg-[#00F2FE]/5 border border-[#00F2FE]/20 flex items-center justify-center transition-smooth group-hover:border-[#00F2FE]/45 group-hover:bg-[#00F2FE]/10">
-              <ShieldCheck className="w-4 h-4 text-[#00F2FE] drop-shadow-[0_0_8px_rgba(0,242,254,0.3)]" />
-            </div>
-            <span className="font-mono text-base font-bold tracking-widest text-slate-100 transition-smooth group-hover:text-[#00F2FE] uppercase">NOXESCROW</span>
-          </div>
+    <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#0B0E17]/95 backdrop-blur-2xl border-t border-white/[0.08] z-50 flex items-center justify-around px-2 pb-safe shadow-2xl">
+      <button
+        onClick={onSelectVaults}
+        className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 text-xs font-semibold transition-all cursor-pointer ${
+          activeTab === 'vaults' ? 'text-[#38BDF8]' : 'text-slate-400 hover:text-white'
+        }`}
+      >
+        <Database className="w-4 h-4" />
+        <span>Vaults</span>
+      </button>
 
-          <div className="flex items-center gap-3 px-3.5 py-3 border border-white/5 bg-white/[0.01] rounded-xl mb-6 transition-smooth hover:border-white/10 hover:bg-white/[0.02]">
-            <div className="w-9 h-9 rounded-xl border border-[#00F2FE]/20 overflow-hidden flex items-center justify-center bg-[#070913]">
-              <Fingerprint className="w-5 h-5 text-[#00F2FE] drop-shadow-[0_0_5px_rgba(0,242,254,0.3)] animate-pulse" />
-            </div>
-            <div className="flex flex-col overflow-hidden">
-              <span className="font-mono text-xs text-[#00F2FE] truncate font-bold uppercase">NOX_DEV_0x42</span>
-              <span className="text-[9px] text-slate-500 font-mono uppercase tracking-widest font-bold">Gold Overseer</span>
-            </div>
-          </div>
+      <button
+        onClick={onSelectWrapper}
+        className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 text-xs font-semibold transition-all cursor-pointer ${
+          activeTab === 'swap' ? 'text-[#38BDF8]' : 'text-slate-400 hover:text-white'
+        }`}
+      >
+        <Coins className="w-4 h-4" />
+        <span>Swap</span>
+      </button>
 
-          <nav className="flex flex-col gap-2 flex-1">
-            <button 
-              onClick={onSelectVaults}
-              className={`px-4 py-3 flex items-center gap-3.5 font-mono text-xs font-bold tracking-widest rounded-xl text-left transition-smooth border border-transparent ${!selectedContract && !showDraftWizard && !showTokenWrapper ? 'text-[#00F2FE] bg-[#00F2FE]/5 border-[#00F2FE]/25 shadow-[0_0_15px_rgba(0,242,254,0.03)]' : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'}`}
-            >
-              <Database className="w-4 h-4" /> Vaults
-            </button>
-            <button 
-              onClick={onSelectDeploy}
-              className={`px-4 py-3 flex items-center gap-3.5 font-mono text-xs font-bold tracking-widest rounded-xl text-left transition-smooth border border-transparent ${showDraftWizard ? 'text-[#00F2FE] bg-[#00F2FE]/5 border-[#00F2FE]/25 shadow-[0_0_15px_rgba(0,242,254,0.03)]' : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'}`}
-            >
-              <Plus className="w-4 h-4" /> Deploy Escrow
-            </button>
-            <button 
-              onClick={onSelectWrapper}
-              className={`px-4 py-3 flex items-center gap-3.5 font-mono text-xs font-bold tracking-widest rounded-xl text-left transition-smooth border border-transparent ${showTokenWrapper ? 'text-[#00F2FE] bg-[#00F2FE]/5 border-[#00F2FE]/25 shadow-[0_0_15px_rgba(0,242,254,0.03)]' : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'}`}
-            >
-              <Coins className="w-4 h-4" /> Swap Portal
-            </button>
-            {/* Protocol configuration sidebar trigger */}
-            {isAdmin && (
-              <button 
-                onClick={onToggleAdminConfig}
-                className={`px-4 py-3 flex items-center gap-3.5 font-mono text-xs font-bold tracking-widest rounded-xl text-left transition-smooth border border-transparent ${showSettings ? 'text-[#00E676] bg-[#00E676]/5 border-[#00E676]/25 shadow-[0_0_15px_rgba(0,230,118,0.03)]' : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'}`}
-              >
-                <Settings className="w-4 h-4" /> Admin Config
-              </button>
-            )}
+      <button
+        onClick={onSelectDeploy}
+        className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 text-xs font-semibold transition-all cursor-pointer ${
+          activeTab === 'deploy' ? 'text-[#38BDF8]' : 'text-slate-400 hover:text-white'
+        }`}
+      >
+        <Plus className="w-4 h-4" />
+        <span>Deploy</span>
+      </button>
 
-            {/* View mode switcher */}
-            <div className="flex flex-col gap-2 border-t border-white/5 pt-4 mt-4">
-              <span className="font-mono text-[9px] text-slate-500 uppercase tracking-widest font-bold px-3">
-                VIEW_MODE_GATEWAY
-              </span>
-              <div className="flex bg-[#05070F] border border-white/5 rounded-xl p-1 gap-1">
-                <button
-                  onClick={() => setViewMode('client')}
-                  className={`flex-1 py-2 font-mono text-[9px] font-bold tracking-wider rounded-lg transition-smooth cursor-pointer ${
-                    viewMode === 'client'
-                      ? 'bg-[#00F2FE]/15 border border-[#00F2FE]/25 text-[#00F2FE] shadow-[0_0_10px_rgba(0,242,254,0.05)]'
-                      : 'text-slate-400 hover:text-slate-200 border border-transparent bg-transparent'
-                  }`}
-                >
-                  CLIENT
-                </button>
-                <button
-                  onClick={() => setViewMode('freelancer')}
-                  className={`flex-1 py-2 font-mono text-[9px] font-bold tracking-wider rounded-lg transition-smooth cursor-pointer ${
-                    viewMode === 'freelancer'
-                      ? 'bg-[#00F2FE]/15 border border-[#00F2FE]/25 text-[#00F2FE] shadow-[0_0_10px_rgba(0,242,254,0.05)]'
-                      : 'text-slate-400 hover:text-slate-200 border border-transparent bg-transparent'
-                  }`}
-                >
-                  FREELANCER
-                </button>
-              </div>
-            </div>
-          </nav>
-
-          <button
-            onClick={logout}
-            className="w-full py-3 bg-red-950/10 hover:bg-red-950/30 border border-red-900/25 text-[#FF1744] font-mono text-[9px] tracking-widest uppercase rounded-xl transition-smooth cursor-pointer flex items-center justify-center gap-2 font-bold hover:shadow-[0_0_15px_rgba(255,23,68,0.1)] active:scale-[0.98]"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            Disconnect Vault
-          </button>
-        </div>
-      </aside>
-
-      {/* Mobile Bottom Navigation Bar (visible on extra-small and small screens) */}
-      <div className="md:hidden flex fixed bottom-0 left-0 right-0 h-16 bg-[#05070F]/90 backdrop-blur-2xl border-t border-white/10 z-45 items-center justify-around px-2 pb-safe">
+      {isAdmin && (
         <button
-          onClick={onSelectVaults}
-          className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 transition-smooth cursor-pointer border border-transparent bg-transparent ${
-            !selectedContract && !showDraftWizard && !showTokenWrapper 
-              ? 'text-[#00F2FE]' 
-              : 'text-slate-500 hover:text-slate-300'
+          onClick={onToggleAdminConfig}
+          className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 text-xs font-semibold transition-all cursor-pointer ${
+            activeTab === 'admin' ? 'text-purple-400' : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Database className="w-4.5 h-4.5" />
-          <span className="font-mono text-[7px] uppercase tracking-wider font-bold">Vaults</span>
+          <Settings className="w-4 h-4" />
+          <span>Admin</span>
         </button>
+      )}
 
-        <button
-          onClick={onSelectDeploy}
-          className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 transition-smooth cursor-pointer border border-transparent bg-transparent ${
-            showDraftWizard 
-              ? 'text-[#00F2FE]' 
-              : 'text-slate-500 hover:text-slate-300'
-          }`}
-        >
-          <Plus className="w-4.5 h-4.5" />
-          <span className="font-mono text-[7px] uppercase tracking-wider font-bold">Deploy</span>
-        </button>
-
-        <button
-          onClick={onSelectWrapper}
-          className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 transition-smooth cursor-pointer border border-transparent bg-transparent ${
-            showTokenWrapper 
-              ? 'text-[#00F2FE]' 
-              : 'text-slate-500 hover:text-slate-300'
-          }`}
-        >
-          <Coins className="w-4.5 h-4.5" />
-          <span className="font-mono text-[7px] uppercase tracking-wider font-bold">Swap</span>
-        </button>
-
-        {isAdmin && (
-          <button
-            onClick={onToggleAdminConfig}
-            className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 transition-smooth cursor-pointer border border-transparent bg-transparent ${
-              showSettings 
-                ? 'text-[#00E676]' 
-                : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            <Settings className="w-4.5 h-4.5" />
-            <span className="font-mono text-[7px] uppercase tracking-wider font-bold">Admin</span>
-          </button>
-        )}
-
-        <button
-          onClick={() => setViewMode(viewMode === 'client' ? 'freelancer' : 'client')}
-          className="flex flex-col items-center justify-center flex-1 py-1 gap-1 transition-smooth cursor-pointer border border-transparent bg-transparent text-slate-500 hover:text-slate-300"
-        >
-          <Fingerprint className={`w-4.5 h-4.5 text-[#00F2FE] ${viewMode === 'freelancer' ? 'drop-shadow-[0_0_4px_#00F2FE]' : ''}`} />
-          <span className="font-mono text-[7px] uppercase tracking-wider font-bold">
-            {viewMode === 'client' ? 'Client' : 'Free'}
-          </span>
-        </button>
-      </div>
-    </>
+      <button
+        onClick={() => setViewMode(viewMode === 'client' ? 'freelancer' : 'client')}
+        className="flex flex-col items-center justify-center flex-1 py-1 gap-1 text-xs font-semibold transition-all cursor-pointer text-slate-400 hover:text-white"
+      >
+        {viewMode === 'client' ? <UserCheck className="w-4 h-4 text-[#38BDF8]" /> : <Briefcase className="w-4 h-4 text-[#C084FC]" />}
+        <span className="capitalize">{viewMode}</span>
+      </button>
+    </div>
   );
 }

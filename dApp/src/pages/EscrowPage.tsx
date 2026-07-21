@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { EscrowWorkspace } from '../components/EscrowWorkspace';
 import { type EscrowContract } from '../services/escrowService';
+import { Loader2, ArrowLeft } from 'lucide-react';
 
 interface EscrowPageProps {
   contractsList: EscrowContract[];
@@ -16,6 +17,7 @@ interface EscrowPageProps {
   handleRaiseDispute: () => Promise<void>;
   handleSubmitDeliverable: () => Promise<void>;
   handleReleaseMilestone: () => Promise<void>;
+  handleMutualCancel?: (address?: string) => Promise<void>;
   deliverableFiles: File[];
   setDeliverableFiles: React.Dispatch<React.SetStateAction<File[]>>;
 }
@@ -34,6 +36,7 @@ export function EscrowPage({
   handleRaiseDispute,
   handleSubmitDeliverable,
   handleReleaseMilestone,
+  handleMutualCancel,
   deliverableFiles,
   setDeliverableFiles
 }: EscrowPageProps) {
@@ -46,44 +49,50 @@ export function EscrowPage({
 
   if (!matchedContract) {
     return (
-      <div className="bento-card p-8 flex flex-col items-center justify-center gap-4 text-center min-h-[400px]">
-        <div className="w-12 h-12 rounded-full border-t-2 border-r-2 border-[#00F2FE] animate-spin mb-2"></div>
-        <h3 className="font-mono text-sm tracking-widest text-[#00F2FE] uppercase font-bold">
-          LOADING_SECURE_ESCROW_NODE
-        </h3>
-        <p className="text-xs text-slate-400 font-sans max-w-sm">
-          Fetching and decrypting the zero-knowledge parameters for contract at <br />
-          <span className="font-mono text-[#7F00FF] break-all">{address}</span>
-        </p>
-        <button
-          onClick={() => navigate('/vaults')}
-          className="mt-4 px-4 py-2 border border-white/5 hover:border-white/25 rounded-xl font-mono text-[10px] text-slate-400 hover:text-white uppercase tracking-wider transition-smooth cursor-pointer"
-        >
-          Return to Vaults
-        </button>
+      <div className="max-w-xl mx-auto px-4 py-16">
+        <div className="uniswap-card p-10 flex flex-col items-center justify-center gap-5 text-center">
+          <Loader2 className="w-10 h-10 text-[#38BDF8] animate-spin" />
+          <div>
+            <h3 className="text-lg font-bold text-white">
+              Loading Escrow Vault
+            </h3>
+            <p className="text-xs text-slate-400 mt-1 font-mono break-all max-w-md">
+              Decrypting parameters for {address}
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/vaults')}
+            className="btn-uniswap-secondary px-5 py-2.5 text-xs flex items-center gap-2 cursor-pointer mt-2"
+          >
+            <ArrowLeft className="w-4 h-4" /> Return to Vaults
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <EscrowWorkspace
-      selectedContract={matchedContract}
-      walletAddress={walletAddress}
-      viewMode={viewMode}
-      disputeStatement={disputeStatement}
-      setDisputeStatement={setDisputeStatement}
-      deliverableInput={deliverableInput}
-      setDeliverableInput={setDeliverableInput}
-      ratingInput={ratingInput}
-      setRatingInput={setRatingInput}
-      isLoading={isLoading}
-      handleRaiseDispute={handleRaiseDispute}
-      handleSubmitDeliverable={handleSubmitDeliverable}
-      handleReleaseMilestone={handleReleaseMilestone}
-      onBack={() => navigate('/vaults')}
-      deliverableFiles={deliverableFiles}
-      setDeliverableFiles={setDeliverableFiles}
-    />
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <EscrowWorkspace
+        selectedContract={matchedContract}
+        walletAddress={walletAddress}
+        viewMode={viewMode}
+        disputeStatement={disputeStatement}
+        setDisputeStatement={setDisputeStatement}
+        deliverableInput={deliverableInput}
+        setDeliverableInput={setDeliverableInput}
+        ratingInput={ratingInput}
+        setRatingInput={setRatingInput}
+        isLoading={isLoading}
+        handleRaiseDispute={handleRaiseDispute}
+        handleSubmitDeliverable={handleSubmitDeliverable}
+        handleReleaseMilestone={handleReleaseMilestone}
+        handleMutualCancel={handleMutualCancel}
+        onBack={() => navigate('/vaults')}
+        deliverableFiles={deliverableFiles}
+        setDeliverableFiles={setDeliverableFiles}
+      />
+    </div>
   );
 }
 export default EscrowPage;

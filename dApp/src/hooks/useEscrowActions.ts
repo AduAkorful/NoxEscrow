@@ -7,6 +7,7 @@ import {
   submitMilestoneDeliverable, 
   releaseEscrowMilestone, 
   raiseEscrowDispute, 
+  executeMutualCancel,
   fetchUserEscrows,
   type EscrowContract
 } from '../services/escrowService';
@@ -315,6 +316,28 @@ export function useEscrowActions({
     }
   }, [selectedContract, disputeStatement, supabaseUrl, supabaseKey, getWeb3Signer, setErrorMessage, setSuccessMessage]);
 
+  const handleMutualCancel = useCallback(async (contractAddress?: string) => {
+    const targetAddress = contractAddress || selectedContract?.address;
+    if (!targetAddress) return;
+
+    setIsLoading(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const signer = await getWeb3Signer();
+      await executeMutualCancel(signer, targetAddress);
+      
+      addToast("Mutual cancellation requested/confirmed on-chain.", "success");
+      setSuccessMessage("✔️ Mutual cancellation status updated on-chain!");
+      await loadOnChainContracts();
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to process mutual cancellation.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedContract, getWeb3Signer, loadOnChainContracts, addToast, setErrorMessage, setSuccessMessage]);
+
   return {
     contractsList,
     setContractsList,
@@ -344,6 +367,7 @@ export function useEscrowActions({
     handleDeployEscrow,
     handleSubmitDeliverable,
     handleReleaseMilestone,
-    handleRaiseDispute
+    handleRaiseDispute,
+    handleMutualCancel
   };
 }

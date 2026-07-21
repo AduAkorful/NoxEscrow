@@ -19,6 +19,7 @@ interface EscrowWorkspaceProps {
   handleRaiseDispute: () => Promise<void>;
   handleSubmitDeliverable: () => Promise<void>;
   handleReleaseMilestone: () => Promise<void>;
+  handleMutualCancel?: (address?: string) => Promise<void>;
   onBack: () => void;
   deliverableFiles: File[];
   setDeliverableFiles: React.Dispatch<React.SetStateAction<File[]>>;
@@ -38,6 +39,7 @@ export function EscrowWorkspace({
   handleRaiseDispute,
   handleSubmitDeliverable,
   handleReleaseMilestone,
+  handleMutualCancel,
   onBack,
   deliverableFiles,
   setDeliverableFiles
@@ -382,17 +384,56 @@ export function EscrowWorkspace({
 
   return (
     <div className="bento-card p-6 md:p-8 flex flex-col gap-8 w-full animate-slide-up">
-      {/* Header Back Action */}
-      <div className="flex justify-between items-center border-b border-white/5 pb-4">
+      {/* Header Back Action & Top Controls */}
+      <div className="flex flex-wrap justify-between items-center gap-3 border-b border-white/5 pb-4">
         <button 
           onClick={onBack}
           className="font-mono text-xs text-slate-400 hover:text-[#00F2FE] cursor-pointer flex items-center gap-2 transition-smooth px-3 py-1.5 rounded-lg border border-white/5 hover:border-[#00F2FE]/25 bg-white/[0.01]"
         >
           <X className="w-3.5 h-3.5" /> [D] Back to Portfolio
         </button>
-        <div className="flex items-center gap-2 bg-white/[0.02] border border-white/5 px-3 py-1.5 rounded-lg">
-          <span className="font-mono text-[10px] text-slate-500 uppercase font-bold tracking-widest">ESCROW_ADDRESS:</span>
-          <span className="font-mono text-xs text-[#00F2FE] font-extrabold">{selectedContract.address.slice(0, 12)}...{selectedContract.address.slice(-10)}</span>
+
+        <div className="flex items-center gap-2">
+          {/* Export Receipt */}
+          <button
+            onClick={() => {
+              const receiptData = {
+                protocol: "NoxEscrow Confidential Escrow v2.0",
+                contractAddress: selectedContract.address,
+                counterpartyAddress: selectedContract.counterparty,
+                role: selectedContract.role,
+                status: selectedContract.status,
+                totalBudget: `${selectedContract.budget} cUSDC`,
+                milestonesCompleted: `${selectedContract.milestonesCompleted} of ${selectedContract.totalMilestones}`,
+                exportedAt: new Date().toISOString()
+              };
+              const blob = new Blob([JSON.stringify(receiptData, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `NoxEscrow_Receipt_${selectedContract.address.slice(0, 8)}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="px-3 py-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-mono text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+          >
+            <Paperclip className="w-3.5 h-3.5 text-[#38BDF8]" /> Export Receipt
+          </button>
+
+          {/* Request Mutual Cancellation */}
+          {selectedContract.status === 'ACTIVE' && handleMutualCancel && (
+            <button
+              onClick={() => handleMutualCancel(selectedContract.address)}
+              className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-xs font-mono text-rose-300 transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-400" /> Mutual Cancel & Refund
+            </button>
+          )}
+
+          <div className="flex items-center gap-2 bg-white/[0.02] border border-white/5 px-3 py-1.5 rounded-lg">
+            <span className="font-mono text-[10px] text-slate-500 uppercase font-bold tracking-widest">ESCROW_ADDRESS:</span>
+            <span className="font-mono text-xs text-[#00F2FE] font-extrabold">{selectedContract.address.slice(0, 10)}...{selectedContract.address.slice(-6)}</span>
+          </div>
         </div>
       </div>
 

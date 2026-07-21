@@ -1,5 +1,5 @@
-import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { DraftWizard } from '../components/DraftWizard';
 
 interface DeployPageProps {
@@ -22,13 +22,27 @@ export function DeployPage({
   handleDeployEscrow
 }: DeployPageProps) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  // Keep these form states in the page component, as they are specific to the deployment wizard
   const [draftFreelancer, setDraftFreelancer] = useState("");
   const [draftTotalMilestones, setDraftTotalMilestones] = useState(1);
   const [draftMilestonePayouts, setDraftMilestonePayouts] = useState<string>("1000");
   const [draftMilestoneReqs, setDraftMilestoneReqs] = useState<string>("Build a responsive collapsible sidebar using React.");
   const [draftFiles, setDraftFiles] = useState<File[]>([]);
+
+  useEffect(() => {
+    const flParam = searchParams.get('freelancer');
+    const payoutsParam = searchParams.get('payouts');
+    const reqsParam = searchParams.get('reqs');
+
+    if (flParam) setDraftFreelancer(flParam);
+    if (payoutsParam) setDraftMilestonePayouts(payoutsParam);
+    if (reqsParam) setDraftMilestoneReqs(reqsParam);
+    if (payoutsParam) {
+      const count = payoutsParam.split(',').length;
+      if (count > 0) setDraftTotalMilestones(count);
+    }
+  }, [searchParams]);
 
   const onDeploy = async () => {
     await handleDeployEscrow(
@@ -65,4 +79,5 @@ export function DeployPage({
     />
   );
 }
+
 export default DeployPage;
