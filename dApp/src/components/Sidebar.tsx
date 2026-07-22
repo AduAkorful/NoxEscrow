@@ -1,12 +1,14 @@
 import React from 'react';
-import { Database, Coins, Plus, Settings, UserCheck, Briefcase } from 'lucide-react';
+import { Database, Coins, Plus, Settings, UserCheck, Briefcase, Users, User } from 'lucide-react';
 
 interface SidebarProps {
-  activeTab: 'home' | 'swap' | 'vaults' | 'deploy' | 'admin';
+  activeTab: 'home' | 'swap' | 'vaults' | 'deploy' | 'marketplace' | 'profile' | 'admin';
   isAdmin: boolean;
   onSelectVaults: () => void;
   onSelectDeploy: () => void;
   onSelectWrapper: () => void;
+  onSelectMarketplace?: () => void;
+  onSelectProfile?: () => void;
   onToggleAdminConfig: () => void;
   viewMode: 'client' | 'freelancer';
   setViewMode: React.Dispatch<React.SetStateAction<'client' | 'freelancer'>>;
@@ -18,12 +20,34 @@ export function Sidebar({
   onSelectVaults,
   onSelectDeploy,
   onSelectWrapper,
+  onSelectMarketplace,
+  onSelectProfile,
   onToggleAdminConfig,
   viewMode,
   setViewMode
 }: SidebarProps) {
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#0B0E17]/95 backdrop-blur-2xl border-t border-white/[0.08] z-50 flex items-center justify-around px-2 pb-safe shadow-2xl">
+      <button
+        onClick={onSelectMarketplace}
+        className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 text-xs font-semibold transition-all cursor-pointer ${
+          activeTab === 'marketplace' ? 'text-[#38BDF8]' : 'text-slate-400 hover:text-white'
+        }`}
+      >
+        <Users className="w-4 h-4" />
+        <span>Market</span>
+      </button>
+
+      <button
+        onClick={onSelectProfile}
+        className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 text-xs font-semibold transition-all cursor-pointer ${
+          activeTab === 'profile' ? 'text-[#38BDF8]' : 'text-slate-400 hover:text-white'
+        }`}
+      >
+        <User className="w-4 h-4" />
+        <span>Profile</span>
+      </button>
+
       <button
         onClick={onSelectVaults}
         className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 text-xs font-semibold transition-all cursor-pointer ${

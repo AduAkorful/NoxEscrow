@@ -32,6 +32,8 @@ import { EscrowPage } from './pages/EscrowPage';
 import { DeployPage } from './pages/DeployPage';
 import { SwapPage } from './pages/SwapPage';
 import { AdminPage } from './pages/AdminPage';
+import { MarketplacePage } from './pages/MarketplacePage';
+import { ProfilePage } from './pages/ProfilePage';
 
 function App() {
   // --- Privy Hooks ---
@@ -313,13 +315,17 @@ function App() {
 
   const activeTab = (location.pathname === '/' || location.pathname === '/home')
     ? 'home' 
-    : location.pathname.startsWith('/swap') 
-      ? 'swap' 
-      : location.pathname.startsWith('/deploy') 
-        ? 'deploy' 
-        : location.pathname.startsWith('/admin') 
-          ? 'admin' 
-          : 'vaults';
+    : location.pathname.startsWith('/marketplace')
+      ? 'marketplace'
+      : location.pathname.startsWith('/profile')
+        ? 'profile'
+        : location.pathname.startsWith('/swap') 
+          ? 'swap' 
+          : location.pathname.startsWith('/deploy') 
+            ? 'deploy' 
+            : location.pathname.startsWith('/admin') 
+              ? 'admin' 
+              : 'vaults';
 
   return (
     <div className="bg-[#0B0E17] text-[#F8FAFC] selection:bg-[#38BDF8]/20 selection:text-[#38BDF8] min-h-screen relative overflow-hidden font-sans">
@@ -340,6 +346,8 @@ function App() {
           onSelectVaults={() => navigate('/vaults')}
           onSelectDeploy={() => navigate('/deploy')}
           onSelectWrapper={() => navigate('/swap')}
+          onSelectMarketplace={() => navigate('/marketplace')}
+          onSelectProfile={() => navigate('/profile')}
           onToggleAdminConfig={() => navigate(activeTab === 'admin' ? '/vaults' : '/admin')}
           viewMode={viewMode}
           setViewMode={setViewMode}
@@ -356,6 +364,8 @@ function App() {
           onSelectVaults={() => navigate('/vaults')}
           onSelectDeploy={() => navigate('/deploy')}
           onSelectWrapper={() => navigate('/swap')}
+          onSelectMarketplace={() => navigate('/marketplace')}
+          onSelectProfile={() => navigate('/profile')}
           onToggleAdminConfig={() => navigate(activeTab === 'admin' ? '/vaults' : '/admin')}
           viewMode={viewMode}
           setViewMode={setViewMode}
@@ -388,10 +398,23 @@ function App() {
                 onLaunchApp={() => navigate('/vaults')} 
               />
             } />
+            <Route path="/marketplace" element={
+              <MarketplacePage 
+                walletAddress={walletAddress} 
+                onHireFreelancer={(freelancerAddr) => navigate(`/deploy?freelancer=${freelancerAddr}`)} 
+              />
+            } />
+            <Route path="/profile" element={
+              <ProfilePage 
+                walletAddress={walletAddress} 
+                onHireFreelancer={(freelancerAddr) => navigate(`/deploy?freelancer=${freelancerAddr}`)} 
+              />
+            } />
             <Route path="/vaults" element={
               <VaultsPage 
                 activeEscrows={activeEscrows} 
                 isFetchingContracts={isFetchingContracts} 
+                viewMode={viewMode}
               />
             } />
             <Route path="/deploy" element={

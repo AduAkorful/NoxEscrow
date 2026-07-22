@@ -13,6 +13,35 @@ export const NOX_CONTRACT_MANAGER = addresses.noxContractManager || import.meta.
 // Default Gateway ports for Local Nox Stack
 export const DEFAULT_NOX_GATEWAY = "http://127.0.0.1:8080";
 
+// Client Marketplace Fee (1.0% = 100 BPS)
+export const CLIENT_FEE_BPS = 100;
+
+export function calculateClientDeposit(milestoneBudgetSum: number): {
+  budgetTotal: number;
+  clientFee: number;
+  totalDeposit: number;
+} {
+  const clientFee = (milestoneBudgetSum * CLIENT_FEE_BPS) / 10000;
+  return {
+    budgetTotal: milestoneBudgetSum,
+    clientFee,
+    totalDeposit: milestoneBudgetSum + clientFee
+  };
+}
+
+export function calculateFreelancerEarnings(milestoneBudget: number, feeDiscountBps: number = 50): {
+  grossPayout: number;
+  freelancerFee: number;
+  netPayout: number;
+} {
+  const freelancerFee = (milestoneBudget * feeDiscountBps) / 10000;
+  return {
+    grossPayout: milestoneBudget,
+    freelancerFee,
+    netPayout: milestoneBudget - freelancerFee
+  };
+}
+
 // Configurable Subgraph URL for Live Network/Sepolia Integration
 export const NOX_SUBGRAPH_URL = import.meta.env.VITE_NOX_SUBGRAPH_URL || "https://example.com/subgraphs/id/none";
 

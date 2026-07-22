@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   ShieldCheck, 
   KeyRound, 
@@ -6,7 +6,9 @@ import {
   Briefcase, 
   LogOut,
   Wallet,
-  Unlock
+  Unlock,
+  User,
+  ChevronDown
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -14,12 +16,14 @@ interface HeaderProps {
   pinataJWT: string;
   supabaseUrl: string;
   supabaseKey: string;
-  activeTab: 'home' | 'swap' | 'vaults' | 'deploy' | 'admin';
+  activeTab: 'home' | 'swap' | 'vaults' | 'deploy' | 'marketplace' | 'profile' | 'admin';
   isAdmin: boolean;
   onSelectHome: () => void;
   onSelectVaults: () => void;
   onSelectDeploy: () => void;
   onSelectWrapper: () => void;
+  onSelectMarketplace?: () => void;
+  onSelectProfile?: () => void;
   onToggleAdminConfig: () => void;
   viewMode: 'client' | 'freelancer';
   setViewMode: React.Dispatch<React.SetStateAction<'client' | 'freelancer'>>;
@@ -41,6 +45,8 @@ export function Header({
   onSelectVaults,
   onSelectDeploy,
   onSelectWrapper,
+  onSelectMarketplace,
+  onSelectProfile,
   onToggleAdminConfig,
   viewMode,
   setViewMode,
@@ -51,15 +57,16 @@ export function Header({
   isDerivingKey
 }: HeaderProps) {
   const isCloudEncrypted = Boolean(pinataJWT && supabaseUrl && supabaseKey);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-50 w-full bg-[#0B0E17]/90 backdrop-blur-2xl border-b border-white/[0.08] transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-6">
         
-        {/* Left Section: Brand Logo (Navigates to Home) + Uniswap-style Flat Left Navigation Links */}
+        {/* Left Section: Brand Logo + Navigation Links */}
         <div className="flex items-center gap-8">
           
-          {/* NoxEscrow Logo -> Leads to Home / Landing */}
+          {/* NoxEscrow Logo */}
           <div 
             onClick={onSelectHome}
             className="flex items-center gap-2.5 cursor-pointer group shrink-0"
@@ -75,13 +82,24 @@ export function Header({
             </div>
           </div>
 
-          {/* Uniswap Flat Left Navigation Links (No Home button) */}
+          {/* Navigation Links */}
           <nav className="hidden md:flex items-center gap-6 text-sm font-semibold">
+            <button
+              onClick={onSelectMarketplace}
+              className={`transition-colors cursor-pointer ${
+                activeTab === 'marketplace'
+                  ? 'text-[#38BDF8] font-bold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Marketplace
+            </button>
+
             <button
               onClick={onSelectWrapper}
               className={`transition-colors cursor-pointer ${
                 activeTab === 'swap'
-                  ? 'text-white font-bold'
+                  ? 'text-[#38BDF8] font-bold'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -178,20 +196,62 @@ export function Header({
             </div>
           )}
 
-          {/* Privy Wallet Button */}
+          {/* Privy Wallet & User Dropdown */}
           {walletAddress ? (
-            <div className="flex items-center gap-2 bg-[#131826] border border-white/[0.1] px-3.5 py-2 rounded-2xl shadow-sm hover:border-[#38BDF8]/40 transition-all">
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-              <span className="font-mono text-xs text-white font-semibold">
-                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-              </span>
+            <div className="relative">
               <button
-                onClick={onLogout}
-                title="Disconnect Wallet"
-                className="ml-1 p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                onClick={() => setIsDropdownOpen(prev => !prev)}
+                className="flex items-center gap-2 bg-[#131826] border border-white/[0.1] px-3.5 py-2 rounded-2xl shadow-sm hover:border-[#38BDF8]/40 transition-all cursor-pointer"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                <span className="font-mono text-xs text-white font-semibold">
+                  {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
+
+              {/* User Dropdown Menu */}
+              {isDropdownOpen && (
+                <div 
+                  onMouseLeave={() => setIsDropdownOpen(false)}
+                  className="absolute right-0 top-full mt-2 w-56 bg-[#131826] border border-white/[0.15] rounded-2xl shadow-2xl p-2 z-50 animate-fade-in space-y-1"
+                >
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      if (onSelectProfile) onSelectProfile();
+                    }}
+                    className="w-full px-3 py-2.5 text-left rounded-xl hover:bg-white/[0.08] text-xs font-semibold text-white flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <User className="w-4 h-4 text-[#38BDF8]" />
+                    <span>My Profile Dashboard</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onSelectVaults();
+                    }}
+                    className="w-full px-3 py-2.5 text-left rounded-xl hover:bg-white/[0.08] text-xs font-semibold text-white flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Briefcase className="w-4 h-4 text-[#C084FC]" />
+                    <span>My Escrow Vaults</span>
+                  </button>
+
+                  <div className="border-t border-white/[0.08] my-1" />
+
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full px-3 py-2.5 text-left rounded-xl hover:bg-rose-500/10 text-xs font-semibold text-rose-400 flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Disconnect Wallet</span>
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <button
