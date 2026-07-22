@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  ShieldCheck, 
   KeyRound, 
   UserCheck, 
   Briefcase, 
@@ -66,19 +65,16 @@ export function Header({
         {/* Left Section: Brand Logo + Navigation Links */}
         <div className="flex items-center gap-8">
           
-          {/* NoxEscrow Logo */}
+          {/* NoxEscrow Typographic Wordmark Logo */}
           <div 
             onClick={onSelectHome}
-            className="flex items-center gap-2.5 cursor-pointer group shrink-0"
-            title="Go to Home"
+            className="flex items-center gap-2 cursor-pointer group shrink-0 select-none"
+            title="NoxEscrow Protocol"
           >
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-[#38BDF8]/20 via-[#818CF8]/20 to-[#C084FC]/20 border border-[#38BDF8]/30 flex items-center justify-center transition-all group-hover:scale-105 group-hover:border-[#38BDF8]/60 shadow-[0_0_20px_rgba(56,189,248,0.2)]">
-              <ShieldCheck className="w-5 h-5 text-[#38BDF8] drop-shadow-[0_0_8px_rgba(56,189,248,0.5)]" />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-lg tracking-tight text-white group-hover:text-[#38BDF8] transition-colors">
-                Nox<span className="shiny-text">Escrow</span>
-              </span>
+            <div className="flex items-center tracking-tight text-xl font-black transition-transform group-hover:scale-[1.02]">
+              <span className="text-white group-hover:text-slate-100 transition-colors">Nox</span>
+              <span className="bg-gradient-to-r from-[#38BDF8] via-[#818CF8] to-[#C084FC] bg-clip-text text-transparent font-extrabold ml-0.5">Escrow</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#38BDF8] ml-1 shadow-[0_0_8px_#38BDF8] animate-pulse" />
             </div>
           </div>
 
