@@ -159,19 +159,39 @@ export function LandingPage({ connectWallet, walletAddress, onLaunchApp }: Landi
         </div>
 
         <div className="space-y-4">
-          {faqs.map((faq, idx) => (
-            <div key={idx} className="uniswap-card p-5 cursor-pointer" onClick={() => toggleFaq(idx)}>
-              <div className="flex justify-between items-center font-bold text-white text-sm">
-                <span>{faq.question}</span>
-                <ChevronDown className={`w-4 h-4 text-[#38BDF8] transition-transform ${openFaqIndex === idx ? 'rotate-180' : ''}`} />
+          {faqs.map((faq, idx) => {
+            const isOpen = openFaqIndex === idx;
+            return (
+              <div 
+                key={idx} 
+                className={`uniswap-card p-5 cursor-pointer transition-all duration-300 ${
+                  isOpen 
+                    ? 'border-[#38BDF8]/40 bg-[#131826]/90 shadow-[0_0_25px_rgba(56,189,248,0.12)]' 
+                    : 'hover:border-white/[0.15] bg-[#131826]/50'
+                }`}
+                onClick={() => toggleFaq(idx)}
+              >
+                <div className="flex justify-between items-center font-bold text-white text-sm">
+                  <span className="pr-4">{faq.question}</span>
+                  <ChevronDown className={`w-4 h-4 text-[#38BDF8] shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+                </div>
+
+                <div 
+                  className={`grid transition-all duration-300 ease-in-out ${
+                    isOpen 
+                      ? 'grid-rows-[1fr] opacity-100 mt-3 pt-3 border-t border-white/[0.08]' 
+                      : 'grid-rows-[0fr] opacity-0 mt-0 pt-0 border-t-0'
+                  }`}
+                >
+                  <div className="overflow-hidden">
+                    <p className="text-xs text-slate-300 leading-relaxed font-normal">
+                      {faq.answer}
+                    </p>
+                  </div>
+                </div>
               </div>
-              {openFaqIndex === idx && (
-                <p className="text-xs text-slate-400 leading-relaxed mt-3 pt-3 border-t border-white/[0.06]">
-                  {faq.answer}
-                </p>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

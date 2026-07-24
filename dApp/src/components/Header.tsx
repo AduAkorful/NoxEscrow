@@ -63,7 +63,7 @@ export function Header({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-6">
         
         {/* Left Section: Brand Logo + Navigation Links */}
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-4 xl:gap-8 shrink-0">
           
           {/* NoxEscrow Typographic Wordmark Logo */}
           <div 
@@ -79,10 +79,10 @@ export function Header({
           </div>
 
           {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold">
+          <nav className="hidden md:flex items-center gap-3 lg:gap-5 xl:gap-6 text-sm font-semibold whitespace-nowrap">
             <button
               onClick={onSelectMarketplace}
-              className={`transition-colors cursor-pointer ${
+              className={`transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
                 activeTab === 'marketplace'
                   ? 'text-[#38BDF8] font-bold'
                   : 'text-slate-400 hover:text-slate-200'
@@ -93,7 +93,7 @@ export function Header({
 
             <button
               onClick={onSelectWrapper}
-              className={`transition-colors cursor-pointer ${
+              className={`transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
                 activeTab === 'swap'
                   ? 'text-[#38BDF8] font-bold'
                   : 'text-slate-400 hover:text-slate-200'
@@ -104,7 +104,7 @@ export function Header({
 
             <button
               onClick={onSelectVaults}
-              className={`transition-colors cursor-pointer ${
+              className={`transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
                 activeTab === 'vaults'
                   ? 'text-white font-bold'
                   : 'text-slate-400 hover:text-slate-200'
@@ -115,7 +115,7 @@ export function Header({
 
             <button
               onClick={onSelectDeploy}
-              className={`transition-colors cursor-pointer ${
+              className={`transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
                 activeTab === 'deploy'
                   ? 'text-white font-bold'
                   : 'text-slate-400 hover:text-slate-200'
@@ -127,7 +127,7 @@ export function Header({
             {isAdmin && (
               <button
                 onClick={onToggleAdminConfig}
-                className={`transition-colors cursor-pointer ${
+                className={`transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
                   activeTab === 'admin'
                     ? 'text-purple-400 font-bold'
                     : 'text-slate-400 hover:text-slate-200'
