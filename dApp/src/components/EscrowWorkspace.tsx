@@ -112,10 +112,16 @@ export function EscrowWorkspace({
     return () => { cancelled = true; };
   }, [vaultKey, getWeb3Signer, selectedContract.address, selectedContract.milestoneKeys, gatewayUrl]);
 
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const prevMsgCountRef = useRef(0);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > prevMsgCountRef.current) {
+      if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      }
+    }
+    prevMsgCountRef.current = messages.length;
   }, [messages]);
 
   // Chat Subscribe, Load & High-Frequency Sync
@@ -932,7 +938,7 @@ export function EscrowWorkspace({
           </div>
 
           {/* Chat message display area */}
-          <div className="bg-[#020308] border border-white/5 p-4 rounded-xl flex flex-col gap-3 min-h-[220px] max-h-[220px] overflow-y-auto custom-scrollbar">
+          <div ref={chatContainerRef} className="bg-[#020308] border border-white/5 p-4 rounded-xl flex flex-col gap-3 min-h-[220px] max-h-[220px] overflow-y-auto custom-scrollbar">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-6">
                 <Lock className="w-8 h-8 text-slate-600 mb-2 opacity-50" />
@@ -961,7 +967,6 @@ export function EscrowWorkspace({
                 );
               })
             )}
-            <div ref={chatEndRef} />
           </div>
 
           {/* Send message input */}
