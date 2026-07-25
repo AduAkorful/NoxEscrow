@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, X, Paperclip, Trash2, ShieldCheck, User, ArrowRight, Briefcase, Copy, Check } from 'lucide-react';
 
 import { ethers } from 'ethers';
+import { getFreelancerProfilesFromSupabase } from '../services/freelancerService';
 
 interface DraftWizardProps {
   walletAddress: string | null;
@@ -50,7 +51,7 @@ export function DraftWizard({
   const [copiedLink, setCopiedLink] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const [registeredFreelancers] = useState<any[]>(() => {
+  const [registeredFreelancers, setRegisteredFreelancers] = useState<any[]>(() => {
     const saved = localStorage.getItem('nox_freelancer_directory');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) {}
@@ -63,6 +64,21 @@ export function DraftWizard({
       { walletAddress: "0xabcdef1234567890abcdef1234567890abcdef12", name: "David Kim", title: "DevOps Architect", tier: "Bronze", feeDiscountBps: 50 }
     ];
   });
+
+  useEffect(() => {
+    async function loadFreelancers() {
+      try {
+        const data = await getFreelancerProfilesFromSupabase();
+        if (data && data.length > 0) {
+          setRegisteredFreelancers(data);
+          localStorage.setItem('nox_freelancer_directory', JSON.stringify(data));
+        }
+      } catch (e) {
+        console.warn("Failed to load freelancers in DraftWizard:", e);
+      }
+    }
+    loadFreelancers();
+  }, []);
 
   const matchedFreelancer = registeredFreelancers.find(
     f => f.walletAddress.toLowerCase() === draftFreelancer.trim().toLowerCase()
