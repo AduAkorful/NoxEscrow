@@ -55,6 +55,35 @@ function hexToUtf8(hex) {
   }
 }
 
+// Helper to parse and decrypt files referenced in metadata JSON objects
+async function parseAndResolveJsonPayload(payloadText, decryptionHexKey) {
+  try {
+    const parsed = JSON.parse(payloadText.trim());
+    let resolvedText = parsed.text || "";
+    
+    if (parsed.files && Array.isArray(parsed.files) && parsed.files.length > 0) {
+      resolvedText += "\n\n--- [ATTACHED FILES DETECTED] ---";
+      for (const file of parsed.files) {
+        try {
+          console.log(`📥 [Arbiter Enclave] Downloading and decrypting attachment: ${file.name} (${file.cid})`);
+          const fileData = await downloadFromIPFS(file.cid);
+          const decryptedHex = decryptPayload(fileData.ciphertext, decryptionHexKey, fileData.iv);
+          const decryptedContent = hexToUtf8(decryptedHex);
+          
+          resolvedText += `\n\nFile Name: ${file.name}\nFile Content:\n\`\`\`\n${decryptedContent}\n\`\`\n`;
+        } catch (fileErr) {
+          console.warn(`⚠️ [Arbiter Enclave] Failed to decrypt attachment ${file.name}:`, fileErr.message);
+          resolvedText += `\n\nFile Name: ${file.name}\n[Unable to decrypt file content: ${fileErr.message}]`;
+        }
+      }
+    }
+    return resolvedText;
+  } catch (err) {
+    // If not JSON, return the original plaintext string directly
+    return payloadText;
+  }
+}
+
 // Helper to download JSON payload from IPFS with failover gateways
 async function downloadFromIPFS(cid) {
   const gateways = [
@@ -115,12 +144,18 @@ async function main() {
   let wallet;
   let useLiveSigner = false;
 
+  const isLocalNetwork = RPC_URL.includes("127.0.0.1") || RPC_URL.includes("localhost") || RPC_URL.includes("31337") || process.env.LOCAL_DRY_RUN === "true";
+
   if (PRIVATE_KEY) {
     const provider = new ethers.JsonRpcProvider(RPC_URL);
     wallet = new ethers.Wallet(PRIVATE_KEY, provider);
     useLiveSigner = true;
     console.log(`🔑 Connected to RPC node using TEE wallet address: ${wallet.address}`);
   } else {
+    if (!isLocalNetwork) {
+      console.error("❌ FATAL ERROR: Missing TEE_ARBITER_PRIVATE_KEY on public network! Preventing silent dry-run.");
+      process.exit(1);
+    }
     // Local testing or dry-run fallback
     wallet = ethers.Wallet.createRandom();
     console.log(`⚠️ No TEE_ARBITER_PRIVATE_KEY provided. Operating in DRY-RUN mode.`);
@@ -190,10 +225,14 @@ async function main() {
         } else {
           // Fall back to decryption using local keys
           const reqsData = await downloadFromIPFS(record.reqs_cid);
-          const devsData = await downloadFromIPFS(record.devs_cid);
-
           plaintextRequirements = decryptPayload(reqsData.ciphertext, reqsHex, reqsData.iv);
-          plaintextDeliverables = decryptPayload(devsData.ciphertext, devsHex, devsData.iv);
+
+          if (record.devs_cid && record.devs_cid !== "null" && record.devs_cid !== "undefined") {
+            const devsData = await downloadFromIPFS(record.devs_cid);
+            plaintextDeliverables = decryptPayload(devsData.ciphertext, devsHex, devsData.iv);
+          } else {
+            plaintextDeliverables = "No deliverables submitted for this milestone.";
+          }
           console.log("✔️ Plaintext deliverables and requirements decrypted successfully from IPFS payload.");
         }
       }
@@ -224,11 +263,14 @@ async function main() {
 
         // Fetch encrypted payload from IPFS
         const reqsData = await downloadFromIPFS(record.reqs_cid);
-        const devsData = await downloadFromIPFS(record.devs_cid);
-
-        // Decrypt payload via AES-GCM using the decrypted keys
         plaintextRequirements = decryptPayload(reqsData.ciphertext, reqsHex, reqsData.iv);
-        plaintextDeliverables = decryptPayload(devsData.ciphertext, devsHex, devsData.iv);
+
+        if (record.devs_cid && record.devs_cid !== "null" && record.devs_cid !== "undefined") {
+          const devsData = await downloadFromIPFS(record.devs_cid);
+          plaintextDeliverables = decryptPayload(devsData.ciphertext, devsHex, devsData.iv);
+        } else {
+          plaintextDeliverables = "No deliverables submitted for this milestone.";
+        }
         console.log("✔️ Plaintext deliverables and requirements decrypted successfully from IPFS payload.");
       }
     } catch (dbError) {
@@ -265,6 +307,11 @@ async function main() {
       }
     }
   }
+
+  // Parse JSON payloads to extract texts and resolve any embedded confidential file attachments
+  console.log("🔍 Parsing metadata JSON payloads and resolving any encrypted file attachments...");
+  plaintextRequirements = await parseAndResolveJsonPayload(plaintextRequirements, reqsHex);
+  plaintextDeliverables = await parseAndResolveJsonPayload(plaintextDeliverables, devsHex);
 
   // 5. Invoke Google Gemini 2.5 Flash
   let adjudicationVerdict = "REFUND_CLIENT";

@@ -23,10 +23,51 @@ const factoryABI = [
   "event EscrowCreated(address indexed escrowAddress, address indexed client, address indexed freelancer, uint256 totalMilestones)"
 ];
 
-// ABI snippet for escrow clone event parsing
+// ABI snippet for escrow clone event parsing and status querying
 const escrowABI = [
-  "event DisputeOpened(uint256 indexed milestoneIndex, uint256 requirementsHash, uint256 deliverableHash)"
+  "event DisputeOpened(uint256 indexed milestoneIndex, uint256 requirementsHash, uint256 deliverableHash)",
+  "function status() view returns (uint8)",
+  "function activeMilestoneIndex() view returns (uint256)",
+  "function milestones(uint256) view returns (bytes32 requirementsHash, bytes32 deliverableHash, bytes32 payoutHandle, uint128 submissionTime, bool isSubmitted, bool isSettled)"
 ];
+
+const RECONCILIATION_INTERVAL = parseInt(process.env.RECONCILIATION_INTERVAL || "300000", 10);
+
+async function reconcileDisputes(escrowClones, triggeredDisputes) {
+  console.log(`\n🔄 [Reconciler] Running active dispute reconciliation scan over ${escrowClones.size} whitelisted contracts...`);
+  for (const cloneAddress of escrowClones) {
+    try {
+      const escrowContract = new ethers.Contract(cloneAddress, escrowABI, provider);
+      const status = await escrowContract.status();
+      
+      if (Number(status) === 2) { // 2 = DISPUTED status enum
+        const milestoneIndex = await escrowContract.activeMilestoneIndex();
+        const milestoneIndexStr = milestoneIndex.toString();
+        const key = `${cloneAddress.toLowerCase()}_${milestoneIndexStr}`;
+        const lastTriggered = triggeredDisputes.get(key) || 0;
+        const now = Date.now();
+        
+        if (now - lastTriggered > 15 * 60 * 1000) { // 15 mins cooldown
+          console.log(`⚠️ [Reconciler] Detected active unresolved dispute on contract ${cloneAddress} Milestone ${milestoneIndexStr}. Re-triggering TEE Arbiter...`);
+          const milestoneInfo = await escrowContract.milestones(milestoneIndex);
+          const { requirementsHash, deliverableHash } = milestoneInfo;
+          
+          triggeredDisputes.set(key, now);
+          
+          const response = await axios.post(IEXEC_RUNNER_ENDPOINT, {
+            escrowAddress: cloneAddress,
+            milestoneIndex: milestoneIndexStr,
+            reqsHandle: requirementsHash,
+            devsHandle: deliverableHash
+          });
+          console.log(`🚀 [Reconciler] TEE execution triggered successfully! Response:`, response.status === 200 ? "Success" : response.statusText);
+        }
+      }
+    } catch (err) {
+      console.warn(`⚠️ [Reconciler] Failed to scan or reconcile clone ${cloneAddress}:`, err.message);
+    }
+  }
+}
 
 const factoryContract = new ethers.Contract(FACTORY_ADDRESS, factoryABI, provider);
 
@@ -36,6 +77,7 @@ console.log(`📡 RPC Node: ${RPC_URL}`);
 console.log(`🏭 Factory Address: ${FACTORY_ADDRESS}`);
 console.log(`🚀 iExec TEE Trigger Endpoint: ${IEXEC_RUNNER_ENDPOINT}`);
 console.log(`⏱️ Polling Interval: ${POLL_INTERVAL}ms`);
+console.log(`⏱️ Reconciliation Interval: ${RECONCILIATION_INTERVAL}ms`);
 console.log("==========================================================\n");
 
 // Filter to listen globally for the DisputeOpened event on any contract
@@ -86,6 +128,7 @@ async function main() {
   let lastProcessedBlock = null;
   let isPolling = false;
   const escrowClones = new Set();
+  const triggeredDisputes = new Map();
 
   // On startup: load all existing escrow clones from the factory to construct initial whitelist
   try {
@@ -177,6 +220,15 @@ async function main() {
     }
   }, POLL_INTERVAL);
 
+  // Start active dispute reconciliation loop
+  const reconciliationIntervalId = setInterval(() => {
+    if (keepRunning && escrowClones.size > 0) {
+      reconcileDisputes(escrowClones, triggeredDisputes).catch((err) => {
+        console.error("⚠️ Error in reconciliation loop:", err.message);
+      });
+    }
+  }, RECONCILIATION_INTERVAL);
+
   // Run immediately once on start to initialize or catch up
   pollForEvents();
 
@@ -196,6 +248,7 @@ async function main() {
     console.log("\n🛑 Shutting down listener gracefully...");
     keepRunning = false;
     clearInterval(pollingIntervalId);
+    clearInterval(reconciliationIntervalId);
     server.close();
     process.exit(0);
   });

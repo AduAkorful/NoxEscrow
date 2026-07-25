@@ -972,6 +972,13 @@ export function EscrowWorkspace({
                         )}
                       </button>
                     </div>
+
+                    <div className="p-2.5 bg-[#0B0E17]/60 border border-white/[0.04] rounded-xl text-[10px] font-sans text-slate-400 leading-normal flex items-start gap-2">
+                      <AlertTriangle className="w-3.5 h-3.5 text-[#38BDF8] shrink-0 mt-0.5" />
+                      <span>
+                        <strong>UX Roadmap Notice:</strong> Continuous streaming demonstrates the proposed Sablier continuous settlement telemetry. Actual production payouts are securely managed on-chain using discrete milestone-based releases.
+                      </span>
+                    </div>
                   </div>
 
                   {viewMode === 'freelancer' ? (
