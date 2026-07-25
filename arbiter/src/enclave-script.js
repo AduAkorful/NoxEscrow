@@ -425,21 +425,33 @@ ${freelancerStatement}
         console.log(`⚖️ Reasoning: "${adjudicationReasoning}"\n`);
       } catch (parseError) {
         console.error("❌ Invalid JSON or malformed format returned by Gemini:", parseError.message);
-        console.log("⚠️ Reverting to safe fallback: REFUND_CLIENT to protect client capital.");
+        if (!isLocalNetwork) {
+          console.error("❌ FATAL: Malformed AI output on live network. Aborting to protect contract state.");
+          process.exit(1);
+        }
+        console.log("⚠️ [Local Fallback] Reverting to safe fallback: REFUND_CLIENT to protect client capital.");
         adjudicationVerdict = "REFUND_CLIENT";
         adjudicationReasoning = "Dispute resolution automatically resolved due to malformed evaluation output.";
         evaluationScore = 0;
       }
     } catch (aiError) {
       console.error("❌ Failed to evaluate dispute using Gemini API:", aiError.message);
-      console.log("⚠️ Reverting to safe fallback: REFUND_CLIENT to protect client capital.");
+      if (!isLocalNetwork) {
+        console.error("❌ FATAL: AI API failure on live network. Aborting to protect contract state.");
+        process.exit(1);
+      }
+      console.log("⚠️ [Local Fallback] Reverting to safe fallback: REFUND_CLIENT to protect client capital.");
       adjudicationVerdict = "REFUND_CLIENT";
       adjudicationReasoning = "Dispute resolution failed due to AI service error.";
       evaluationScore = 0;
     }
   } else {
     console.log("\n⚠️ GEMINI_API_KEY is missing. Production AI assessment cannot proceed.");
-    console.log("⚠️ For safety, defaulting to REFUND_CLIENT. Disputes should use emergency resolution if no AI.");
+    if (!isLocalNetwork) {
+      console.error("❌ FATAL: Missing GEMINI_API_KEY on live network. Aborting to protect contract state.");
+      process.exit(1);
+    }
+    console.log("⚠️ [Local Fallback] For safety, defaulting to REFUND_CLIENT. Disputes should use emergency resolution if no AI.");
     adjudicationVerdict = "REFUND_CLIENT";
     adjudicationReasoning = "AI assessment unavailable - safe fallback to protect client funds.";
     evaluationScore = 0;

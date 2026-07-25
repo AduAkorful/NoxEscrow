@@ -92,8 +92,12 @@ contract NoxEscrowReputation is
     ) external override onlyEscrowContract {
         if (!Nox.isInitialized(baseReputationHandle)) revert BaseReputationNotConfigured();
 
+        euint256 maxPayout = Nox.toEuint256(1000 * 10**6); // $1,000 cUSDC cap to mitigate whale-bloat
+        ebool isGreaterOrEqual = Nox.ge(payout, maxPayout);
+        euint256 cappedPayout = Nox.select(isGreaterOrEqual, maxPayout, payout);
+
         euint256 ratingHandle = Nox.toEuint256(rating);
-        euint256 scoreToAdd = Nox.mul(payout, ratingHandle);
+        euint256 scoreToAdd = Nox.mul(cappedPayout, ratingHandle);
 
         euint256 currentRep = reputationScores[freelancer];
         euint256 nextRep;

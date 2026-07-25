@@ -63,7 +63,13 @@ export function EscrowWorkspace({
   getWeb3Signer,
   gatewayUrl
 }: EscrowWorkspaceProps) {
-  const activeRequirement = selectedContract.requirements[selectedContract.milestonesCompleted] || "All milestones settled!";
+  const [selectedMilestoneIndex, setSelectedMilestoneIndex] = useState(() => {
+    return selectedContract.milestonesCompleted < selectedContract.totalMilestones 
+      ? selectedContract.milestonesCompleted 
+      : selectedContract.totalMilestones - 1;
+  });
+
+  const activeRequirement = selectedContract.requirements[selectedMilestoneIndex] || "All milestones settled!";
   const milestoneBudget = selectedContract.budget / selectedContract.totalMilestones;
 
   // --- Deployed SIGNING Setup / Recovery states (Finding C) ---
@@ -297,7 +303,7 @@ export function EscrowWorkspace({
   const loadReviews = async () => {
     if (!selectedContract.address || !chatKey || !walletAddress) return;
     const escrowAddrClean = selectedContract.address.toLowerCase();
-    const milestoneIndex = selectedContract.milestonesCompleted;
+    const milestoneIndex = selectedMilestoneIndex;
 
     try {
       const { data, error } = await supabase
@@ -353,7 +359,7 @@ export function EscrowWorkspace({
     loadReviews();
     const reviewInterval = setInterval(loadReviews, 4000);
     return () => clearInterval(reviewInterval);
-  }, [selectedContract.address, selectedContract.milestonesCompleted, walletAddress, chatKey]);
+  }, [selectedContract.address, selectedMilestoneIndex, walletAddress, chatKey]);
 
   // Optimistic Chat Send Handler
   const handleSendMessage = async () => {
@@ -526,7 +532,7 @@ export function EscrowWorkspace({
   }
 
   // Safe parse deliverables JSON
-  const currentDeliverable = selectedContract.deliverables?.[selectedContract.milestonesCompleted] || "";
+  const currentDeliverable = selectedContract.deliverables?.[selectedMilestoneIndex] || "";
   let deliverableText = currentDeliverable;
   let deliverableAttachedFiles: { name: string; type: string; cid: string }[] = [];
   try {
@@ -626,17 +632,21 @@ export function EscrowWorkspace({
         <div className="flex items-center gap-3 overflow-x-auto py-3 px-1 custom-scrollbar">
           {selectedContract.requirements.map((_, idx) => (
             <div key={idx} className="flex items-center gap-3 flex-shrink-0">
-              <div className={`px-4 py-2 border font-mono text-[10px] rounded-xl uppercase font-bold flex items-center gap-2 transition-smooth ${
-                idx < selectedContract.milestonesCompleted ? 'bg-emerald-950/10 text-[#00E676] border-emerald-900/35 shadow-[0_0_10px_rgba(0,230,118,0.02)]' :
-                idx === selectedContract.milestonesCompleted ? 'bg-[#00F2FE]/5 text-[#00F2FE] border-[#00F2FE]/25 shadow-[0_0_15px_rgba(0,242,254,0.03)] animate-pulse' :
-                'bg-white/[0.01] text-slate-500 border-white/5'
-              }`}>
+              <div 
+                onClick={() => setSelectedMilestoneIndex(idx)}
+                className={`px-4 py-2 border font-mono text-[10px] rounded-xl uppercase font-bold flex items-center gap-2 transition-smooth cursor-pointer ${
+                  idx === selectedMilestoneIndex ? 'border-[#00F2FE] shadow-[0_0_10px_rgba(0,242,254,0.15)] bg-[#00F2FE]/10 text-white' :
+                  idx < selectedContract.milestonesCompleted ? 'bg-emerald-950/10 text-[#00E676] border-emerald-900/35 shadow-[0_0_10px_rgba(0,230,118,0.02)] hover:border-emerald-500/40' :
+                  idx === selectedContract.milestonesCompleted ? 'bg-[#00F2FE]/5 text-[#00F2FE] border-[#00F2FE]/25 shadow-[0_0_15px_rgba(0,242,254,0.03)] animate-pulse hover:border-[#00F2FE]/45' :
+                  'bg-white/[0.01] text-slate-500 border-white/5 hover:border-white/20'
+                }`}
+              >
                 <span className={`w-1.5 h-1.5 rounded-full ${
                   idx < selectedContract.milestonesCompleted ? 'bg-[#00E676] drop-shadow-[0_0_4px_#00E676]' :
                   idx === selectedContract.milestonesCompleted ? 'bg-[#00F2FE] drop-shadow-[0_0_4px_#00F2FE]' :
                   'bg-slate-700'
                 }`}></span>
-                Milestone {idx + 1}
+                Milestone {idx + 1} {idx === selectedMilestoneIndex && "👁️"}
               </div>
               {idx < selectedContract.totalMilestones - 1 && (
                 <div className={`w-8 h-[1px] ${
@@ -860,7 +870,7 @@ export function EscrowWorkspace({
                           <button
                             onClick={() => handleDownloadFile(
                               file.cid, 
-                              selectedContract.milestoneKeys?.[selectedContract.milestonesCompleted] || "", 
+                              selectedContract.milestoneKeys?.[selectedMilestoneIndex] || "", 
                               file.name, 
                               file.type
                             )}
@@ -1084,7 +1094,7 @@ export function EscrowWorkspace({
                                   <button
                                     onClick={() => handleDownloadFile(
                                       file.cid, 
-                                      selectedContract.deliverableKeys?.[selectedContract.milestonesCompleted] || "", 
+                                      selectedContract.deliverableKeys?.[selectedMilestoneIndex] || "", 
                                       file.name, 
                                       file.type
                                     )}
