@@ -269,15 +269,15 @@ function App() {
     }
   }, [getWeb3Signer]);
 
-  // Auto-fetch data on wallet connect (without blocking UI with KeyDerivationGate)
+  // Auto-fetch data on wallet connect (never triggers interactive decrypt popups)
   useEffect(() => {
     if (walletAddress) {
       checkNetwork();
-      loadOnChainContracts(Boolean(vaultKey));
+      loadOnChainContracts(false);
       checkAdminStatus();
       loadFactoryParams();
     }
-  }, [walletAddress, vaultKey, checkNetwork, loadOnChainContracts, checkAdminStatus, loadFactoryParams]);
+  }, [walletAddress, checkNetwork, loadOnChainContracts, checkAdminStatus, loadFactoryParams]);
 
   // Derived Key check
   const triggerKeyDerivation = useCallback(async (): Promise<string> => {
