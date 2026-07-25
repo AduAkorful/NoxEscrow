@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { EscrowWorkspace } from '../components/EscrowWorkspace';
 import { type EscrowContract } from '../services/escrowService';
 import { Loader2, ArrowLeft } from 'lucide-react';
+import { ethers } from 'ethers';
 
 interface EscrowPageProps {
   contractsList: EscrowContract[];
@@ -22,6 +23,8 @@ interface EscrowPageProps {
   setDeliverableFiles: React.Dispatch<React.SetStateAction<File[]>>;
   vaultKey?: string | null;
   onDeriveKey?: () => void;
+  getWeb3Signer?: () => Promise<ethers.JsonRpcSigner>;
+  gatewayUrl?: string;
 }
 
 export function EscrowPage({
@@ -42,7 +45,9 @@ export function EscrowPage({
   deliverableFiles,
   setDeliverableFiles,
   vaultKey,
-  onDeriveKey
+  onDeriveKey,
+  getWeb3Signer,
+  gatewayUrl
 }: EscrowPageProps) {
   const { address } = useParams<{ address: string }>();
   const navigate = useNavigate();
@@ -97,6 +102,8 @@ export function EscrowPage({
         setDeliverableFiles={setDeliverableFiles}
         vaultKey={vaultKey}
         onDeriveKey={onDeriveKey}
+        getWeb3Signer={getWeb3Signer}
+        gatewayUrl={gatewayUrl}
       />
     </div>
   );

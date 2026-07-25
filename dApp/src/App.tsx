@@ -542,6 +542,8 @@ function App() {
                 setDeliverableFiles={setDraftFiles => setDeliverableFiles(setDraftFiles)}
                 vaultKey={vaultKey}
                 onDeriveKey={triggerKeyDerivation}
+                getWeb3Signer={getWeb3Signer}
+                gatewayUrl={gatewayUrl}
               />
             } />
             <Route path="*" element={<Navigate to="/" replace />} />

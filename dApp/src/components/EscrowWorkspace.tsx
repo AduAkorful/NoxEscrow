@@ -1,9 +1,10 @@
 import { X, Lock, AlertTriangle, ShieldCheck, Terminal, Unlock, Paperclip, Trash2, Activity, Play, Pause } from 'lucide-react';
-import { type EscrowContract } from '../services/escrowService';
+import { type EscrowContract, decryptMilestoneChatKey } from '../services/escrowService';
 import { fetchAndDecryptFile, encryptText, decryptText } from '../crypto/fileUploader';
 import { useState, useEffect, useRef } from 'react';
 import { TEECourtroom } from './TEECourtroom';
 import { supabase } from '../services/supabaseClient';
+import { ethers } from 'ethers';
 
 interface EscrowWorkspaceProps {
   selectedContract: EscrowContract;
@@ -25,6 +26,8 @@ interface EscrowWorkspaceProps {
   setDeliverableFiles: React.Dispatch<React.SetStateAction<File[]>>;
   vaultKey?: string | null;
   onDeriveKey?: () => void;
+  getWeb3Signer?: () => Promise<ethers.JsonRpcSigner>;
+  gatewayUrl?: string;
 }
 
 export function EscrowWorkspace({
@@ -46,7 +49,9 @@ export function EscrowWorkspace({
   deliverableFiles,
   setDeliverableFiles,
   vaultKey,
-  onDeriveKey
+  onDeriveKey,
+  getWeb3Signer,
+  gatewayUrl
 }: EscrowWorkspaceProps) {
   const activeRequirement = selectedContract.requirements[selectedContract.milestonesCompleted] || "All milestones settled!";
   const milestoneBudget = selectedContract.budget / selectedContract.totalMilestones;
@@ -71,6 +76,42 @@ export function EscrowWorkspace({
   const [bothReviewsSubmitted, setBothReviewsSubmitted] = useState(false);
   const [decryptedReviews, setDecryptedReviews] = useState<{ reviewer: string; rating: number; text: string }[]>([]);
 
+  // Lazy chat key: derived on-demand from on-chain handle (single wallet prompt)
+  const [chatKey, setChatKey] = useState<string | null>(null);
+  const [, setIsChatKeyDeriving] = useState(false);
+  const chatKeyDerivedRef = useRef(false);
+
+  // Derive chat key lazily when vaultKey is unlocked (once per workspace open)
+  useEffect(() => {
+    if (chatKeyDerivedRef.current || !vaultKey || !getWeb3Signer || !selectedContract.address) return;
+    // If we already have a milestoneKey from the contract, use it directly
+    const existingKey = selectedContract.milestoneKeys?.[0];
+    if (existingKey) {
+      setChatKey(existingKey);
+      chatKeyDerivedRef.current = true;
+      return;
+    }
+    // Otherwise, lazily decrypt the milestone 0 handle
+    let cancelled = false;
+    const deriveChatKey = async () => {
+      setIsChatKeyDeriving(true);
+      try {
+        const signer = await getWeb3Signer();
+        const key = await decryptMilestoneChatKey(signer, selectedContract.address, 0, gatewayUrl);
+        if (!cancelled) {
+          setChatKey(key);
+          chatKeyDerivedRef.current = true;
+        }
+      } catch (err) {
+        console.warn("Failed to derive chat key:", err);
+      } finally {
+        if (!cancelled) setIsChatKeyDeriving(false);
+      }
+    };
+    deriveChatKey();
+    return () => { cancelled = true; };
+  }, [vaultKey, getWeb3Signer, selectedContract.address, selectedContract.milestoneKeys, gatewayUrl]);
+
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,9 +120,7 @@ export function EscrowWorkspace({
 
   // Chat Subscribe & Load
   useEffect(() => {
-    if (!selectedContract.address || !selectedContract.milestoneKeys?.[0]) return;
-
-    const chatKey = selectedContract.milestoneKeys[0];
+    if (!selectedContract.address || !chatKey) return;
     const escrowAddrClean = selectedContract.address.toLowerCase();
 
     const loadMessages = async () => {
@@ -160,12 +199,11 @@ export function EscrowWorkspace({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedContract.address, selectedContract.milestoneKeys]);
+  }, [selectedContract.address, chatKey]);
 
   // Load reviews
   const loadReviews = async () => {
-    if (!selectedContract.address || !selectedContract.milestoneKeys?.[0] || !walletAddress) return;
-    const chatKey = selectedContract.milestoneKeys[0];
+    if (!selectedContract.address || !chatKey || !walletAddress) return;
     const escrowAddrClean = selectedContract.address.toLowerCase();
     const milestoneIndex = selectedContract.milestonesCompleted;
 
@@ -220,10 +258,9 @@ export function EscrowWorkspace({
 
   useEffect(() => {
     loadReviews();
-  }, [selectedContract.address, selectedContract.milestonesCompleted, walletAddress, selectedContract.milestoneKeys]);
+  }, [selectedContract.address, selectedContract.milestonesCompleted, walletAddress, chatKey]);
 
   const handleSendMessage = async () => {
-    const chatKey = selectedContract.milestoneKeys?.[0];
     if (!chatKey || !walletAddress || !newMessage.trim()) return;
     setIsSendingMessage(true);
     try {
@@ -247,7 +284,6 @@ export function EscrowWorkspace({
   };
 
   const handleSubmitReview = async () => {
-    const chatKey = selectedContract.milestoneKeys?.[0];
     if (!chatKey || !walletAddress || !reviewText.trim()) return;
     setIsSubmittingReview(true);
     try {

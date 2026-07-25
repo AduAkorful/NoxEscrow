@@ -151,6 +151,26 @@ export function bytes32HashToString(val: bigint): string {
 }
 
 /**
+ * Lazily decrypt a single milestone's requirements handle to derive the shared
+ * symmetric chat key. This triggers ONE wallet authorization prompt (to create
+ * the handle client) and then caches it for subsequent decrypts.
+ */
+export async function decryptMilestoneChatKey(
+  signer: ethers.JsonRpcSigner,
+  escrowAddress: string,
+  milestoneIndex: number = 0,
+  gatewayUrl: string = DEFAULT_NOX_GATEWAY
+): Promise<string> {
+  const escrow = new ethers.Contract(escrowAddress, NoxEscrowContractABI, signer);
+  const milestoneInfo = await escrow.milestones(milestoneIndex);
+
+  const handleClient = await getOrCreateHandleClient(signer, gatewayUrl);
+  const decryptedReq = await handleClient.decrypt(milestoneInfo.requirementsHash);
+  const decryptedKeyBigInt = decryptedReq.value as bigint;
+  return decryptedKeyBigInt.toString(16).padStart(64, "0");
+}
+
+/**
  * Fetches all active escrow agreements associated with the user's wallet address from the blockchain.
  */
 export async function fetchUserEscrows(
