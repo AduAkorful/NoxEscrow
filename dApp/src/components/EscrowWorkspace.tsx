@@ -23,6 +23,8 @@ interface EscrowWorkspaceProps {
   onBack: () => void;
   deliverableFiles: File[];
   setDeliverableFiles: React.Dispatch<React.SetStateAction<File[]>>;
+  vaultKey?: string | null;
+  onDeriveKey?: () => void;
 }
 
 export function EscrowWorkspace({
@@ -42,7 +44,9 @@ export function EscrowWorkspace({
   handleMutualCancel,
   onBack,
   deliverableFiles,
-  setDeliverableFiles
+  setDeliverableFiles,
+  vaultKey,
+  onDeriveKey
 }: EscrowWorkspaceProps) {
   const activeRequirement = selectedContract.requirements[selectedContract.milestonesCompleted] || "All milestones settled!";
   const milestoneBudget = selectedContract.budget / selectedContract.totalMilestones;
@@ -384,6 +388,29 @@ export function EscrowWorkspace({
 
   return (
     <div className="bento-card p-6 md:p-8 flex flex-col gap-8 w-full animate-slide-up">
+      {/* Key Locked Notice Banner */}
+      {!vaultKey && (
+        <div className="uniswap-card p-4 bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Lock className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <h4 className="text-xs font-bold text-amber-300">Vault Key Locked</h4>
+              <p className="text-[11px] text-amber-200/80">
+                Please click <span className="font-bold underline cursor-pointer text-amber-300" onClick={onDeriveKey}>"Unlock Vault Key"</span> in the top header menu to decrypt contract deliverables and execute actions.
+              </p>
+            </div>
+          </div>
+          {onDeriveKey && (
+            <button 
+              onClick={onDeriveKey}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-[#0B0E17] font-bold text-xs shadow-md transition-all cursor-pointer whitespace-nowrap"
+            >
+              Unlock Vault Key
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Header Back Action & Top Controls */}
       <div className="flex flex-wrap justify-between items-center gap-3 border-b border-white/5 pb-4">
         <button 

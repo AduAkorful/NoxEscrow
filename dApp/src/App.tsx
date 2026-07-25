@@ -46,11 +46,18 @@ function App() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [vaultKey, setVaultKey] = useState<string | null>(null);
   const [isDeriving, setIsDeriving] = useState(false);
-  const [viewMode, setViewMode] = useState<'client' | 'freelancer'>('client');
+  const [viewMode, setViewMode] = useState<'client' | 'freelancer'>(() => {
+    const saved = localStorage.getItem('nox_view_mode');
+    return (saved === 'freelancer' || saved === 'client') ? saved : 'client';
+  });
   const [showShortcutsHUD, setShowShortcutsHUD] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('nox_view_mode', viewMode);
+  }, [viewMode]);
 
   // --- Toast notifications state ---
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -493,7 +500,9 @@ function App() {
                 handleReleaseMilestone={withKeyRequirement(handleReleaseMilestone)}
                 handleMutualCancel={withKeyRequirement(handleMutualCancel)}
                 deliverableFiles={deliverableFiles}
-                setDeliverableFiles={setDeliverableFiles}
+                setDeliverableFiles={setDraftFiles => setDeliverableFiles(setDraftFiles)}
+                vaultKey={vaultKey}
+                onDeriveKey={triggerKeyDerivation}
               />
             } />
             <Route path="*" element={<Navigate to="/" replace />} />

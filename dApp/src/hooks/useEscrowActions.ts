@@ -106,7 +106,8 @@ export function useEscrowActions({
     draftMilestoneReqs: string,
     draftFiles: File[],
     setDraftFiles: React.Dispatch<React.SetStateAction<File[]>>,
-    setShowDraftWizard: (show: boolean) => void
+    setShowDraftWizard: (show: boolean) => void,
+    draftTitle?: string
   ) => {
     if (!walletAddress) return;
     setErrorMessage(null);
@@ -168,7 +169,8 @@ export function useEscrowActions({
           supabaseUrl,
           supabaseKey
         },
-        draftFiles
+        draftFiles,
+        draftTitle
       );
 
       const newContract: EscrowContract = {
@@ -179,7 +181,8 @@ export function useEscrowActions({
         totalMilestones: draftTotalMilestones,
         budget: payouts.reduce((a, b) => a + b, 0),
         status: 'ACTIVE',
-        requirements: requirements
+        requirements: requirements,
+        title: draftTitle || "Confidential Escrow Agreement"
       };
 
       setContractsList(prev => [newContract, ...prev]);

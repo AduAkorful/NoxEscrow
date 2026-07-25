@@ -20,6 +20,8 @@ interface EscrowPageProps {
   handleMutualCancel?: (address?: string) => Promise<void>;
   deliverableFiles: File[];
   setDeliverableFiles: React.Dispatch<React.SetStateAction<File[]>>;
+  vaultKey?: string | null;
+  onDeriveKey?: () => void;
 }
 
 export function EscrowPage({
@@ -38,7 +40,9 @@ export function EscrowPage({
   handleReleaseMilestone,
   handleMutualCancel,
   deliverableFiles,
-  setDeliverableFiles
+  setDeliverableFiles,
+  vaultKey,
+  onDeriveKey
 }: EscrowPageProps) {
   const { address } = useParams<{ address: string }>();
   const navigate = useNavigate();
@@ -91,6 +95,8 @@ export function EscrowPage({
         onBack={() => navigate('/vaults')}
         deliverableFiles={deliverableFiles}
         setDeliverableFiles={setDeliverableFiles}
+        vaultKey={vaultKey}
+        onDeriveKey={onDeriveKey}
       />
     </div>
   );

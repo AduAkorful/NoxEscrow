@@ -480,7 +480,7 @@ export function FreelancerMarketplace({ walletAddress, onHireFreelancer }: Freel
                 {myProfile ? 'Customize Public Freelancer Profile' : 'Create Freelancer Profile'}
               </h3>
               <p className="text-xs text-slate-400 mt-1">
-                Your profile will be synced to Supabase Production Database and discoverable by clients.
+                Your profile will be published on the NoxEscrow Talent Network and discoverable by clients.
               </p>
             </div>
 
@@ -637,7 +637,7 @@ export function FreelancerMarketplace({ walletAddress, onHireFreelancer }: Freel
                   disabled={isSaving}
                   className="btn-uniswap-primary px-6 py-2.5 text-xs cursor-pointer shadow-lg disabled:opacity-50"
                 >
-                  {isSaving ? 'Syncing to Supabase...' : 'Save Profile'}
+                  {isSaving ? 'Saving Profile...' : 'Save Profile'}
                 </button>
               </div>
             </div>

@@ -5,6 +5,7 @@ export interface EscrowMetadata {
   devs_cid?: string | null;
   client_statement?: string | null;
   freelancer_statement?: string | null;
+  title?: string | null;
 }
 
 /**
@@ -29,7 +30,8 @@ export async function insertEscrowMetadata(
       milestone_index: record.milestone_index,
       reqs_cid: record.reqs_cid,
       client_statement: record.client_statement || "None provided.",
-      freelancer_statement: record.freelancer_statement || "None provided."
+      freelancer_statement: record.freelancer_statement || "None provided.",
+      title: record.title || null
     })
   });
 

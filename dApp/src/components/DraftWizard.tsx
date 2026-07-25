@@ -5,6 +5,8 @@ import { ethers } from 'ethers';
 
 interface DraftWizardProps {
   walletAddress: string | null;
+  draftTitle: string;
+  setDraftTitle: (val: string) => void;
   draftFreelancer: string;
   setDraftFreelancer: (val: string) => void;
   draftTotalMilestones: number;
@@ -27,6 +29,8 @@ interface MilestoneItem {
 
 export function DraftWizard({
   walletAddress,
+  draftTitle,
+  setDraftTitle,
   draftFreelancer,
   setDraftFreelancer,
   draftTotalMilestones,
@@ -75,13 +79,13 @@ export function DraftWizard({
   });
 
   const [milestoneItems, setMilestoneItems] = useState<MilestoneItem[]>(() => {
-    const payouts = draftMilestonePayouts ? draftMilestonePayouts.split(',').map(p => p.trim()) : ["1000"];
-    const reqs = draftMilestoneReqs ? draftMilestoneReqs.split(';').map(r => r.trim()) : ["Build core deliverables & UI components."];
+    const payouts = draftMilestonePayouts ? draftMilestonePayouts.split(',').map(p => p.trim()) : [""];
+    const reqs = draftMilestoneReqs ? draftMilestoneReqs.split(';').map(r => r.trim()) : [""];
     const length = Math.max(payouts.length, reqs.length, draftTotalMilestones || 1);
     const items: MilestoneItem[] = [];
     for (let i = 0; i < length; i++) {
       items.push({
-        payout: payouts[i] || "1000",
+        payout: payouts[i] || "",
         requirements: reqs[i] || ""
       });
     }
@@ -98,7 +102,7 @@ export function DraftWizard({
 
   const handleAddMilestone = () => {
     if (milestoneItems.length >= 20) return;
-    setMilestoneItems(prev => [...prev, { payout: "1000", requirements: "" }]);
+    setMilestoneItems(prev => [...prev, { payout: "", requirements: "" }]);
   };
 
   const handleRemoveMilestone = (idx: number) => {
@@ -209,6 +213,20 @@ export function DraftWizard({
                 <Briefcase className="w-3.5 h-3.5" /> Freelancer (Invoice / Proposal)
               </button>
             </div>
+          </div>
+
+          {/* Contract Title Input */}
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+              <Briefcase className="w-3.5 h-3.5 text-[#38BDF8]" /> Contract Title / Project Name
+            </label>
+            <input 
+              type="text" 
+              placeholder="e.g. DeFi Smart Contract Security Audit" 
+              value={draftTitle} 
+              onChange={(e) => setDraftTitle(e.target.value)}
+              className="uniswap-input-box px-4 py-3 text-sm text-white focus:outline-none w-full"
+            />
           </div>
 
           {/* Counterparty Address Input with Registered Freelancer Auto-Suggest */}
@@ -450,7 +468,7 @@ export function DraftWizard({
               </div>
 
               <div className="flex justify-between items-center gap-2">
-                <span className="text-slate-400 font-medium">Client Processing Fee (1.0%)</span>
+                <span className="text-slate-400 font-medium">Processing Fee (1.0%)</span>
                 <span className="font-mono text-[#38BDF8] font-bold whitespace-nowrap">
                   {(totalBudget * 0.01).toFixed(2)} <span className="text-[11px] text-[#38BDF8]/80 font-normal">cUSDC</span>
                 </span>

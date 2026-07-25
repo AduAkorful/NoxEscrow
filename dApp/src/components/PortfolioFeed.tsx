@@ -92,7 +92,7 @@ export function PortfolioFeed({
                 {clientCapitalLocked.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[#38BDF8] text-lg">cUSDC</span>
               </span>
               <p className="text-[11px] text-slate-400 font-medium mt-1 flex items-center gap-1">
-                <Percent className="w-3 h-3 text-[#38BDF8]" /> Includes 1.0% Client Processing Fee
+                <Percent className="w-3 h-3 text-[#38BDF8]" /> Includes 1.0% Processing Fee
               </p>
             </div>
           </div>

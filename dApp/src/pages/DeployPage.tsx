@@ -12,7 +12,8 @@ interface DeployPageProps {
     draftMilestoneReqs: string,
     draftFiles: File[],
     setDraftFiles: React.Dispatch<React.SetStateAction<File[]>>,
-    setShowDraftWizard: (show: boolean) => void
+    setShowDraftWizard: (show: boolean) => void,
+    draftTitle?: string
   ) => Promise<void>;
 }
 
@@ -24,17 +25,20 @@ export function DeployPage({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  const [draftTitle, setDraftTitle] = useState("");
   const [draftFreelancer, setDraftFreelancer] = useState("");
   const [draftTotalMilestones, setDraftTotalMilestones] = useState(1);
-  const [draftMilestonePayouts, setDraftMilestonePayouts] = useState<string>("1000");
-  const [draftMilestoneReqs, setDraftMilestoneReqs] = useState<string>("Build a responsive collapsible sidebar using React.");
+  const [draftMilestonePayouts, setDraftMilestonePayouts] = useState<string>("");
+  const [draftMilestoneReqs, setDraftMilestoneReqs] = useState<string>("");
   const [draftFiles, setDraftFiles] = useState<File[]>([]);
 
   useEffect(() => {
+    const titleParam = searchParams.get('title');
     const flParam = searchParams.get('freelancer');
     const payoutsParam = searchParams.get('payouts');
     const reqsParam = searchParams.get('reqs');
 
+    if (titleParam) setDraftTitle(titleParam);
     if (flParam) setDraftFreelancer(flParam);
     if (payoutsParam) setDraftMilestonePayouts(payoutsParam);
     if (reqsParam) setDraftMilestoneReqs(reqsParam);
@@ -56,13 +60,16 @@ export function DeployPage({
         if (!show) {
           navigate('/vaults');
         }
-      }
+      },
+      draftTitle
     );
   };
 
   return (
     <DraftWizard
       walletAddress={walletAddress}
+      draftTitle={draftTitle}
+      setDraftTitle={setDraftTitle}
       draftFreelancer={draftFreelancer}
       setDraftFreelancer={setDraftFreelancer}
       draftTotalMilestones={draftTotalMilestones}

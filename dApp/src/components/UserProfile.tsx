@@ -152,7 +152,7 @@ export function UserProfile({ walletAddress, onHireFreelancer }: UserProfileProp
     return (
       <div className="flex flex-col items-center justify-center p-20 text-slate-400 gap-3">
         <Sparkles className="w-8 h-8 text-[#38BDF8] animate-spin" />
-        <span className="text-xs font-mono">Fetching profile from Supabase Database...</span>
+        <span className="text-xs font-mono">Loading Profile...</span>
       </div>
     );
   }
@@ -403,7 +403,7 @@ export function UserProfile({ walletAddress, onHireFreelancer }: UserProfileProp
                 Edit Profile Dashboard
               </h3>
               <p className="text-xs text-slate-400 mt-1">
-                Updates will be saved directly to the Supabase Production Database.
+                Updates will be saved to your verified talent profile and discoverable by clients.
               </p>
             </div>
 
@@ -546,7 +546,7 @@ export function UserProfile({ walletAddress, onHireFreelancer }: UserProfileProp
                   disabled={isSaving}
                   className="btn-uniswap-primary px-6 py-2.5 text-xs cursor-pointer shadow-lg disabled:opacity-50"
                 >
-                  {isSaving ? 'Saving to Supabase...' : 'Save Profile'}
+                  {isSaving ? 'Saving Profile...' : 'Save Profile'}
                 </button>
               </div>
             </div>

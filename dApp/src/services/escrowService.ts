@@ -61,6 +61,7 @@ export interface EscrowContract {
   reviewWindow?: number;
   milestoneKeys?: string[];
   deliverableKeys?: string[];
+  title?: string;
 }
 
 export interface MetadataConfig {
@@ -157,16 +158,16 @@ export async function fetchUserEscrows(
   factoryAddress: string,
   userAddress: string,
   gatewayUrl: string = DEFAULT_NOX_GATEWAY,
-  metadataConfig?: MetadataConfig
+  metadataConfig?: MetadataConfig,
+  allowInteractiveDecrypt: boolean = false
 ): Promise<EscrowContract[]> {
   try {
     const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
-    const count = await factory.escrowsCount();
-    const total = Number(count);
+    const totalCount = await factory.getEscrowsCount();
+    const total = Number(totalCount);
 
     const userEscrows: EscrowContract[] = [];
 
-    // Loop backwards (latest agreements first)
     for (let i = total - 1; i >= 0; i--) {
       const escrowAddress = await factory.allEscrows(i);
       const escrow = new ethers.Contract(escrowAddress, NoxEscrowContractABI, signer);
@@ -193,14 +194,23 @@ export async function fetchUserEscrows(
         let activeMilestoneSubmitted = false;
         let activeMilestoneSubmissionTime = 0;
         let accumulatedBudget = 0;
+        let contractTitle = "Confidential Escrow Agreement";
 
-        const handleClient = await createEthersHandleClient(signer as any, {
-          smartContractAddress: NOX_CONTRACT_MANAGER,
-          gatewayUrl: gatewayUrl as any,
-          subgraphUrl: NOX_SUBGRAPH_URL,
-        });
+        let handleClient: any = null;
+        if (allowInteractiveDecrypt) {
+          try {
+            handleClient = await createEthersHandleClient(signer as any, {
+              smartContractAddress: NOX_CONTRACT_MANAGER,
+              gatewayUrl: gatewayUrl as any,
+              subgraphUrl: NOX_SUBGRAPH_URL,
+            });
+          } catch (hErr) {
+            console.warn("Handle client creation skipped:", hErr);
+          }
+        }
 
         const activeMilestoneIndex = Number(activeMilestone);
+        const useE2E = metadataConfig && metadataConfig.supabaseUrl && metadataConfig.supabaseKey;
 
         for (let m = 0; m < Number(totalMilestones); m++) {
           try {
@@ -210,24 +220,30 @@ export async function fetchUserEscrows(
               activeMilestoneSubmissionTime = Number(milestoneInfo.submissionTime);
             }
 
-            // Decrypt real milestone budget dynamically (ZK Handle Decryption - no mock values!)
-            let payoutValue = Number(status) === 0 ? 0 : 1000;
-            try {
-              const decryptedPayout = await handleClient.decrypt(milestoneInfo.payoutHandle);
-              payoutValue = Number(decryptedPayout.value);
-            } catch (payErr) {
-              console.warn(`Failed to decrypt payout handle for milestone ${m}:`, payErr);
+            let payoutValue = Number(status) === 0 ? 0 : 0;
+            if (handleClient && allowInteractiveDecrypt) {
+              try {
+                const decryptedPayout = await handleClient.decrypt(milestoneInfo.payoutHandle);
+                payoutValue = Number(decryptedPayout.value);
+              } catch (payErr) {
+                console.warn(`Failed to decrypt payout handle for milestone ${m}:`, payErr);
+              }
             }
             accumulatedBudget += payoutValue;
 
-            const decryptedReq = await handleClient.decrypt(milestoneInfo.requirementsHash);
-            const decryptedKeyBigInt = decryptedReq.value as bigint;
-            const decryptedKeyHex = decryptedKeyBigInt.toString(16).padStart(64, "0");
+            let decryptedKeyHex = "";
+            if (handleClient && allowInteractiveDecrypt) {
+              try {
+                const decryptedReq = await handleClient.decrypt(milestoneInfo.requirementsHash);
+                const decryptedKeyBigInt = decryptedReq.value as bigint;
+                decryptedKeyHex = decryptedKeyBigInt.toString(16).padStart(64, "0");
+              } catch (reqErr) {
+                console.warn(`Failed to decrypt requirement handle for milestone ${m}:`, reqErr);
+              }
+            }
             milestoneKeys.push(decryptedKeyHex);
 
             let reqText = "";
-            const useE2E = metadataConfig && metadataConfig.supabaseUrl && metadataConfig.supabaseKey;
-
             if (useE2E) {
               try {
                 const metadata = await getEscrowMetadata(
@@ -236,13 +252,17 @@ export async function fetchUserEscrows(
                   escrowAddress,
                   m
                 );
-                if (metadata && metadata.reqs_cid) {
-                  // Fetch ciphertext from IPFS via standard gateway
-                  const reqsUrl = `https://gateway.pinata.cloud/ipfs/${metadata.reqs_cid}`;
-                  const resp = await fetch(reqsUrl);
-                  if (resp.ok) {
-                    const payload = await resp.json();
-                    reqText = await decryptText(payload.ciphertext, decryptedKeyHex, payload.iv);
+                if (metadata) {
+                  if (metadata.title) {
+                    contractTitle = metadata.title;
+                  }
+                  if (metadata.reqs_cid && decryptedKeyHex) {
+                    const reqsUrl = `https://gateway.pinata.cloud/ipfs/${metadata.reqs_cid}`;
+                    const resp = await fetch(reqsUrl);
+                    if (resp.ok) {
+                      const payload = await resp.json();
+                      reqText = await decryptText(payload.ciphertext, decryptedKeyHex, payload.iv);
+                    }
                   }
                 }
               } catch (metaErr) {
@@ -250,17 +270,11 @@ export async function fetchUserEscrows(
               }
             }
 
-            if (!reqText) {
-              // Fallback to direct ASCII bytes32 decoding
-              reqText = bytes32HashToString(decryptedKeyBigInt);
-            }
+            requirements.push(reqText || `${contractTitle} - Milestone ${m + 1}`);
 
-            requirements.push(reqText || `Milestone ${m + 1}`);
-
-            // Decrypt deliverables
             let deliverableText = "";
             let devKeyHex = "";
-            if (milestoneInfo.isSubmitted) {
+            if (milestoneInfo.isSubmitted && handleClient && allowInteractiveDecrypt) {
               try {
                 const decryptedDev = await handleClient.decrypt(milestoneInfo.deliverableHash);
                 const devKeyBigInt = decryptedDev.value as bigint;
@@ -273,7 +287,7 @@ export async function fetchUserEscrows(
                     escrowAddress,
                     m
                   );
-                  if (metadata && metadata.devs_cid) {
+                  if (metadata && metadata.devs_cid && devKeyHex) {
                     const devsUrl = `https://gateway.pinata.cloud/ipfs/${metadata.devs_cid}`;
                     const resp = await fetch(devsUrl);
                     if (resp.ok) {
@@ -281,8 +295,6 @@ export async function fetchUserEscrows(
                       deliverableText = await decryptText(payload.ciphertext, devKeyHex, payload.iv);
                     }
                   }
-                } else {
-                  deliverableText = bytes32HashToString(devKeyBigInt);
                 }
               } catch (devErr) {
                 console.warn(`Failed to decrypt deliverable for milestone ${m}:`, devErr);
@@ -292,7 +304,7 @@ export async function fetchUserEscrows(
             deliverableKeys.push(devKeyHex);
           } catch (err) {
             console.error(`Error processing milestone ${m}:`, err);
-            requirements.push(`Encrypted Milestone ${m + 1}`);
+            requirements.push(`Milestone ${m + 1}`);
             deliverables.push("");
             milestoneKeys.push("");
             deliverableKeys.push("");
@@ -305,7 +317,7 @@ export async function fetchUserEscrows(
           role: isClient ? 'CLIENT' : 'FREELANCER',
           milestonesCompleted: activeMilestoneIndex,
           totalMilestones: Number(totalMilestones),
-          budget: accumulatedBudget, // Real decrypted on-chain budget (no mock fallback!)
+          budget: accumulatedBudget,
           status: statusNames[Number(status)] || 'ACTIVE',
           requirements,
           deliverables,
@@ -313,7 +325,8 @@ export async function fetchUserEscrows(
           activeMilestoneSubmissionTime,
           reviewWindow: Number(reviewWindow),
           milestoneKeys,
-          deliverableKeys
+          deliverableKeys,
+          title: contractTitle
         });
       }
     }
@@ -387,7 +400,8 @@ export async function initializeEscrowMilestones(
   requirements: string[],
   gatewayUrl: string = DEFAULT_NOX_GATEWAY,
   metadataConfig?: MetadataConfig,
-  attachedFiles?: File[]
+  attachedFiles?: File[],
+  title?: string
 ) {
   const escrow = new ethers.Contract(escrowAddress, NoxEscrowContractABI, signer);
 
@@ -441,6 +455,7 @@ export async function initializeEscrowMilestones(
         escrow_address: escrowAddress,
         milestone_index: i,
         reqs_cid: cid,
+        title: title || "Confidential Escrow Agreement",
         client_statement: "None provided.",
         freelancer_statement: "None provided."
       });
