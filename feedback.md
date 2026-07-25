@@ -31,6 +31,14 @@ While the core mechanics are revolutionary, we identified several developer fric
 *   **Issue:** When initializing sequential milestones in `initializeEscrow()`, we had to loop through our arrays and call `Nox.allowThis`, `Nox.addViewer`, and `Nox.allow` individually on each handle.
 *   **Friction:** For projects with multiple milestones, this recursive loop leads to significant gas overhead and increases the risk of a developer accidentally missing a permission call on an array index (leading to a permanent decryption lockout).
 
+### Friction 4: Session Key Re-authentication Overheads (Repetitive Wallet Popups)
+*   **Issue:** In our dApp workspace, decrypting chat keys and validating private parameters requires instantiating the iExec `createEthersHandleClient`.
+*   **Friction:** This process forces repetitive wallet signature popups whenever the user navigates pages or refreshes tabs. There is currently no out-of-the-box standard to securely delegate transient decryption rights to a short-lived session key in browser memory, resulting in high-friction UX.
+
+### Friction 5: Highly Intricate Multi-Step Wrapping/Unwrapping Protocol Flow
+*   **Issue:** Standard wrapping/unwrapping implementations are usually one-step functions. Under iExec Nox, unshielding `cUSDC` requires an intricate multi-step dance: encrypting inputs locally, manually calling on-chain ACL allowances, sending the `unwrap()` transaction, waiting for block receipt, querying public decryption proofs from the KMS, and finally calling `finalizeUnwrap()`.
+*   **Friction:** Implementing and debugging this multi-step flow manually consumes days of developer research. A single minor mistake in step sequence or block-time verification results in transaction reverts or locked assets.
+
 ---
 
 ## 3. Tooling Roadmap & API Suggestions
@@ -52,6 +60,24 @@ Provide an offline, pure-JS mock library for the `@iexec-nox/nox-hardhat-plugin`
 
 ### Suggestion C: Standardized Gas-Estimation Guidelines for Handles
 Currently, estimating gas for transactions utilizing `euint256` handles and transient permissions can be unpredictable on live testnets (due to handle gateway verification offsets). Proposing a detailed chapter in the developer docs explaining gas profiles for different handle operation configurations.
+
+### Suggestion D: Browser SDK Native Session Key Delegation Standard
+Implement an SDK feature allowing developers to sign a transient, timed "session key delegation" proof. This delegator would authorize a secure local key in browser state to execute KMS decryptions and handle-client interactions within a configurable timebox (e.g., 1 hour), entirely eliminating repetitive wallet signatures during active user sessions.
+
+### Suggestion E: Synthesized Wrapping/Unwrapping SDK Orchestrator Helpers
+Provide synthesized utility helpers directly in `@iexec-nox/handle` to consolidate multi-step processes into single awaitable calls:
+```typescript
+// Proposed high-level SDK helper
+const receipt = await handleClient.unwrapShieldedAsset({
+  tokenAddress: cUSDCAddress,
+  recipient: userAddress,
+  amount: unwrapAmount
+});
+```
+This simplifies the developer workflow from 5 complex steps to a single orchestrated helper.
+
+### Suggestion F: TypeSafe Code Generation Bindings for euint256 Handles
+Currently, on-chain event parameters involving `euint256` or `externalEuint256` are exported in ABIs as standard `uint256` or `bytes32`. Frontend tools (like TypeChain or Wagmi codegen) parse these blindly as standard numbers/hex, making it easy to introduce type-casting bugs. Providing a custom plugin to generate types that recognize Nox handles as distinct types would prevent type-safety violations on client codebases.
 
 ---
 
