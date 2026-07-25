@@ -19,6 +19,13 @@ interface EscrowPageProps {
   handleSubmitDeliverable: () => Promise<void>;
   handleReleaseMilestone: () => Promise<void>;
   handleMutualCancel?: (address?: string) => Promise<void>;
+  handleInitializeDeployedEscrow?: (
+    escrowAddress: string,
+    payouts: number[],
+    requirements: string[],
+    title: string,
+    files: File[]
+  ) => Promise<void>;
   deliverableFiles: File[];
   setDeliverableFiles: React.Dispatch<React.SetStateAction<File[]>>;
   vaultKey?: string | null;
@@ -42,6 +49,7 @@ export function EscrowPage({
   handleSubmitDeliverable,
   handleReleaseMilestone,
   handleMutualCancel,
+  handleInitializeDeployedEscrow,
   deliverableFiles,
   setDeliverableFiles,
   vaultKey,
@@ -97,6 +105,7 @@ export function EscrowPage({
         handleSubmitDeliverable={handleSubmitDeliverable}
         handleReleaseMilestone={handleReleaseMilestone}
         handleMutualCancel={handleMutualCancel}
+        handleInitializeDeployedEscrow={handleInitializeDeployedEscrow}
         onBack={() => navigate('/vaults')}
         deliverableFiles={deliverableFiles}
         setDeliverableFiles={setDeliverableFiles}

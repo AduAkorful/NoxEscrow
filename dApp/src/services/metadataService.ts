@@ -6,6 +6,7 @@ export interface EscrowMetadata {
   client_statement?: string | null;
   freelancer_statement?: string | null;
   title?: string | null;
+  payout_amount?: number | null;
 }
 
 /**
@@ -31,7 +32,8 @@ export async function insertEscrowMetadata(
       reqs_cid: record.reqs_cid,
       client_statement: record.client_statement || "None provided.",
       freelancer_statement: record.freelancer_statement || "None provided.",
-      title: record.title || null
+      title: record.title || null,
+      payout_amount: record.payout_amount || null
     })
   });
 
@@ -221,5 +223,50 @@ export function removePendingSync(id: string): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   } catch (err) {
     console.error("Failed to remove pending sync from localStorage:", err);
+  }
+}
+
+/**
+ * Processes all pending synchronization records stored in localStorage.
+ * Sequentially retries them against Supabase and deletes them if successful.
+ */
+export async function processPendingSyncs(
+  supabaseUrl: string,
+  supabaseKey: string
+): Promise<void> {
+  const syncs = getPendingSyncs();
+  if (syncs.length === 0) return;
+
+  console.log(`🔄 Sync Engine: Found ${syncs.length} pending metadata synchronization records.`);
+
+  for (const sync of syncs) {
+    try {
+      if (sync.type === "INSERT") {
+        await insertEscrowMetadata(supabaseUrl, supabaseKey, sync.data);
+      } else if (sync.type === "UPDATE") {
+        await updateEscrowDeliverable(
+          supabaseUrl,
+          supabaseKey,
+          sync.escrowAddress,
+          sync.milestoneIndex,
+          sync.data.devsCid
+        );
+      } else if (sync.type === "STATEMENT") {
+        const roleStr = sync.data.role === 'client' || sync.data.role === 'CLIENT' ? 'CLIENT' : 'FREELANCER';
+        await updateEscrowStatement(
+          supabaseUrl,
+          supabaseKey,
+          sync.escrowAddress,
+          sync.milestoneIndex,
+          sync.data.statement,
+          roleStr
+        );
+      }
+      // Remove sync from local storage queue if successful
+      removePendingSync(sync.id);
+      console.log(`✔️ Sync Engine: Pending sync ${sync.id} processed and cleared successfully!`);
+    } catch (err: any) {
+      console.warn(`⚠️ Sync Engine: Failed to process sync ${sync.id}, will retry on next run:`, err.message);
+    }
   }
 }

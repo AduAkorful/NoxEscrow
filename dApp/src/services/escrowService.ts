@@ -249,6 +249,20 @@ export async function fetchUserEscrows(
               activeMilestoneSubmissionTime = Number(milestoneInfo.submissionTime);
             }
 
+            let metadata: any = null;
+            if (useE2E) {
+              try {
+                metadata = await getEscrowMetadata(
+                  metadataConfig.supabaseUrl!,
+                  metadataConfig.supabaseKey!,
+                  escrowAddress,
+                  m
+                );
+              } catch (metaErr) {
+                console.warn(`Failed to fetch E2E metadata for milestone ${m}:`, metaErr);
+              }
+            }
+
             let payoutValue = Number(status) === 0 ? 0 : 0;
             if (handleClient && allowInteractiveDecrypt) {
               try {
@@ -257,6 +271,8 @@ export async function fetchUserEscrows(
               } catch (payErr) {
                 console.warn(`Failed to decrypt payout handle for milestone ${m}:`, payErr);
               }
+            } else if (metadata && metadata.payout_amount) {
+              payoutValue = Number(metadata.payout_amount);
             }
             accumulatedBudget += payoutValue;
 
@@ -273,25 +289,17 @@ export async function fetchUserEscrows(
             milestoneKeys.push(decryptedKeyHex);
 
             let reqText = "";
-            if (useE2E) {
+            if (useE2E && metadata) {
               try {
-                const metadata = await getEscrowMetadata(
-                  metadataConfig.supabaseUrl!,
-                  metadataConfig.supabaseKey!,
-                  escrowAddress,
-                  m
-                );
-                if (metadata) {
-                  if (metadata.title) {
-                    contractTitle = metadata.title;
-                  }
-                  if (metadata.reqs_cid && decryptedKeyHex) {
-                    const reqsUrl = `https://gateway.pinata.cloud/ipfs/${metadata.reqs_cid}`;
-                    const resp = await fetch(reqsUrl);
-                    if (resp.ok) {
-                      const payload = await resp.json();
-                      reqText = await decryptText(payload.ciphertext, decryptedKeyHex, payload.iv);
-                    }
+                if (metadata.title) {
+                  contractTitle = metadata.title;
+                }
+                if (metadata.reqs_cid && decryptedKeyHex) {
+                  const reqsUrl = `https://gateway.pinata.cloud/ipfs/${metadata.reqs_cid}`;
+                  const resp = await fetch(reqsUrl);
+                  if (resp.ok) {
+                    const payload = await resp.json();
+                    reqText = await decryptText(payload.ciphertext, decryptedKeyHex, payload.iv);
                   }
                 }
               } catch (metaErr) {
@@ -309,14 +317,8 @@ export async function fetchUserEscrows(
                 const devKeyBigInt = decryptedDev.value as bigint;
                 devKeyHex = devKeyBigInt.toString(16).padStart(64, "0");
 
-                if (useE2E) {
-                  const metadata = await getEscrowMetadata(
-                    metadataConfig.supabaseUrl!,
-                    metadataConfig.supabaseKey!,
-                    escrowAddress,
-                    m
-                  );
-                  if (metadata && metadata.devs_cid && devKeyHex) {
+                if (useE2E && metadata) {
+                  if (metadata.devs_cid && devKeyHex) {
                     const devsUrl = `https://gateway.pinata.cloud/ipfs/${metadata.devs_cid}`;
                     const resp = await fetch(devsUrl);
                     if (resp.ok) {
@@ -486,7 +488,8 @@ export async function initializeEscrowMilestones(
         reqs_cid: cid,
         title: title || "Confidential Escrow Agreement",
         client_statement: "None provided.",
-        freelancer_statement: "None provided."
+        freelancer_statement: "None provided.",
+        payout_amount: payouts[i]
       });
     } else {
       // Fallback Mode: stringToBytes32Hash directly (limited to 32 bytes on-chain)

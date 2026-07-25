@@ -13,6 +13,8 @@ interface TEECourtroomProps {
   freelancerAddress: string;
   disputeReason: string;
   onResolve: (ruling: 'CLIENT' | 'FREELANCER') => void;
+  simulationMode?: boolean;
+  disputeRecord?: any;
 }
 
 export function TEECourtroom({
@@ -20,7 +22,9 @@ export function TEECourtroom({
   clientAddress,
   freelancerAddress,
   disputeReason,
-  onResolve
+  onResolve,
+  simulationMode = false,
+  disputeRecord = null
 }: TEECourtroomProps) {
   void clientAddress;
   void freelancerAddress;
@@ -63,6 +67,56 @@ export function TEECourtroom({
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [teeLogs]);
+
+  // Telemetry sync from real-time database dispute record
+  useEffect(() => {
+    if (disputeRecord) {
+      const time = disputeRecord.created_at 
+        ? new Date(disputeRecord.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      
+      setMessages(prev => {
+        // Prevent duplicate appends
+        if (prev.some(m => m.text.includes("Gemini Verdict Resolved"))) return prev;
+        return [
+          ...prev,
+          {
+            sender: 'TEE_SYSTEM',
+            text: `🔬 Gemini Verdict Resolved inside Secure Enclave. Verdict: ${disputeRecord.verdict} (Score: ${disputeRecord.score}/100)`,
+            timestamp: time
+          },
+          {
+            sender: 'TEE_SYSTEM',
+            text: `💬 Reasoning: "${disputeRecord.reasoning}"`,
+            timestamp: time
+          },
+          {
+            sender: 'TEE_SYSTEM',
+            text: `⚖️ Transaction broadcasted to NoxEscrow contract on-chain. State finalized.`,
+            timestamp: time
+          }
+        ];
+      });
+
+      setTeeLogs(prev => {
+        if (prev.some(l => l.includes("DECISION BROADCASTED"))) return prev;
+        return [
+          ...prev,
+          `[${time}] Gemini LLM output parsed. Verdict: ${disputeRecord.verdict}`,
+          `[${time}] DECISION BROADCASTED ON-CHAIN successfully.`
+        ];
+      });
+
+      if (disputeRecord.verdict === 'PAY_FREELANCER') {
+        setFreelancerClaimPercent(disputeRecord.score);
+        setClientClaimPercent(100 - disputeRecord.score);
+      } else {
+        setClientClaimPercent(disputeRecord.score);
+        setFreelancerClaimPercent(100 - disputeRecord.score);
+      }
+      setConfidence(98);
+    }
+  }, [disputeRecord]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -237,20 +291,42 @@ export function TEECourtroom({
           </div>
 
           {/* Quick Resolution button triggers */}
-          <div className="grid grid-cols-2 gap-3 mt-2">
-            <button 
-              onClick={() => onResolve('CLIENT')}
-              className="py-2.5 border border-rose-500/20 bg-rose-950/20 text-rose-400 rounded-lg font-mono text-[10px] uppercase font-bold hover:bg-rose-900/30 transition-smooth cursor-pointer active:scale-95"
-            >
-              Refund Client
-            </button>
-            <button 
-              onClick={() => onResolve('FREELANCER')}
-              className="py-2.5 border border-emerald-500/20 bg-emerald-950/20 text-emerald-400 rounded-lg font-mono text-[10px] uppercase font-bold hover:bg-emerald-900/30 transition-smooth cursor-pointer active:scale-95"
-            >
-              Pay Freelancer
-            </button>
-          </div>
+          {simulationMode ? (
+            <div className="border border-yellow-500/20 bg-yellow-500/5 p-3 rounded-xl mt-2 flex flex-col gap-2">
+              <span className="font-mono text-[9px] text-yellow-400 font-bold uppercase tracking-wider block text-center">
+                ⚠️ Developer Simulation Override
+              </span>
+              <div className="grid grid-cols-2 gap-3">
+                <button 
+                  onClick={() => onResolve('CLIENT')}
+                  className="py-2.5 border border-rose-500/20 bg-rose-950/20 text-rose-400 rounded-lg font-mono text-[10px] uppercase font-bold hover:bg-rose-900/30 transition-smooth cursor-pointer active:scale-95"
+                >
+                  Refund Client
+                </button>
+                <button 
+                  onClick={() => onResolve('FREELANCER')}
+                  className="py-2.5 border border-emerald-500/20 bg-emerald-950/20 text-emerald-400 rounded-lg font-mono text-[10px] uppercase font-bold hover:bg-emerald-900/30 transition-smooth cursor-pointer active:scale-95"
+                >
+                  Pay Freelancer
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 rounded-xl bg-[#131d35] border border-cyan-500/20 flex flex-col gap-2.5 mt-2 animate-pulse">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
+                </span>
+                <span className="font-mono text-[10px] text-cyan-400 font-bold uppercase tracking-widest">
+                  Awaiting Autonomous TEE Settlement...
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 font-sans leading-relaxed">
+                The off-chain iExec TDX Enclave is evaluating the encrypted deliverables against the specifications. Settlement will be broadcasted on-chain autonomously.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Monospaced Enclave Sandbox analysis */}

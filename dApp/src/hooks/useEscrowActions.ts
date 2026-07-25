@@ -13,7 +13,8 @@ import {
 } from '../services/escrowService';
 import { 
   updateEscrowStatement, 
-  savePendingSync
+  savePendingSync,
+  processPendingSyncs
 } from '../services/metadataService';
 import type { StepItem } from '../components/TransactionStepper';
 
@@ -67,6 +68,14 @@ export function useEscrowActions({
     setErrorMessage(null);
 
     try {
+      if (supabaseUrl && supabaseKey) {
+        try {
+          await processPendingSyncs(supabaseUrl, supabaseKey);
+        } catch (syncErr) {
+          console.warn("Background sync process failed:", syncErr);
+        }
+      }
+
       const signer = await getWeb3Signer();
       const escrows = await fetchUserEscrows(
         signer,
@@ -341,6 +350,51 @@ export function useEscrowActions({
     }
   }, [selectedContract, getWeb3Signer, loadOnChainContracts, addToast, setErrorMessage, setSuccessMessage]);
 
+  const handleInitializeDeployedEscrow = useCallback(async (
+    escrowAddress: string,
+    payouts: number[],
+    requirements: string[],
+    title: string,
+    files: File[]
+  ) => {
+    if (!walletAddress) return;
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsLoading(true);
+
+    try {
+      const signer = await getWeb3Signer();
+      
+      // Approve operator just in case (Step 2)
+      await approveEscrowOperator(signer, cUSDCAddress, escrowAddress);
+
+      // Initialize escrow milestones (Step 3)
+      await initializeEscrowMilestones(
+        signer,
+        escrowAddress,
+        payouts,
+        requirements,
+        gatewayUrl,
+        {
+          pinataJWT,
+          supabaseUrl,
+          supabaseKey
+        },
+        files,
+        title
+      );
+
+      addToast("✔️ Escrow vault funded and initialized successfully!", "success");
+      await loadOnChainContracts();
+    } catch (err: any) {
+      const errMsg = err.message || 'Failed to initialize escrow.';
+      setErrorMessage(errMsg);
+      addToast(`❌ Initialization failed: ${errMsg.slice(0, 100)}`, "error");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [walletAddress, cUSDCAddress, gatewayUrl, pinataJWT, supabaseUrl, supabaseKey, getWeb3Signer, addToast, setErrorMessage, loadOnChainContracts]);
+
   return {
     contractsList,
     setContractsList,
@@ -364,10 +418,11 @@ export function useEscrowActions({
     stepperTitle,
     stepperSteps,
     stepperSubtext,
-
+    
     // Methods
     loadOnChainContracts,
     handleDeployEscrow,
+    handleInitializeDeployedEscrow,
     handleSubmitDeliverable,
     handleReleaseMilestone,
     handleRaiseDispute,

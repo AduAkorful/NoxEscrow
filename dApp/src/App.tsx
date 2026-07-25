@@ -136,6 +136,7 @@ function App() {
     // Methods
     loadOnChainContracts,
     handleDeployEscrow,
+    handleInitializeDeployedEscrow,
     handleSubmitDeliverable,
     handleReleaseMilestone,
     handleRaiseDispute,
@@ -538,6 +539,7 @@ function App() {
                 handleSubmitDeliverable={withKeyRequirement(handleSubmitDeliverable)}
                 handleReleaseMilestone={withKeyRequirement(handleReleaseMilestone)}
                 handleMutualCancel={withKeyRequirement(handleMutualCancel)}
+                handleInitializeDeployedEscrow={withKeyRequirement(handleInitializeDeployedEscrow)}
                 deliverableFiles={deliverableFiles}
                 setDeliverableFiles={setDraftFiles => setDeliverableFiles(setDraftFiles)}
                 vaultKey={vaultKey}
