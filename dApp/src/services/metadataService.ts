@@ -131,7 +131,7 @@ export async function getEscrowMetadata(
       return data[0];
     }
     return null;
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -172,7 +172,7 @@ export async function getEscrowDisputeRecord(
       return data[0];
     }
     return null;
-  } catch (err) {
+  } catch {
     return null;
   }
 }

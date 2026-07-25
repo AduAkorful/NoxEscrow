@@ -315,7 +315,7 @@ function App() {
       if (!vaultKey) {
         try {
           await triggerKeyDerivation();
-        } catch (e) {
+        } catch {
           return;
         }
       }

@@ -54,7 +54,7 @@ export function DraftWizard({
   const [registeredFreelancers, setRegisteredFreelancers] = useState<any[]>(() => {
     const saved = localStorage.getItem('nox_freelancer_directory');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try { return JSON.parse(saved); } catch {}
     }
     return [
       { walletAddress: "0x74B4134C8d527a8D8AE8cb9503ab2043bCfC0ffd", name: "Alex Vance", title: "Lead Systems Architect", tier: "Gold TEE Certified", feeDiscountBps: 30 },

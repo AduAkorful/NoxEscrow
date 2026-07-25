@@ -393,7 +393,7 @@ export function useEscrowActions({
     } finally {
       setIsLoading(false);
     }
-  }, [walletAddress, cUSDCAddress, gatewayUrl, pinataJWT, supabaseUrl, supabaseKey, getWeb3Signer, addToast, setErrorMessage, loadOnChainContracts]);
+  }, [walletAddress, cUSDCAddress, gatewayUrl, pinataJWT, supabaseUrl, supabaseKey, getWeb3Signer, addToast, setErrorMessage, setSuccessMessage, loadOnChainContracts]);
 
   return {
     contractsList,

@@ -137,12 +137,12 @@ export function EventLog({ signer, factoryAddress, contractsList }: EventLogProp
       if (factoryContract) {
         try {
           factoryContract.removeAllListeners();
-        } catch (e) {}
+        } catch {}
       }
       activeContracts.forEach(c => {
         try {
           c.removeAllListeners();
-        } catch (e) {}
+        } catch {}
       });
     };
   }, [signer, contractsList, factoryAddress]);

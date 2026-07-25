@@ -2,7 +2,7 @@ import { X, Lock, AlertTriangle, ShieldCheck, Terminal, Unlock, Paperclip, Trash
 import { type EscrowContract, decryptMilestoneChatKey } from '../services/escrowService';
 import { NoxEscrowContractABI } from '../contracts/NoxEscrowContract';
 import { fetchAndDecryptFile, encryptText, decryptText } from '../crypto/fileUploader';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { TEECourtroom } from './TEECourtroom';
 import { supabase } from '../services/supabaseClient';
 import { getEscrowDisputeRecord, type EscrowDisputeRecord } from '../services/metadataService';
@@ -300,7 +300,7 @@ export function EscrowWorkspace({
   }, [selectedContract.address, chatKey]);
 
   // Load reviews
-  const loadReviews = async () => {
+  const loadReviews = useCallback(async () => {
     if (!selectedContract.address || !chatKey || !walletAddress) return;
     const escrowAddrClean = selectedContract.address.toLowerCase();
     const milestoneIndex = selectedMilestoneIndex;
@@ -352,14 +352,14 @@ export function EscrowWorkspace({
     } catch (err) {
       console.error("Error in loadReviews:", err);
     }
-  };
+  }, [selectedContract.address, chatKey, walletAddress, selectedMilestoneIndex]);
 
   // Double-Blind Review Auto-Polling
   useEffect(() => {
     loadReviews();
     const reviewInterval = setInterval(loadReviews, 4000);
     return () => clearInterval(reviewInterval);
-  }, [selectedContract.address, selectedMilestoneIndex, walletAddress, chatKey]);
+  }, [loadReviews]);
 
   // Optimistic Chat Send Handler
   const handleSendMessage = async () => {
@@ -527,7 +527,7 @@ export function EscrowWorkspace({
         reqAttachedFiles = parsed.files || [];
       }
     }
-  } catch (e) {
+  } catch {
     // legacy fallback
   }
 
@@ -543,7 +543,7 @@ export function EscrowWorkspace({
         deliverableAttachedFiles = parsed.files || [];
       }
     }
-  } catch (e) {
+  } catch {
     // legacy fallback
   }
 
