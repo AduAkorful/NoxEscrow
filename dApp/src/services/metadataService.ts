@@ -134,6 +134,51 @@ export async function getEscrowMetadata(
   return response.json();
 }
 
+export interface EscrowDisputeRecord {
+  escrow_address: string;
+  milestone_index: number;
+  verdict: 'PAY_FREELANCER' | 'REFUND_CLIENT';
+  score: number;
+  reasoning: string;
+  model_name?: string;
+  created_at?: string;
+}
+
+/**
+ * Retrieves live Gemini AI evaluation records for a disputed escrow milestone.
+ */
+export async function getEscrowDisputeRecord(
+  supabaseUrl: string,
+  supabaseKey: string,
+  escrowAddress: string,
+  milestoneIndex: number
+): Promise<EscrowDisputeRecord | null> {
+  try {
+    const url = `${supabaseUrl}/rest/v1/escrow_disputes?escrow_address=eq.${escrowAddress.toLowerCase()}&milestone_index=eq.${milestoneIndex}`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Accept": "application/vnd.pgrst.object+json"
+      }
+    });
+
+    if (response.status === 406 || response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return response.json();
+  } catch (err) {
+    console.warn("Failed to fetch dispute record:", err);
+    return null;
+  }
+}
+
 export interface PendingSync {
   id: string;
   type: "INSERT" | "UPDATE" | "STATEMENT";

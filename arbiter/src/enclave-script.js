@@ -400,6 +400,38 @@ ${freelancerStatement}
 
   const ruleInFavorOfFreelancer = (adjudicationVerdict === "PAY_FREELANCER");
 
+  // 5.5 Persist live Gemini dispute evaluation record to Supabase
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (supabaseUrl && supabaseKey) {
+    console.log("💾 Persisting live Gemini evaluation record to Supabase...");
+    try {
+      await axios.post(
+        `${supabaseUrl}/rest/v1/escrow_disputes`,
+        {
+          escrow_address: escrowAddress.toLowerCase(),
+          milestone_index: parseInt(milestoneIndex, 10),
+          verdict: adjudicationVerdict,
+          score: evaluationScore,
+          reasoning: adjudicationReasoning,
+          model_name: "gemini-2.5-flash"
+        },
+        {
+          headers: {
+            "apikey": supabaseKey,
+            "Authorization": `Bearer ${supabaseKey}`,
+            "Content-Type": "application/json",
+            "Prefer": "resolution=merge-duplicates"
+          }
+        }
+      );
+      console.log("✔️ Live Gemini evaluation record persisted to Supabase!");
+    } catch (sbErr) {
+      console.error("⚠️ Warning: Failed to persist dispute record to Supabase:", sbErr.message);
+    }
+  }
+
   // 6. Broadcast Settlement Transaction
   if (useLiveSigner) {
     console.log(`🚀 Broadcasting resolveDispute(${ruleInFavorOfFreelancer}) to blockchain...`);

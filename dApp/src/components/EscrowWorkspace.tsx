@@ -4,6 +4,7 @@ import { fetchAndDecryptFile, encryptText, decryptText } from '../crypto/fileUpl
 import { useState, useEffect, useRef } from 'react';
 import { TEECourtroom } from './TEECourtroom';
 import { supabase } from '../services/supabaseClient';
+import { getEscrowDisputeRecord, type EscrowDisputeRecord } from '../services/metadataService';
 import { ethers } from 'ethers';
 
 interface EscrowWorkspaceProps {
@@ -75,6 +76,29 @@ export function EscrowWorkspace({
   const [hasSubmittedReview, setHasSubmittedReview] = useState(false);
   const [bothReviewsSubmitted, setBothReviewsSubmitted] = useState(false);
   const [decryptedReviews, setDecryptedReviews] = useState<{ reviewer: string; rating: number; text: string }[]>([]);
+  const [disputeRecord, setDisputeRecord] = useState<EscrowDisputeRecord | null>(null);
+
+  // Fetch live Gemini TEE dispute evaluation record from Supabase
+  useEffect(() => {
+    if (!selectedContract.address) return;
+    const fetchDispute = async () => {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_KEY;
+      if (supabaseUrl && supabaseKey) {
+        const rec = await getEscrowDisputeRecord(
+          supabaseUrl,
+          supabaseKey,
+          selectedContract.address,
+          selectedContract.milestonesCompleted
+        );
+        if (rec) setDisputeRecord(rec);
+      }
+    };
+
+    fetchDispute();
+    const interval = setInterval(fetchDispute, 5000);
+    return () => clearInterval(interval);
+  }, [selectedContract.address, selectedContract.milestonesCompleted, selectedContract.status]);
 
   // Lazy chat key: derived on-demand from on-chain handle (single wallet prompt)
   const [chatKey, setChatKey] = useState<string | null>(null);
@@ -1094,11 +1118,13 @@ export function EscrowWorkspace({
           {/* Status Metrics */}
           <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-white/[0.01] border border-white/5">
             <span className="text-[8px] font-mono text-slate-500 uppercase font-bold tracking-wider">Arbitration Model</span>
-            <span className="text-[11px] font-mono text-slate-200">Llama-3-70B-Arbitrator</span>
+            <span className="text-[11px] font-mono text-slate-200">{disputeRecord?.model_name || "gemini-2.5-flash"}</span>
           </div>
           <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-white/[0.01] border border-white/5">
             <span className="text-[8px] font-mono text-slate-500 uppercase font-bold tracking-wider">Consensus Confidence</span>
-            <span className="text-[11px] font-mono text-slate-200">98.4% Rating Consensus</span>
+            <span className="text-[11px] font-mono text-slate-200">
+              {disputeRecord ? `${disputeRecord.score}% Rating Consensus` : selectedContract.status === 'DISPUTED' ? 'Evaluating...' : '98.4% Rating Consensus'}
+            </span>
           </div>
           <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-white/[0.01] border border-white/5">
             <span className="text-[8px] font-mono text-slate-500 uppercase font-bold tracking-wider">Attestation Status</span>
@@ -1114,17 +1140,22 @@ export function EscrowWorkspace({
 
         {/* Live Terminal Log */}
         <div className="bg-[#020308] border border-white/5 p-4 rounded-xl font-mono text-[10px] text-slate-400 space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar">
-          {selectedContract.status === 'DISPUTED' ? (
+          {disputeRecord ? (
             <>
-              <div className="text-yellow-500 font-bold">[14:32:01] ⚠️ NOX_DISPUTE_EVENT DETECTED: ARBITRATION TRIGGERED</div>
-              <div>[14:32:02] INITIALIZING AMD SEV-SNP ISOLATED SANDBOX CONTAINER...</div>
-              <div>[14:32:03] DECRYPTING PROJECT SPECIFICATIONS VIA NOX KMS DECR-HANDLE... SUCCESS</div>
-              <div>[14:32:05] DECRYPTING FREELANCER DELIVERABLES AND FILE METADATA... SUCCESS</div>
-              <div>[14:32:07] PARSING MULTIPLE SYSTEM PERSONAS: [1/3] TECHNICAL ANALYST, [2/3] CODE REVIEWER, [3/3] PROTOCOL JUDGE</div>
-              <div>[14:32:10] RUNNING PROGRAMMATIC UNIT-TEST SCREENER AND STATIC AST CODE ANALYZER...</div>
-              <div className="text-emerald-400">[14:32:12] COMPILATION: SUCCESS. 16/16 TEST CRITERIA MET. ZERO PARSING DISCREPANCIES.</div>
-              <div>[14:32:15] COMPUTING AGENTIC CONSENSUS MATRIX FOR FINAL RESOLUTION...</div>
-              <div className="text-[#00F2FE] font-bold">[14:32:18] TEE CONSENSUS (98.4% CONFIDENCE): RELEASE FULL BALANCE TO FREELANCER (VERIFIED DELIVERABLES MATCH SPECIFICATIONS).</div>
+              <div className="text-yellow-500 font-bold">[TEE_ARBITER] ⚠️ DISPUTE RESOLUTION BROADCASTED ON-CHAIN</div>
+              <div>[MODEL] Active Arbitration Engine: {disputeRecord.model_name || 'gemini-2.5-flash'}</div>
+              <div>[VERDICT] Ruling: <span className={disputeRecord.verdict === 'PAY_FREELANCER' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{disputeRecord.verdict}</span> (Score: {disputeRecord.score}/100)</div>
+              <div className="text-slate-200 font-sans leading-relaxed text-[11px] bg-white/[0.02] p-2.5 rounded-lg border border-white/5 mt-1">
+                💬 <strong>Gemini Reasoning:</strong> "{disputeRecord.reasoning}"
+              </div>
+            </>
+          ) : selectedContract.status === 'DISPUTED' ? (
+            <>
+              <div className="text-yellow-500 font-bold">[LIVE] ⚠️ ON-CHAIN DISPUTE DETECTED: FORWARDING TO TEE RENDER ARBITER...</div>
+              <div>[LISTEN] Deployed Arbiter listening for DisputeOpened logs...</div>
+              <div>[DECRYPT] KMS Handles decrypting requirements & deliverable hashes...</div>
+              <div>[PROMPT] Google Gemini 2.5 Flash evaluating spec match score...</div>
+              <div className="text-[#00F2FE] font-bold animate-pulse">[PROCESSING] Awaiting Gemini 2.5 Flash adjudication response...</div>
             </>
           ) : (
             <>
