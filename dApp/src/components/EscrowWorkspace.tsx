@@ -874,7 +874,7 @@ export function EscrowWorkspace({
 
                       <button
                         onClick={handleSubmitDeliverable}
-                        disabled={isLoading || (!walletAddress || walletAddress.toLowerCase() !== (selectedContract.role === 'FREELANCER' ? walletAddress.toLowerCase() : selectedContract.counterparty.toLowerCase())) || (!deliverableInput && deliverableFiles.length === 0)}
+                        disabled={isLoading || (!deliverableInput.trim() && deliverableFiles.length === 0)}
                         className="w-full py-4.5 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth hover:shadow-[0_0_20px_rgba(0,242,254,0.45)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2.5 rounded-xl border border-transparent"
                       >
                         <Terminal className="w-4 h-4" />
