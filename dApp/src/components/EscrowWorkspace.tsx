@@ -800,6 +800,16 @@ export function EscrowWorkspace({
                   {viewMode === 'freelancer' ? (
                     /* Freelancer Action Console */
                     <div className="space-y-4">
+                      {(!walletAddress || walletAddress.toLowerCase() !== (selectedContract.role === 'FREELANCER' ? walletAddress.toLowerCase() : selectedContract.counterparty.toLowerCase())) && (
+                        <div className="p-3.5 bg-amber-950/20 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-xs font-mono text-amber-300">
+                          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                          <div className="leading-relaxed">
+                            <span className="font-bold uppercase block text-[10px] text-amber-400 mb-0.5">Wallet Role Mismatch</span>
+                            Your connected wallet is the <strong>Client</strong> for this contract. Switch your Web3 wallet (MetaMask/Rabby) to the assigned <strong>Freelancer wallet</strong> ({selectedContract.role === 'FREELANCER' ? walletAddress?.slice(0,6) : selectedContract.counterparty.slice(0,6)}...{selectedContract.role === 'FREELANCER' ? walletAddress?.slice(-4) : selectedContract.counterparty.slice(-4)}) to submit deliverables on-chain.
+                          </div>
+                        </div>
+                      )}
+
                       <label className="block text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">Submit Code Deliverable / Git diff</label>
                       <textarea 
                         rows={3}
@@ -864,7 +874,7 @@ export function EscrowWorkspace({
 
                       <button
                         onClick={handleSubmitDeliverable}
-                        disabled={isLoading || (!deliverableInput && deliverableFiles.length === 0)}
+                        disabled={isLoading || (!walletAddress || walletAddress.toLowerCase() !== (selectedContract.role === 'FREELANCER' ? walletAddress.toLowerCase() : selectedContract.counterparty.toLowerCase())) || (!deliverableInput && deliverableFiles.length === 0)}
                         className="w-full py-4.5 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth hover:shadow-[0_0_20px_rgba(0,242,254,0.45)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2.5 rounded-xl border border-transparent"
                       >
                         <Terminal className="w-4 h-4" />
