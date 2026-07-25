@@ -161,13 +161,22 @@ export async function decryptMilestoneChatKey(
   milestoneIndex: number = 0,
   gatewayUrl: string = DEFAULT_NOX_GATEWAY
 ): Promise<string> {
+  const cacheKey = `nox_chat_key_${escrowAddress.toLowerCase()}`;
+  const existing = localStorage.getItem(cacheKey);
+  if (existing) {
+    return existing;
+  }
+
   const escrow = new ethers.Contract(escrowAddress, NoxEscrowContractABI, signer);
   const milestoneInfo = await escrow.milestones(milestoneIndex);
 
   const handleClient = await getOrCreateHandleClient(signer, gatewayUrl);
   const decryptedReq = await handleClient.decrypt(milestoneInfo.requirementsHash);
   const decryptedKeyBigInt = decryptedReq.value as bigint;
-  return decryptedKeyBigInt.toString(16).padStart(64, "0");
+  const derivedKeyHex = decryptedKeyBigInt.toString(16).padStart(64, "0");
+  
+  localStorage.setItem(cacheKey, derivedKeyHex);
+  return derivedKeyHex;
 }
 
 /**

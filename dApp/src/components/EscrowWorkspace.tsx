@@ -118,7 +118,7 @@ export function EscrowWorkspace({
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Chat Subscribe & Load
+  // Chat Subscribe, Load & High-Frequency Sync
   useEffect(() => {
     if (!selectedContract.address || !chatKey) return;
     const escrowAddrClean = selectedContract.address.toLowerCase();
@@ -156,7 +156,14 @@ export function EscrowWorkspace({
               };
             }
           }));
-          setMessages(decrypted);
+
+          setMessages(prev => {
+            // Retain any pending optimistic temporary messages
+            const pendingTemps = prev.filter(m => m.id.startsWith('temp-'));
+            const fetchedIds = new Set(decrypted.map(d => d.id));
+            const uniqueTemps = pendingTemps.filter(t => !fetchedIds.has(t.id));
+            return [...decrypted, ...uniqueTemps];
+          });
         }
       } catch (err) {
         console.error("Failed to load/decrypt messages:", err);
@@ -165,7 +172,7 @@ export function EscrowWorkspace({
 
     loadMessages();
 
-    // Subscribe to realtime inserts
+    // 1. Subscribe to realtime inserts
     const channel = supabase
       .channel(`chat:${escrowAddrClean}`)
       .on(
@@ -182,7 +189,8 @@ export function EscrowWorkspace({
             const plain = await decryptText(newMsg.ciphertext, chatKey, newMsg.iv);
             setMessages(prev => {
               if (prev.some(m => m.id === newMsg.id)) return prev;
-              return [...prev, {
+              const cleanPrev = prev.filter(m => !m.id.startsWith('temp-'));
+              return [...cleanPrev, {
                 id: newMsg.id,
                 sender: newMsg.sender_address,
                 text: plain,
@@ -196,8 +204,12 @@ export function EscrowWorkspace({
       )
       .subscribe();
 
+    // 2. High-frequency 3-second background polling loop for instant cross-party sync
+    const pollInterval = setInterval(loadMessages, 3000);
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(pollInterval);
     };
   }, [selectedContract.address, chatKey]);
 
@@ -256,28 +268,56 @@ export function EscrowWorkspace({
     }
   };
 
+  // Double-Blind Review Auto-Polling
   useEffect(() => {
     loadReviews();
+    const reviewInterval = setInterval(loadReviews, 4000);
+    return () => clearInterval(reviewInterval);
   }, [selectedContract.address, selectedContract.milestonesCompleted, walletAddress, chatKey]);
 
+  // Optimistic Chat Send Handler
   const handleSendMessage = async () => {
     if (!chatKey || !walletAddress || !newMessage.trim()) return;
     setIsSendingMessage(true);
+    const textToSend = newMessage.trim();
+    setNewMessage(""); // Clear input field instantly
+
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const optimisticMsg = {
+      id: tempId,
+      sender: walletAddress.toLowerCase(),
+      text: textToSend,
+      time: timeStr
+    };
+
+    // 1. Immediately render sent message in local chat box (0ms latency for sender)
+    setMessages(prev => [...prev, optimisticMsg]);
+
     try {
-      const encrypted = await encryptText(newMessage, chatKey);
-      const { error } = await supabase
+      const encrypted = await encryptText(textToSend, chatKey);
+      const { data, error } = await supabase
         .from('escrow_messages')
         .insert({
           escrow_address: selectedContract.address.toLowerCase(),
           sender_address: walletAddress.toLowerCase(),
           ciphertext: encrypted.ciphertext,
           iv: encrypted.iv
-        });
+        })
+        .select();
+
       if (error) throw error;
-      setNewMessage("");
+
+      if (data && data[0]) {
+        const realId = data[0].id;
+        setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: realId } : m));
+      }
     } catch (err) {
       console.error("Failed to send encrypted message:", err);
       alert("Error sending E2E encrypted message. Please try again.");
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      setNewMessage(textToSend);
     } finally {
       setIsSendingMessage(false);
     }
