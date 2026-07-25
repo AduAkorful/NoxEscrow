@@ -539,7 +539,7 @@ export async function submitMilestoneDeliverable(
 ) {
   const escrow = new ethers.Contract(escrowAddress, NoxEscrowContractABI, signer);
 
-  const useE2E = metadataConfig && metadataConfig.pinataJWT && metadataConfig.supabaseUrl && metadataConfig.supabaseKey;
+  const useE2E = metadataConfig && metadataConfig.supabaseUrl && metadataConfig.supabaseKey;
   let devEnc;
   let cacheCid = "";
 
@@ -555,10 +555,14 @@ export async function submitMilestoneDeliverable(
 
     // Encrypt attached files
     const fileCids: { name: string; type: string; cid: string }[] = [];
-    if (attachedFiles && attachedFiles.length > 0) {
+    if (attachedFiles && attachedFiles.length > 0 && metadataConfig.pinataJWT) {
       for (const file of attachedFiles) {
-        const encResult = await encryptAndUploadFile(file, randomHexKey, metadataConfig.pinataJWT!);
-        fileCids.push(encResult);
+        try {
+          const encResult = await encryptAndUploadFile(file, randomHexKey, metadataConfig.pinataJWT);
+          fileCids.push(encResult);
+        } catch (fErr) {
+          console.warn("Pinata file upload failed:", fErr);
+        }
       }
     }
 
@@ -569,8 +573,17 @@ export async function submitMilestoneDeliverable(
     };
     const encryptedPayload = await encryptText(JSON.stringify(devObj), randomHexKey);
 
-    // Upload payload to IPFS
-    cacheCid = await uploadToPinata(encryptedPayload, metadataConfig.pinataJWT!);
+    // Upload payload to Pinata IPFS if available, else store directly as inline data URI
+    if (metadataConfig.pinataJWT) {
+      try {
+        cacheCid = await uploadToPinata(encryptedPayload, metadataConfig.pinataJWT);
+      } catch (pErr) {
+        console.warn("Pinata upload failed, falling back to data URI:", pErr);
+        cacheCid = "data:application/json;base64," + btoa(JSON.stringify(encryptedPayload));
+      }
+    } else {
+      cacheCid = "data:application/json;base64," + btoa(JSON.stringify(encryptedPayload));
+    }
   } else {
     // Fallback Mode: stringToBytes32Hash directly (limited to 32 bytes on-chain)
     const devHash = stringToBytes32Hash(deliverableText);

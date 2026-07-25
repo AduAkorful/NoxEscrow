@@ -51,15 +51,18 @@ export async function updateEscrowDeliverable(
   milestoneIndex: number,
   devsCid: string
 ): Promise<void> {
-  const url = `${supabaseUrl}/rest/v1/escrow_metadata?escrow_address=eq.${escrowAddress.toLowerCase()}&milestone_index=eq.${milestoneIndex}`;
+  const url = `${supabaseUrl}/rest/v1/escrow_metadata`;
   const response = await fetch(url, {
-    method: "PATCH",
+    method: "POST",
     headers: {
       "apikey": supabaseKey,
       "Authorization": `Bearer ${supabaseKey}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "Prefer": "resolution=merge-duplicates"
     },
     body: JSON.stringify({
+      escrow_address: escrowAddress.toLowerCase(),
+      milestone_index: milestoneIndex,
       devs_cid: devsCid
     })
   });
@@ -78,14 +81,12 @@ export async function updateEscrowStatement(
   supabaseKey: string,
   escrowAddress: string,
   milestoneIndex: number,
-  role: "client" | "freelancer",
-  statement: string
+  statement: string,
+  role: 'CLIENT' | 'FREELANCER'
 ): Promise<void> {
   const url = `${supabaseUrl}/rest/v1/escrow_metadata?escrow_address=eq.${escrowAddress.toLowerCase()}&milestone_index=eq.${milestoneIndex}`;
-  const payload = role === "client" 
-    ? { client_statement: statement }
-    : { freelancer_statement: statement };
-
+  const payload = role === 'CLIENT' ? { client_statement: statement } : { freelancer_statement: statement };
+  
   const response = await fetch(url, {
     method: "PATCH",
     headers: {
@@ -111,27 +112,26 @@ export async function getEscrowMetadata(
   escrowAddress: string,
   milestoneIndex: number
 ): Promise<EscrowMetadata | null> {
-  const url = `${supabaseUrl}/rest/v1/escrow_metadata?escrow_address=eq.${escrowAddress.toLowerCase()}&milestone_index=eq.${milestoneIndex}`;
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "apikey": supabaseKey,
-      "Authorization": `Bearer ${supabaseKey}`,
-      "Accept": "application/vnd.pgrst.object+json" // Return as single object instead of array
-    }
-  });
+  try {
+    const url = `${supabaseUrl}/rest/v1/escrow_metadata?escrow_address=eq.${escrowAddress.toLowerCase()}&milestone_index=eq.${milestoneIndex}&limit=1`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`
+      }
+    });
 
-  if (response.status === 406 || response.status === 404) {
-    // 406 Not Acceptable is returned by postgrest if no rows match the single object header
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0];
+    }
+    return null;
+  } catch (err) {
     return null;
   }
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to fetch metadata from Supabase: ${response.statusText} - ${errorText}`);
-  }
-
-  return response.json();
 }
 
 export interface EscrowDisputeRecord {
@@ -154,27 +154,23 @@ export async function getEscrowDisputeRecord(
   milestoneIndex: number
 ): Promise<EscrowDisputeRecord | null> {
   try {
-    const url = `${supabaseUrl}/rest/v1/escrow_disputes?escrow_address=eq.${escrowAddress.toLowerCase()}&milestone_index=eq.${milestoneIndex}`;
+    const url = `${supabaseUrl}/rest/v1/escrow_disputes?escrow_address=eq.${escrowAddress.toLowerCase()}&milestone_index=eq.${milestoneIndex}&limit=1`;
     const response = await fetch(url, {
       method: "GET",
       headers: {
         "apikey": supabaseKey,
-        "Authorization": `Bearer ${supabaseKey}`,
-        "Accept": "application/vnd.pgrst.object+json"
+        "Authorization": `Bearer ${supabaseKey}`
       }
     });
 
-    if (response.status === 406 || response.status === 404) {
-      return null;
-    }
+    if (!response.ok) return null;
 
-    if (!response.ok) {
-      return null;
+    const data = await response.json();
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0];
     }
-
-    return response.json();
+    return null;
   } catch (err) {
-    console.warn("Failed to fetch dispute record:", err);
     return null;
   }
 }

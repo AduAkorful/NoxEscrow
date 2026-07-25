@@ -228,7 +228,6 @@ export function useEscrowActions({
         if (c.address.toLowerCase() === selectedContract.address.toLowerCase()) {
           return { 
             ...c, 
-            milestonesCompleted: Math.min(c.milestonesCompleted + 1, c.totalMilestones),
             activeMilestoneSubmitted: true
           };
         }
@@ -286,8 +285,8 @@ export function useEscrowActions({
             supabaseKey,
             selectedContract.address,
             selectedContract.milestonesCompleted,
-            role,
-            disputeStatement.trim()
+            disputeStatement.trim(),
+            selectedContract.role
           );
         } catch (dbErr) {
           console.warn("Failed to sync dispute statement to Supabase, caching locally:", dbErr);
