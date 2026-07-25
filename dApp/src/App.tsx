@@ -37,7 +37,7 @@ import { ProfilePage } from './pages/ProfilePage';
 
 function App() {
   // --- Privy Hooks ---
-  const { logout: privyLogout, login: loginPrivy, authenticated, user } = usePrivy();
+  const { logout: privyLogout, login: loginPrivy, authenticated, user, ready } = usePrivy();
   const { wallets } = useWallets();
   const activeWallet = wallets[0];
   const connectedAddress = activeWallet?.address || user?.wallet?.address || null;
@@ -208,15 +208,47 @@ function App() {
 
   const isLoading = isEscrowLoading || isAdminLoading;
 
-  // Sync Privy connection with application walletAddress state
+  // Sync Privy connection with application walletAddress state & vaultKey persistence across tabs
   useEffect(() => {
+    if (!ready) return; // Wait for Privy session to hydrate from localStorage
+
     if (authenticated && connectedAddress) {
       setWalletAddress(connectedAddress);
-    } else {
-      setWalletAddress(null);
-      setVaultKey(null);
+      localStorage.setItem('nox_connected_wallet', connectedAddress);
+
+      // Restore vault key from localStorage if previously derived for this wallet
+      const cachedKey = localStorage.getItem(`nox_vault_key_${connectedAddress.toLowerCase()}`);
+      if (cachedKey) {
+        setVaultKey(cachedKey);
+      }
+    } else if (ready && !authenticated) {
+      const win = window as any;
+      if (win.ethereum && win.ethereum.selectedAddress) {
+        const addr = win.ethereum.selectedAddress;
+        setWalletAddress(addr);
+        const cachedKey = localStorage.getItem(`nox_vault_key_${addr.toLowerCase()}`);
+        if (cachedKey) setVaultKey(cachedKey);
+      } else {
+        setWalletAddress(null);
+        setVaultKey(null);
+      }
     }
-  }, [authenticated, connectedAddress]);
+  }, [ready, authenticated, connectedAddress]);
+
+  // Cross-Tab Vault Key Sync Listener
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (walletAddress && e.key === `nox_vault_key_${walletAddress.toLowerCase()}`) {
+        if (e.newValue) {
+          setVaultKey(e.newValue);
+        } else {
+          setVaultKey(null);
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [walletAddress]);
 
   // Network Verification Check
   const checkNetwork = useCallback(async () => {
@@ -241,11 +273,11 @@ function App() {
   useEffect(() => {
     if (walletAddress) {
       checkNetwork();
-      loadOnChainContracts();
+      loadOnChainContracts(Boolean(vaultKey));
       checkAdminStatus();
       loadFactoryParams();
     }
-  }, [walletAddress, checkNetwork, loadOnChainContracts, checkAdminStatus, loadFactoryParams]);
+  }, [walletAddress, vaultKey, checkNetwork, loadOnChainContracts, checkAdminStatus, loadFactoryParams]);
 
   // Derived Key check
   const triggerKeyDerivation = useCallback(async (): Promise<string> => {
@@ -260,9 +292,10 @@ function App() {
       const signature = await s.signMessage(SIGN_MESSAGE);
       const key = await deriveEncryptionKey(signature);
       setVaultKey(key);
+      localStorage.setItem(`nox_vault_key_${walletAddress.toLowerCase()}`, key);
       setSuccessMessage("🔐 Cryptographic key successfully derived! Environment unlocked.");
       
-      loadOnChainContracts();
+      loadOnChainContracts(true);
       checkAdminStatus();
       loadFactoryParams();
       return key;
@@ -308,6 +341,10 @@ function App() {
     } catch (err) {
       console.warn("Disconnect error:", err);
     } finally {
+      if (walletAddress) {
+        localStorage.removeItem(`nox_vault_key_${walletAddress.toLowerCase()}`);
+      }
+      localStorage.removeItem('nox_connected_wallet');
       setWalletAddress(null);
       setVaultKey(null);
     }
@@ -422,6 +459,8 @@ function App() {
                 activeEscrows={activeEscrows} 
                 isFetchingContracts={isFetchingContracts} 
                 viewMode={viewMode}
+                vaultKey={vaultKey}
+                onDeriveKey={triggerKeyDerivation}
               />
             } />
             <Route path="/deploy" element={

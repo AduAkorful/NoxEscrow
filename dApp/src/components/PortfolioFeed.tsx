@@ -14,7 +14,8 @@ import {
   UserCheck,
   Briefcase,
   TrendingUp,
-  Percent
+  Percent,
+  Lock
 } from 'lucide-react';
 import { type EscrowContract } from '../services/escrowService';
 
@@ -23,13 +24,17 @@ interface PortfolioFeedProps {
   isFetchingContracts: boolean;
   viewMode: 'client' | 'freelancer';
   setSelectedContract: (escrow: EscrowContract) => void;
+  vaultKey?: string | null;
+  onDeriveKey?: () => void;
 }
 
 export function PortfolioFeed({
   activeEscrows,
   isFetchingContracts,
   viewMode,
-  setSelectedContract
+  setSelectedContract,
+  vaultKey,
+  onDeriveKey
 }: PortfolioFeedProps) {
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'COMPLETED' | 'DISPUTED'>('ALL');
   const [searchQuery, setSearchQuery] = useState("");
@@ -75,6 +80,31 @@ export function PortfolioFeed({
   return (
     <div className="flex flex-col gap-8 w-full max-w-6xl mx-auto">
       
+      {/* Key Locked Notice Banner */}
+      {!vaultKey && (
+        <div className="uniswap-card p-4 bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
+              <Lock className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-amber-300">Vault Key Locked</h4>
+              <p className="text-[11px] text-amber-200/80 mt-0.5">
+                Please click <span className="font-bold underline cursor-pointer text-amber-300" onClick={onDeriveKey}>"Unlock Vault Key"</span> in the top header menu to decrypt contract deliverables and execute zero-knowledge actions.
+              </p>
+            </div>
+          </div>
+          {onDeriveKey && (
+            <button 
+              onClick={onDeriveKey}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-[#0B0E17] font-bold text-xs shadow-md transition-all cursor-pointer whitespace-nowrap self-stretch sm:self-auto text-center"
+            >
+              Unlock Vault Key
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Dynamic Role-Based Stats Banner */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         

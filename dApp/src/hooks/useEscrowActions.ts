@@ -60,7 +60,7 @@ export function useEscrowActions({
   const [stepperSteps, setStepperSteps] = useState<StepItem[]>([]);
   const [stepperSubtext, setStepperSubtext] = useState("");
 
-  const loadOnChainContracts = useCallback(async () => {
+  const loadOnChainContracts = useCallback(async (allowInteractiveDecrypt: boolean = false) => {
     if (!walletAddress) return;
     
     setIsFetchingContracts(true);
@@ -77,7 +77,8 @@ export function useEscrowActions({
           pinataJWT,
           supabaseUrl,
           supabaseKey
-        }
+        },
+        allowInteractiveDecrypt
       );
       setContractsList(escrows);
     } catch (err: any) {

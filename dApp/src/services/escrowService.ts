@@ -163,7 +163,7 @@ export async function fetchUserEscrows(
 ): Promise<EscrowContract[]> {
   try {
     const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
-    const totalCount = await factory.getEscrowsCount();
+    const totalCount = await factory.escrowsCount();
     const total = Number(totalCount);
 
     const userEscrows: EscrowContract[] = [];
