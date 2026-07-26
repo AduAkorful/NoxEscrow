@@ -241,8 +241,7 @@ function App() {
       localStorage.setItem('nox_connected_wallet', connectedAddress);
 
       // Restore vault key from sessionStorage if previously derived for this wallet in current session
-      const cachedKey = sessionStorage.getItem(`nox_vault_key_${connectedAddress.toLowerCase()}`) ||
-                        localStorage.getItem(`nox_vault_key_${connectedAddress.toLowerCase()}`);
+      const cachedKey = sessionStorage.getItem(`nox_vault_key_${connectedAddress.toLowerCase()}`);
       if (cachedKey) {
         setVaultKey(cachedKey);
       } else {
@@ -253,8 +252,7 @@ function App() {
       if (win.ethereum && win.ethereum.selectedAddress) {
         const addr = win.ethereum.selectedAddress;
         setWalletAddress(addr);
-        const cachedKey = sessionStorage.getItem(`nox_vault_key_${addr.toLowerCase()}`) ||
-                          localStorage.getItem(`nox_vault_key_${addr.toLowerCase()}`);
+        const cachedKey = sessionStorage.getItem(`nox_vault_key_${addr.toLowerCase()}`);
         if (cachedKey) {
           setVaultKey(cachedKey);
         } else {
@@ -322,7 +320,7 @@ function App() {
       const s = await getWeb3Signer();
       setSigner(s);
       const signature = await s.signMessage(SIGN_MESSAGE);
-      const key = await deriveEncryptionKey(signature);
+      const key = await deriveEncryptionKey(signature, walletAddress);
       setVaultKey(key);
       sessionStorage.setItem(`nox_vault_key_${walletAddress.toLowerCase()}`, key);
       setSuccessMessage("🔐 Cryptographic key successfully derived! Environment unlocked.");

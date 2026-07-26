@@ -167,7 +167,7 @@ export async function decryptMilestoneChatKey(
   gatewayUrl: string = DEFAULT_NOX_GATEWAY
 ): Promise<string> {
   const cacheKey = `nox_chat_key_${escrowAddress.toLowerCase()}`;
-  const existing = localStorage.getItem(cacheKey);
+  const existing = sessionStorage.getItem(cacheKey);
   if (existing) {
     return existing;
   }
@@ -180,7 +180,7 @@ export async function decryptMilestoneChatKey(
   const decryptedKeyBigInt = decryptedReq.value as bigint;
   const derivedKeyHex = decryptedKeyBigInt.toString(16).padStart(64, "0");
   
-  localStorage.setItem(cacheKey, derivedKeyHex);
+  sessionStorage.setItem(cacheKey, derivedKeyHex);
   return derivedKeyHex;
 }
 
@@ -418,7 +418,7 @@ export async function approveEscrowOperator(
   signer: ethers.JsonRpcSigner,
   cUSDCAddress: string,
   escrowAddress: string,
-  expirySeconds: number = 3600
+  expirySeconds: number = 86400
 ) {
   const token = new ethers.Contract(cUSDCAddress, ERC7984ABI, signer);
   const expiry = BigInt(Math.floor(Date.now() / 1000) + expirySeconds);

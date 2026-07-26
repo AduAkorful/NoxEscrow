@@ -84,19 +84,41 @@ async function parseAndResolveJsonPayload(payloadText, decryptionHexKey) {
   }
 }
 
-// Helper to download JSON payload from IPFS with failover gateways
+// Helper to download JSON payload from IPFS with failover gateways & Data URI handling
 async function downloadFromIPFS(cid) {
+  if (!cid) {
+    throw new Error("Invalid CID parameter.");
+  }
+
+  // Handle inline Data URIs directly
+  if (cid.startsWith("data:")) {
+    try {
+      console.log("📥 Resolving inline Data URI payload...");
+      const base64Data = cid.split(",")[1];
+      const jsonStr = Buffer.from(base64Data, "base64").toString("utf8");
+      return JSON.parse(jsonStr);
+    } catch (dataUriErr) {
+      throw new Error(`Failed to parse inline Data URI payload: ${dataUriErr.message}`);
+    }
+  }
+
+  const pinataJwt = process.env.PINATA_JWT || process.env.VITE_PINATA_JWT;
   const gateways = [
     `https://gateway.pinata.cloud/ipfs/${cid}`,
     `https://cloudflare-ipfs.com/ipfs/${cid}`,
-    `https://ipfs.io/ipfs/${cid}`
+    `https://ipfs.io/ipfs/${cid}`,
+    `https://dweb.link/ipfs/${cid}`
   ];
 
   let lastError = null;
   for (const url of gateways) {
     try {
       console.log(`📥 Attempting download from IPFS: ${url}`);
-      const resp = await axios.get(url, { timeout: 10000 }); // 10 second timeout per gateway
+      const headers = {};
+      if (pinataJwt && url.includes("pinata.cloud")) {
+        headers["Authorization"] = `Bearer ${pinataJwt}`;
+      }
+      const resp = await axios.get(url, { headers, timeout: 12000 });
       if (resp.status === 200 && resp.data) {
         return resp.data;
       }

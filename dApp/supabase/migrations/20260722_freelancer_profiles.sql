@@ -33,9 +33,15 @@ ON public.freelancer_profiles
 FOR SELECT 
 USING (true);
 
--- Allow profile creation and updates
-CREATE POLICY "Allow insert and update of freelancer profiles" 
+-- Allow profile creation and updates for authenticated sessions or service role
+CREATE POLICY "Allow authenticated insert of freelancer profiles" 
 ON public.freelancer_profiles 
-FOR ALL 
-USING (true)
+FOR INSERT
+TO authenticated, service_role
 WITH CHECK (true);
+
+CREATE POLICY "Allow authenticated update of freelancer profiles" 
+ON public.freelancer_profiles 
+FOR UPDATE
+TO authenticated, service_role
+USING (true);

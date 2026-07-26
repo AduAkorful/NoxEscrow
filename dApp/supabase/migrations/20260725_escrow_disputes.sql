@@ -15,17 +15,21 @@ CREATE TABLE IF NOT EXISTS public.escrow_disputes (
 -- Enable Row-Level Security on escrow_disputes
 ALTER TABLE public.escrow_disputes ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow select disputes" 
+-- Allow public read access to dispute records
+CREATE POLICY "Allow public select disputes" 
 ON public.escrow_disputes
 FOR SELECT
 USING (true);
 
-CREATE POLICY "Allow insert disputes" 
+-- Restrict write/update operations strictly to service role / TEE arbiter authenticated backend
+CREATE POLICY "Allow service_role insert disputes" 
 ON public.escrow_disputes
 FOR INSERT
+TO service_role
 WITH CHECK (true);
 
-CREATE POLICY "Allow update disputes" 
+CREATE POLICY "Allow service_role update disputes" 
 ON public.escrow_disputes
 FOR UPDATE
+TO service_role
 USING (true);

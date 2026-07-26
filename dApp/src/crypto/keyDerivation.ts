@@ -2,10 +2,12 @@ export const SIGN_MESSAGE = "Initialize your NoxEscrow Secure Environment. Signi
 
 /**
  * Derives a stable 256-bit symmetric key from a wallet signature using browser-native WebCrypto PBKDF2.
+ * Binds salt to user's wallet address to ensure unique salt entropy.
  * @param signature The EIP-191 signature string from the connected wallet.
+ * @param walletAddress Optional wallet address to salt key derivation uniquely per account.
  * @returns A promise resolving to a 256-bit (32-byte) hex-encoded key string.
  */
-export async function deriveEncryptionKey(signature: string): Promise<string> {
+export async function deriveEncryptionKey(signature: string, walletAddress?: string): Promise<string> {
   if (!globalThis.crypto?.subtle) {
     throw new Error("WebCrypto is unavailable. Open NoxEscrow from a secure browser context.");
   }
@@ -22,7 +24,10 @@ export async function deriveEncryptionKey(signature: string): Promise<string> {
     ["deriveBits", "deriveKey"]
   );
 
-  const saltBuffer = encoder.encode("noxescrow-protocol-salt");
+  const saltString = walletAddress
+    ? `noxescrow-protocol-salt-${walletAddress.toLowerCase()}`
+    : "noxescrow-protocol-salt";
+  const saltBuffer = encoder.encode(saltString);
 
   // Derive a stable symmetric AES-GCM key
   const derivedKey = await window.crypto.subtle.deriveKey(

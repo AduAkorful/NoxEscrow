@@ -98,12 +98,12 @@ contract NoxEscrowReputation is
         ebool isGreaterOrEqual = Nox.ge(payout, maxPayout);
         euint256 cappedPayout = Nox.select(isGreaterOrEqual, maxPayout, payout);
 
-        // Normalize cappedPayout to whole token units according to tokenDecimals
-        euint256 divisor = Nox.toEuint256(10**uint256(tokenDecimals));
-        euint256 scaledPayout = tokenDecimals > 0 ? Nox.div(cappedPayout, divisor) : cappedPayout;
-
+        // Multiply payout by rating first to preserve precision before scaling down by tokenDecimals
         euint256 ratingHandle = Nox.toEuint256(rating);
-        euint256 scoreToAdd = Nox.mul(scaledPayout, ratingHandle);
+        euint256 weightedPayout = Nox.mul(cappedPayout, ratingHandle);
+
+        euint256 divisor = Nox.toEuint256(10**uint256(tokenDecimals));
+        euint256 scoreToAdd = tokenDecimals > 0 ? Nox.div(weightedPayout, divisor) : weightedPayout;
 
         euint256 currentRep = reputationScores[freelancer];
         euint256 nextRep;

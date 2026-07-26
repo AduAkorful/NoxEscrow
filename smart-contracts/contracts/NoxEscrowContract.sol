@@ -253,7 +253,9 @@ contract NoxEscrowContract is Initializable, INoxEscrowContract {
 
         Nox.allow(activeMilestone.payoutHandle, teeArbiter);
         Nox.allow(activeMilestone.requirementsHash, teeArbiter);
-        Nox.allow(devHash, teeArbiter);
+        if (activeMilestone.isSubmitted) {
+            Nox.allow(activeMilestone.deliverableHash, teeArbiter);
+        }
 
         emit DisputeOpened(activeMilestoneIndex, activeMilestone.requirementsHash, devHash);
     }
