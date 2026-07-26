@@ -6,7 +6,6 @@ import { getFreelancerProfilesFromSupabase } from '../services/freelancerService
 
 interface DraftWizardProps {
   walletAddress: string | null;
-  viewMode?: 'client' | 'freelancer';
   draftTitle: string;
   setDraftTitle: (val: string) => void;
   draftFreelancer: string;
@@ -31,7 +30,6 @@ interface MilestoneItem {
 
 export function DraftWizard({
   walletAddress,
-  viewMode,
   draftTitle,
   setDraftTitle,
   draftFreelancer,
@@ -49,13 +47,7 @@ export function DraftWizard({
   setDraftFiles
 }: DraftWizardProps) {
   const [isDragging, setIsDragging] = useState(false);
-  const [deploymentIntent, setDeploymentIntent] = useState<'client' | 'freelancer'>(viewMode || 'client');
-
-  useEffect(() => {
-    if (viewMode) {
-      setDeploymentIntent(viewMode);
-    }
-  }, [viewMode]);
+  const [deploymentIntent, setDeploymentIntent] = useState<'client' | 'freelancer'>('client');
   const [copiedLink, setCopiedLink] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -203,37 +195,35 @@ export function DraftWizard({
         <div className="lg:col-span-8 flex flex-col gap-6">
           
           {/* Creator Role / Intent Selector */}
-          {!viewMode && (
-            <div className="flex flex-col gap-2 p-3 bg-[#131826]/70 rounded-2xl border border-white/[0.08]">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
-                Deployment Mode
-              </span>
-              <div className="grid grid-cols-2 gap-2 p-1 bg-[#0B0E17] rounded-xl border border-white/[0.06]">
-                <button
-                  type="button"
-                  onClick={() => setDeploymentIntent('client')}
-                  className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                    deploymentIntent === 'client'
-                      ? 'bg-[#38BDF8] text-[#0B0E17] shadow-sm'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <User className="w-3.5 h-3.5" /> Client (Direct Deposit)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDeploymentIntent('freelancer')}
-                  className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                    deploymentIntent === 'freelancer'
-                      ? 'bg-[#C084FC] text-[#0B0E17] shadow-sm'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Briefcase className="w-3.5 h-3.5" /> Freelancer (Invoice / Proposal)
-                </button>
-              </div>
+          <div className="flex flex-col gap-2 p-3 bg-[#131826]/70 rounded-2xl border border-white/[0.08]">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
+              Deployment Mode
+            </span>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-[#0B0E17] rounded-xl border border-white/[0.06]">
+              <button
+                type="button"
+                onClick={() => setDeploymentIntent('client')}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  deploymentIntent === 'client'
+                    ? 'bg-[#38BDF8] text-[#0B0E17] shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <User className="w-3.5 h-3.5" /> Client (Direct Deposit)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeploymentIntent('freelancer')}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  deploymentIntent === 'freelancer'
+                    ? 'bg-[#C084FC] text-[#0B0E17] shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Briefcase className="w-3.5 h-3.5" /> Freelancer (Invoice / Proposal)
+              </button>
             </div>
-          )}
+          </div>
 
           {/* Contract Title Input */}
           <div className="flex flex-col gap-2">
