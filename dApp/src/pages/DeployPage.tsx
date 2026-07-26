@@ -5,6 +5,7 @@ import { DraftWizard } from '../components/DraftWizard';
 interface DeployPageProps {
   walletAddress: string | null;
   isLoading: boolean;
+  viewMode: 'client' | 'freelancer';
   handleDeployEscrow: (
     draftFreelancer: string,
     draftTotalMilestones: number,
@@ -20,6 +21,7 @@ interface DeployPageProps {
 export function DeployPage({
   walletAddress,
   isLoading,
+  viewMode,
   handleDeployEscrow
 }: DeployPageProps) {
   const navigate = useNavigate();
@@ -68,6 +70,7 @@ export function DeployPage({
   return (
     <DraftWizard
       walletAddress={walletAddress}
+      viewMode={viewMode}
       draftTitle={draftTitle}
       setDraftTitle={setDraftTitle}
       draftFreelancer={draftFreelancer}

@@ -474,6 +474,7 @@ function App() {
               <DeployPage 
                 walletAddress={walletAddress} 
                 isLoading={isLoading} 
+                viewMode={viewMode}
                 handleDeployEscrow={withKeyRequirement(handleDeployEscrow)} 
               />
             } />
