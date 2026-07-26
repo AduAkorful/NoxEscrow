@@ -340,20 +340,6 @@ function App() {
     }
   }, [walletAddress, getWeb3Signer, loadOnChainContracts, checkAdminStatus, loadFactoryParams]);
 
-  // Just-in-time key requirement wrapper for transactional operations
-  const withKeyRequirement = <T extends (...args: any[]) => Promise<any>>(actionFn: T): T => {
-    return (async (...args: Parameters<T>) => {
-      if (!vaultKey) {
-        try {
-          await triggerKeyDerivation();
-        } catch {
-          return;
-        }
-      }
-      return actionFn(...args);
-    }) as T;
-  };
-
   const connectWallet = async () => {
     setErrorMessage(null);
     try {
@@ -500,7 +486,7 @@ function App() {
               <DeployPage 
                 walletAddress={walletAddress} 
                 isLoading={isLoading} 
-                handleDeployEscrow={withKeyRequirement(handleDeployEscrow)} 
+                handleDeployEscrow={handleDeployEscrow} 
               />
             } />
             <Route path="/swap" element={
@@ -544,14 +530,14 @@ function App() {
                 newTreasuryInput={newTreasuryInput}
                 setNewTreasuryInput={setNewTreasuryInput}
                 isLoading={isLoading}
-                handleUpdateImplementation={withKeyRequirement(handleUpdateImplementation)}
-                handleUpdateRegistry={withKeyRequirement(handleUpdateRegistry)}
-                handleUpdateUSDCToken={withKeyRequirement(handleUpdateUSDCToken)}
-                handleUpdateReviewWindow={withKeyRequirement(handleUpdateReviewWindow)}
-                handleUpdateMutualCancelWindow={withKeyRequirement(handleUpdateMutualCancelWindow)}
-                handleUpdateTeeArbiter={withKeyRequirement(handleUpdateTeeArbiter)}
-                handleUpdatePlatformFeeBps={withKeyRequirement(handleUpdatePlatformFeeBps)}
-                handleUpdateTreasury={withKeyRequirement(handleUpdateTreasury)}
+                handleUpdateImplementation={handleUpdateImplementation}
+                handleUpdateRegistry={handleUpdateRegistry}
+                handleUpdateUSDCToken={handleUpdateUSDCToken}
+                handleUpdateReviewWindow={handleUpdateReviewWindow}
+                handleUpdateMutualCancelWindow={handleUpdateMutualCancelWindow}
+                handleUpdateTeeArbiter={handleUpdateTeeArbiter}
+                handleUpdatePlatformFeeBps={handleUpdatePlatformFeeBps}
+                handleUpdateTreasury={handleUpdateTreasury}
                 isAdmin={isAdmin}
               />
             } />
@@ -567,11 +553,11 @@ function App() {
                 ratingInput={ratingInput}
                 setRatingInput={setRatingInput}
                 isLoading={isLoading}
-                handleRaiseDispute={withKeyRequirement(handleRaiseDispute)}
-                handleSubmitDeliverable={withKeyRequirement(handleSubmitDeliverable)}
-                handleReleaseMilestone={withKeyRequirement(handleReleaseMilestone)}
-                handleMutualCancel={withKeyRequirement(handleMutualCancel)}
-                handleInitializeDeployedEscrow={withKeyRequirement(handleInitializeDeployedEscrow)}
+                handleRaiseDispute={handleRaiseDispute}
+                handleSubmitDeliverable={handleSubmitDeliverable}
+                handleReleaseMilestone={handleReleaseMilestone}
+                handleMutualCancel={handleMutualCancel}
+                handleInitializeDeployedEscrow={handleInitializeDeployedEscrow}
                 deliverableFiles={deliverableFiles}
                 setDeliverableFiles={setDraftFiles => setDeliverableFiles(setDraftFiles)}
                 vaultKey={vaultKey}
