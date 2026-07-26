@@ -21,6 +21,7 @@ import { ShortcutsHUD } from './components/ShortcutsHUD';
 import { Footer } from './components/Footer';
 import { TransactionStepper } from './components/TransactionStepper';
 import { ToastContainer } from './components/ToastContainer';
+import { NetworkSwitchModal } from './components/NetworkSwitchModal';
 import type { Toast } from './components/ToastContainer';
 
 // Custom Hooks
@@ -55,6 +56,8 @@ function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null);
+  const [isWrongNetwork, setIsWrongNetwork] = useState(false);
+  const [currentChainId, setCurrentChainId] = useState<number | null>(null);
 
   useEffect(() => {
     localStorage.setItem('nox_view_mode', viewMode);
@@ -257,17 +260,37 @@ function App() {
       setSigner(s);
       const network = await s.provider.getNetwork();
       const chainIdNumber = Number(network.chainId);
+      setCurrentChainId(chainIdNumber);
       
       const isLocalhost = chainIdNumber === 31337 || chainIdNumber === 1337;
       const isSepolia = chainIdNumber === 11155111;
       
       if (!isLocalhost && !isSepolia) {
+        setIsWrongNetwork(true);
         setErrorMessage(`Connected to chain ID ${chainIdNumber}. Please switch your Web3 wallet network to Sepolia Testnet or Localhost 31337.`);
+      } else {
+        setIsWrongNetwork(false);
+        setErrorMessage(null);
       }
     } catch (e: any) {
       console.warn("Network check error:", e);
     }
   }, [getWeb3Signer]);
+
+  useEffect(() => {
+    const win = window as any;
+    if (win.ethereum && typeof win.ethereum.on === 'function') {
+      const handleChainChanged = () => {
+        checkNetwork();
+      };
+      win.ethereum.on('chainChanged', handleChainChanged);
+      return () => {
+        if (win.ethereum.removeListener) {
+          win.ethereum.removeListener('chainChanged', handleChainChanged);
+        }
+      };
+    }
+  }, [checkNetwork]);
 
   // Auto-fetch data on wallet connect (never triggers interactive decrypt popups)
   useEffect(() => {
@@ -562,6 +585,17 @@ function App() {
 
       {showShortcutsHUD && (
         <ShortcutsHUD onClose={() => setShowShortcutsHUD(false)} />
+      )}
+
+      {walletAddress && isWrongNetwork && (
+        <NetworkSwitchModal
+          currentChainId={currentChainId}
+          onSwitchSuccess={() => {
+            setIsWrongNetwork(false);
+            checkNetwork();
+          }}
+          activeWallet={activeWallet}
+        />
       )}
 
       <TransactionStepper

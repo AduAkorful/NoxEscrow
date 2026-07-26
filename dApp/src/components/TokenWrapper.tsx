@@ -92,6 +92,10 @@ export function TokenWrapper({
       const confidentialBal = await getConfidentialUSDCBalance(signer, cUSDCAddress, walletAddress, gatewayUrl);
       setCUSDCBalance(confidentialBal);
       setIsConfidentialRevealed(true);
+
+      // Persist decrypted balance in sessionStorage for this session
+      sessionStorage.setItem(`nox_cusdc_bal_${walletAddress.toLowerCase()}`, confidentialBal.toString());
+      sessionStorage.setItem(`nox_cusdc_revealed_${walletAddress.toLowerCase()}`, "true");
     } catch (err: any) {
       console.error("Failed to decrypt confidential balance:", err);
       setErrorMessage(err.message || "Failed to decrypt confidential cUSDC balance.");
@@ -100,10 +104,30 @@ export function TokenWrapper({
     }
   }, [walletAddress, cUSDCAddress, gatewayUrl, getWeb3Signer]);
 
-  // Initial load on page mount (0 signature popups!)
+  // Initial load on page mount (checks session storage for previously decrypted balance)
   useEffect(() => {
     fetchPublicBalances();
-  }, [fetchPublicBalances]);
+
+    if (walletAddress) {
+      const savedBal = sessionStorage.getItem(`nox_cusdc_bal_${walletAddress.toLowerCase()}`);
+      const savedRevealed = sessionStorage.getItem(`nox_cusdc_revealed_${walletAddress.toLowerCase()}`);
+
+      if (savedRevealed === "true" && savedBal !== null) {
+        try {
+          setCUSDCBalance(BigInt(savedBal));
+          setIsConfidentialRevealed(true);
+        } catch {
+          setIsConfidentialRevealed(false);
+        }
+      } else {
+        setIsConfidentialRevealed(false);
+        setCUSDCBalance(0n);
+      }
+    } else {
+      setIsConfidentialRevealed(false);
+      setCUSDCBalance(0n);
+    }
+  }, [walletAddress, fetchPublicBalances]);
 
   // --- Execute Approval ---
   const handleApprove = async (amountToApprove: bigint) => {
