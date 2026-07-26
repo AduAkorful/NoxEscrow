@@ -56,13 +56,7 @@ export function DraftWizard({
     if (saved) {
       try { return JSON.parse(saved); } catch {}
     }
-    return [
-      { walletAddress: "0x74B4134C8d527a8D8AE8cb9503ab2043bCfC0ffd", name: "Alex Vance", title: "Lead Systems Architect", tier: "Gold TEE Certified", feeDiscountBps: 30 },
-      { walletAddress: "0x38BDF8A1234567890abcdef1234567890abcdef1", name: "Elena Rostova", title: "Principal UI/UX Designer", tier: "Silver", feeDiscountBps: 50 },
-      { walletAddress: "0x9876543210fedcba9876543210fedcba98765432", name: "Dr. Marcus Chen", title: "Security Researcher", tier: "Gold TEE Certified", feeDiscountBps: 30 },
-      { walletAddress: "0x555544443333222211110000aaaaabbbbbbccccc", name: "Sophia Martinez", title: "AI Engineer & Machine Learning", tier: "Gold TEE Certified", feeDiscountBps: 30 },
-      { walletAddress: "0xabcdef1234567890abcdef1234567890abcdef12", name: "David Kim", title: "DevOps Architect", tier: "Bronze", feeDiscountBps: 50 }
-    ];
+    return [];
   });
 
   useEffect(() => {

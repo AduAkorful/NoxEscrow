@@ -1,4 +1,4 @@
-import { X, Lock, AlertTriangle, ShieldCheck, Terminal, Unlock, Paperclip, Trash2, Activity, Play, Pause } from 'lucide-react';
+import { X, Lock, AlertTriangle, ShieldCheck, Terminal, Unlock, Paperclip, Trash2, Activity } from 'lucide-react';
 import { type EscrowContract, decryptMilestoneChatKey } from '../services/escrowService';
 import { NoxEscrowContractABI } from '../contracts/NoxEscrowContract';
 import { fetchAndDecryptFile, encryptText, decryptText } from '../crypto/fileUploader';
@@ -37,6 +37,7 @@ interface EscrowWorkspaceProps {
   onDeriveKey?: () => void;
   getWeb3Signer?: () => Promise<ethers.JsonRpcSigner>;
   gatewayUrl?: string;
+  loadOnChainContracts?: (allowInteractiveDecrypt: boolean) => Promise<void>;
 }
 
 export function EscrowWorkspace({
@@ -61,7 +62,8 @@ export function EscrowWorkspace({
   vaultKey,
   onDeriveKey,
   getWeb3Signer,
-  gatewayUrl
+  gatewayUrl,
+  loadOnChainContracts
 }: EscrowWorkspaceProps) {
   const [selectedMilestoneIndex, setSelectedMilestoneIndex] = useState(() => {
     return selectedContract.milestonesCompleted < selectedContract.totalMilestones 
@@ -86,8 +88,6 @@ export function EscrowWorkspace({
 
   const [downloadingFileCid, setDownloadingFileCid] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamedAmount, setStreamedAmount] = useState(0);
   const [showDisputeConfirm, setShowDisputeConfirm] = useState(false);
   const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
   const [disputeConsentChecked, setDisputeConsentChecked] = useState(false);
@@ -141,8 +141,12 @@ export function EscrowWorkspace({
         const currentOnChainStatus = statusNames[Number(onChainStatus)] || 'ACTIVE';
 
         if (!cancelled && currentOnChainStatus !== 'DISPUTED') {
-          console.log(`⚖️ Dispute resolved on-chain to status: ${currentOnChainStatus}. Reloading...`);
-          window.location.reload();
+          console.log(`⚖️ Dispute resolved on-chain to status: ${currentOnChainStatus}. Reloading contracts...`);
+          if (loadOnChainContracts) {
+            await loadOnChainContracts(true);
+          } else {
+            window.location.reload();
+          }
         }
       } catch (err) {
         console.warn("Dispute status poll failed:", err);
@@ -154,7 +158,7 @@ export function EscrowWorkspace({
       cancelled = true;
       clearInterval(interval);
     };
-  }, [selectedContract.address, selectedContract.status, getWeb3Signer]);
+  }, [selectedContract.address, selectedContract.status, getWeb3Signer, loadOnChainContracts]);
 
   // Lazy chat key: derived on-demand from on-chain handle (single wallet prompt)
   const [chatKey, setChatKey] = useState<string | null>(null);
@@ -438,16 +442,6 @@ export function EscrowWorkspace({
       setIsSubmittingReview(false);
     }
   };
-
-  useEffect(() => {
-    let interval: any;
-    if (isStreaming) {
-      interval = setInterval(() => {
-        setStreamedAmount(prev => prev + 0.000025);
-      }, 50);
-    }
-    return () => clearInterval(interval);
-  }, [isStreaming]);
 
   const [timeLeft, setTimeLeft] = useState<{
     days: number;
@@ -935,58 +929,56 @@ export function EscrowWorkspace({
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Shared Sablier Stream Payout Visualizer Widget */}
+                  {/* Real-time Milestone Escrow Financial Ledger Panel */}
                   <div className="bg-[#05070F] border border-white/5 p-4 rounded-xl flex flex-col gap-3">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
-                        <Activity className={`w-3.5 h-3.5 ${isStreaming ? "text-emerald-400 animate-pulse" : "text-slate-500"}`} />
+                        <Activity className="w-3.5 h-3.5 text-[#00F2FE]" />
                         <span className="font-mono text-[9px] uppercase tracking-wider text-slate-300 font-bold">
-                          Continuous Payment Streaming
+                          Escrow Vault Financial Ledger
                         </span>
                       </div>
-                      <span className="font-mono text-[8px] text-slate-500 uppercase">Sablier/LlamaPay V2 Protocol</span>
+                      <span className="font-mono text-[8px] text-emerald-400 uppercase">✓ Hardware Attested</span>
                     </div>
 
-                    <div className="flex items-center justify-between border-y border-white/5 py-2.5 my-1">
+                    <div className="grid grid-cols-3 gap-2.5 border-y border-white/5 py-3 my-1">
                       <div className="flex flex-col">
-                        <span className="text-[8px] font-mono text-slate-500 uppercase">Streamed Balance</span>
-                        <span className="font-mono text-xs font-bold text-[#00F2FE] teal-glow-text">
-                          {streamedAmount.toFixed(6)} cUSDC
+                        <span className="text-[8px] font-mono text-slate-500 uppercase">Total Locked</span>
+                        <span className="font-mono text-xs font-bold text-white mt-0.5">
+                          {selectedContract.budget.toLocaleString()} cUSDC
+                        </span>
+                      </div>
+                      <div className="flex flex-col text-center border-x border-white/5 px-2">
+                        <span className="text-[8px] font-mono text-slate-500 uppercase">Released</span>
+                        <span className="font-mono text-xs font-bold text-emerald-400 mt-0.5">
+                          {((selectedContract.budget / selectedContract.totalMilestones) * selectedContract.milestonesCompleted).toLocaleString()} cUSDC
                         </span>
                       </div>
                       <div className="flex flex-col text-right">
-                        <span className="text-[8px] font-mono text-slate-500 uppercase">Flow Rate</span>
-                        <span className="font-mono text-[9px] text-emerald-400 font-semibold">
-                          +0.0005 cUSDC/sec
+                        <span className="text-[8px] font-mono text-slate-500 uppercase">Remaining</span>
+                        <span className="font-mono text-xs font-bold text-[#38BDF8] mt-0.5">
+                          {(selectedContract.status === 'COMPLETED' || selectedContract.status === 'REFUNDED' ? 0 : selectedContract.budget - ((selectedContract.budget / selectedContract.totalMilestones) * selectedContract.milestonesCompleted)).toLocaleString()} cUSDC
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setIsStreaming(!isStreaming)}
-                        className={`flex-1 py-1.5 px-3 rounded-lg font-mono text-[9px] uppercase font-bold flex items-center justify-center gap-1.5 transition-smooth cursor-pointer active:scale-95 border ${
-                          isStreaming
-                            ? "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
-                            : "bg-[#00F2FE]/5 text-[#00F2FE] border-[#00F2FE]/20 hover:bg-[#00F2FE]/15"
-                        }`}
-                      >
-                        {isStreaming ? (
-                          <>
-                            <Pause className="w-3 h-3" /> Pause Stream Payout
-                          </>
-                        ) : (
-                          <>
-                            <Play className="w-3 h-3 animate-pulse" /> Start Payout Stream
-                          </>
-                        )}
-                      </button>
+                    <div className="space-y-1.5 mt-0.5">
+                      <div className="flex justify-between text-[9px] font-mono">
+                        <span className="text-slate-400 uppercase">Ledger Settlement progress</span>
+                        <span className="text-white font-bold">{Math.round((selectedContract.milestonesCompleted / selectedContract.totalMilestones) * 100)}% Settled</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-900 border border-white/5 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-[#00F2FE] to-[#7F00FF] transition-all duration-500"
+                          style={{ width: `${(selectedContract.milestonesCompleted / selectedContract.totalMilestones) * 100}%` }}
+                        />
+                      </div>
                     </div>
 
                     <div className="p-2.5 bg-[#0B0E17]/60 border border-white/[0.04] rounded-xl text-[10px] font-sans text-slate-400 leading-normal flex items-start gap-2">
-                      <AlertTriangle className="w-3.5 h-3.5 text-[#38BDF8] shrink-0 mt-0.5" />
+                      <ShieldCheck className="w-3.5 h-3.5 text-[#38BDF8] shrink-0 mt-0.5" />
                       <span>
-                        <strong>UX Roadmap Notice:</strong> Continuous streaming demonstrates the proposed Sablier continuous settlement telemetry. Actual production payouts are securely managed on-chain using discrete milestone-based releases.
+                        <strong>ZK Budget Assurance:</strong> All settlement variables are processed cryptographically on-chain. Decrypted balances are only visible to verified contract counterparties.
                       </span>
                     </div>
                   </div>

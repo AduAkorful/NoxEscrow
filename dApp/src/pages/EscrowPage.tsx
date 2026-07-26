@@ -32,6 +32,7 @@ interface EscrowPageProps {
   onDeriveKey?: () => void;
   getWeb3Signer?: () => Promise<ethers.JsonRpcSigner>;
   gatewayUrl?: string;
+  loadOnChainContracts?: (allowInteractiveDecrypt: boolean) => Promise<void>;
 }
 
 export function EscrowPage({
@@ -55,7 +56,8 @@ export function EscrowPage({
   vaultKey,
   onDeriveKey,
   getWeb3Signer,
-  gatewayUrl
+  gatewayUrl,
+  loadOnChainContracts
 }: EscrowPageProps) {
   const { address } = useParams<{ address: string }>();
   const navigate = useNavigate();
@@ -113,6 +115,7 @@ export function EscrowPage({
         onDeriveKey={onDeriveKey}
         getWeb3Signer={getWeb3Signer}
         gatewayUrl={gatewayUrl}
+        loadOnChainContracts={loadOnChainContracts}
       />
     </div>
   );

@@ -546,6 +546,7 @@ function App() {
                 onDeriveKey={triggerKeyDerivation}
                 getWeb3Signer={getWeb3Signer}
                 gatewayUrl={gatewayUrl}
+                loadOnChainContracts={loadOnChainContracts}
               />
             } />
             <Route path="*" element={<Navigate to="/" replace />} />
