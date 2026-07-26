@@ -17,12 +17,6 @@ export function normalizeCategory(cat: string): FreelancerProfile['category'] {
  */
 export async function getFreelancerProfilesFromSupabase(): Promise<FreelancerProfile[]> {
   try {
-    // Delete any legacy mock seed rows from Supabase database table
-    await supabase
-      .from('freelancer_profiles')
-      .delete()
-      .in('id', ['f1', 'f2', 'f3', 'f4', 'f5']);
-
     const { data, error } = await supabase
       .from('freelancer_profiles')
       .select('*')

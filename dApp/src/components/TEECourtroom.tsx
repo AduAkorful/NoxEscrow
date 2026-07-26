@@ -13,7 +13,7 @@ interface TEECourtroomProps {
   clientAddress: string;
   freelancerAddress: string;
   disputeReason: string;
-  onResolve: (ruling: 'CLIENT' | 'FREELANCER') => void;
+  onResolve?: (ruling: 'CLIENT' | 'FREELANCER') => void;
   simulationMode?: boolean;
   disputeRecord?: any;
   milestoneIndex?: number;
@@ -24,13 +24,10 @@ export function TEECourtroom({
   clientAddress,
   freelancerAddress,
   disputeReason,
-  onResolve,
   simulationMode = false,
   disputeRecord = null,
   milestoneIndex
 }: TEECourtroomProps) {
-  void clientAddress;
-  void freelancerAddress;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [metadata, setMetadata] = useState<any>(null);
 
@@ -58,10 +55,10 @@ export function TEECourtroom({
   useEffect(() => {
     const clientMsg = metadata?.client_statement && metadata.client_statement !== "None provided."
       ? metadata.client_statement
-      : disputeReason || "The contractor failed to satisfy the milestone requirements. The API responses are malformed and delayed.";
+      : disputeReason || `The client (${clientAddress.slice(0, 6)}...${clientAddress.slice(-4)}) opened a dispute on milestone compliance.`;
     const freelancerMsg = metadata?.freelancer_statement && metadata.freelancer_statement !== "None provided."
       ? metadata.freelancer_statement
-      : "I submitted the correct deliverables, and verified all test cases pass locally. The client is trying to avoid payment.";
+      : `Freelancer (${freelancerAddress.slice(0, 6)}...${freelancerAddress.slice(-4)}) submitted deliverables for review.`;
 
     setMessages([
       {
@@ -85,7 +82,7 @@ export function TEECourtroom({
         timestamp: '14:23:15'
       }
     ]);
-  }, [metadata, disputeReason, escrowAddress]);
+  }, [metadata, disputeReason, escrowAddress, clientAddress, freelancerAddress]);
 
   const [inputVal, setInputVal] = useState('');
   const [clientClaimPercent, setClientClaimPercent] = useState(48);
@@ -167,19 +164,10 @@ export function TEECourtroom({
     setMessages(prev => [...prev, newMsg]);
     setInputVal('');
 
-    // Trigger TEE reactions
-    setTimeout(() => {
-      setTeeLogs(prev => [
-        ...prev,
-        `[${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}] Analyzing new user submission...`,
-        `[${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}] Running local code validator inside TEE...`
-      ]);
-
-      // Shift scores slightly to make it feel alive!
-      setClientClaimPercent(prev => Math.max(30, Math.min(70, prev + (Math.random() > 0.5 ? 5 : -5))));
-      setFreelancerClaimPercent(prev => Math.max(30, Math.min(70, prev + (Math.random() > 0.5 ? 5 : -5))));
-      setConfidence(prev => Math.min(99, prev + 2));
-    }, 1000);
+    setTeeLogs(prev => [
+      ...prev,
+      `[${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}] User statement submitted to TEE dispute record.`
+    ]);
   };
 
   return (
@@ -332,43 +320,21 @@ export function TEECourtroom({
             </div>
           </div>
 
-          {/* Quick Resolution button triggers */}
-          {simulationMode ? (
-            <div className="border border-yellow-500/20 bg-yellow-500/5 p-3 rounded-xl mt-2 flex flex-col gap-2">
-              <span className="font-mono text-[9px] text-yellow-400 font-bold uppercase tracking-wider block text-center">
-                ⚠️ Developer Simulation Override
+          {/* Settlement Status Display */}
+          <div className="p-4 rounded-xl bg-[#131d35] border border-cyan-500/20 flex flex-col gap-2.5 mt-2 animate-pulse">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
               </span>
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={() => onResolve('CLIENT')}
-                  className="py-2.5 border border-rose-500/20 bg-rose-950/20 text-rose-400 rounded-lg font-mono text-[10px] uppercase font-bold hover:bg-rose-900/30 transition-smooth cursor-pointer active:scale-95"
-                >
-                  Refund Client
-                </button>
-                <button 
-                  onClick={() => onResolve('FREELANCER')}
-                  className="py-2.5 border border-emerald-500/20 bg-emerald-950/20 text-emerald-400 rounded-lg font-mono text-[10px] uppercase font-bold hover:bg-emerald-900/30 transition-smooth cursor-pointer active:scale-95"
-                >
-                  Pay Freelancer
-                </button>
-              </div>
+              <span className="font-mono text-[10px] text-cyan-400 font-bold uppercase tracking-widest">
+                Awaiting Autonomous TEE Settlement...
+              </span>
             </div>
-          ) : (
-            <div className="p-4 rounded-xl bg-[#131d35] border border-cyan-500/20 flex flex-col gap-2.5 mt-2 animate-pulse">
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
-                </span>
-                <span className="font-mono text-[10px] text-cyan-400 font-bold uppercase tracking-widest">
-                  Awaiting Autonomous TEE Settlement...
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 font-sans leading-relaxed">
-                The off-chain iExec TDX Enclave is evaluating the encrypted deliverables against the specifications. Settlement will be broadcasted on-chain autonomously.
-              </p>
-            </div>
-          )}
+            <p className="text-[10px] text-slate-400 font-sans leading-relaxed">
+              The off-chain iExec TDX Enclave is evaluating the encrypted deliverables against the specifications. Settlement will be broadcasted on-chain autonomously.
+            </p>
+          </div>
         </div>
 
         {/* Monospaced Enclave Sandbox analysis */}

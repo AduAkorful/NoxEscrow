@@ -2,14 +2,25 @@ import { ethers } from "ethers";
 import axios from "axios";
 import http from "http";
 
-// Environment variables with sensible defaults for local development
-const RPC_URL = process.env.RPC_URL || "http://127.0.0.1:8545";
+// Environment variables strictly required or validated
+const RPC_URL = process.env.RPC_URL;
 const FACTORY_ADDRESS = process.env.ESCROW_FACTORY_ADDRESS;
-const IEXEC_RUNNER_ENDPOINT = process.env.IEXEC_RUNNER_ENDPOINT || "http://127.0.0.1:3000/trigger-task";
+const IEXEC_RUNNER_ENDPOINT = process.env.IEXEC_RUNNER_ENDPOINT;
 const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL || "15000", 10);
+const RECONCILIATION_INTERVAL = parseInt(process.env.RECONCILIATION_INTERVAL || "300000", 10);
+
+if (!RPC_URL) {
+  console.error("❌ ERROR: RPC_URL environment variable is required.");
+  process.exit(1);
+}
 
 if (!FACTORY_ADDRESS) {
   console.error("❌ ERROR: ESCROW_FACTORY_ADDRESS environment variable is required.");
+  process.exit(1);
+}
+
+if (!IEXEC_RUNNER_ENDPOINT) {
+  console.error("❌ ERROR: IEXEC_RUNNER_ENDPOINT environment variable is required.");
   process.exit(1);
 }
 
@@ -52,14 +63,17 @@ async function reconcileDisputes(escrowClones, triggeredDisputes) {
           const milestoneInfo = await escrowContract.milestones(milestoneIndex);
           const { requirementsHash, deliverableHash } = milestoneInfo;
           
+          const reqsHex = typeof requirementsHash === "string" ? requirementsHash : `0x${BigInt(requirementsHash).toString(16).padStart(64, "0")}`;
+          const devsHex = typeof deliverableHash === "string" ? deliverableHash : `0x${BigInt(deliverableHash).toString(16).padStart(64, "0")}`;
+          
           triggeredDisputes.set(key, now);
           
           const response = await axios.post(IEXEC_RUNNER_ENDPOINT, {
             escrowAddress: cloneAddress,
             milestoneIndex: milestoneIndexStr,
-            reqsHandle: requirementsHash,
-            devsHandle: deliverableHash
-          });
+            reqsHandle: reqsHex,
+            devsHandle: devsHex
+          }, { timeout: 10000 });
           console.log(`🚀 [Reconciler] TEE execution triggered successfully! Response:`, response.status === 200 ? "Success" : response.statusText);
         }
       }
@@ -113,9 +127,9 @@ async function handleDisputeOpened(log) {
     const response = await axios.post(IEXEC_RUNNER_ENDPOINT, {
       escrowAddress: contractAddress,
       milestoneIndex: milestoneIndex.toString(),
-      reqsHandle: `0x${requirementsHash.toString(16).padStart(64, "0")}`,
-      devsHandle: `0x${deliverableHash.toString(16).padStart(64, "0")}`
-    });
+      reqsHandle: `0x${BigInt(requirementsHash).toString(16).padStart(64, "0")}`,
+      devsHandle: `0x${BigInt(deliverableHash).toString(16).padStart(64, "0")}`
+    }, { timeout: 10000 });
 
     console.log(`🚀 iExec TEE execution triggered successfully! Response:`, response.status === 200 ? "Success" : response.statusText);
   } catch (error) {
@@ -132,15 +146,18 @@ async function main() {
 
   // On startup: load all existing escrow clones from the factory to construct initial whitelist
   try {
-    const count = await factoryContract.escrowsCount();
+    const count = Number(await factoryContract.escrowsCount());
     console.log(`🔍 Initializing clone registry. Found ${count} existing escrow clones in factory.`);
-    const fetchPromises = [];
-    for (let i = 0; i < count; i++) {
-      fetchPromises.push(factoryContract.allEscrows(i));
-    }
-    const addresses = await Promise.all(fetchPromises);
-    for (const addr of addresses) {
-      escrowClones.add(addr.toLowerCase());
+    const batchSize = 10;
+    for (let i = 0; i < count; i += batchSize) {
+      const chunk = [];
+      for (let j = i; j < Math.min(i + batchSize, count); j++) {
+        chunk.push(factoryContract.allEscrows(j));
+      }
+      const addresses = await Promise.all(chunk);
+      for (const addr of addresses) {
+        escrowClones.add(addr.toLowerCase());
+      }
     }
     if (escrowClones.size > 0) {
       console.log(`✔️ Loaded ${escrowClones.size} clones into active whitelist.`);

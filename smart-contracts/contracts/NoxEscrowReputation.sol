@@ -27,6 +27,7 @@ contract NoxEscrowReputation is
     address public factory;
     mapping(address => euint256) private reputationScores;
     euint256 public baseReputationHandle; // Pre-encrypted starting score (1000)
+    uint8 public tokenDecimals;
 
     // ============ Modifiers ============
 
@@ -55,6 +56,7 @@ contract NoxEscrowReputation is
         if (_factory == address(0)) revert InvalidAddress();
         __Ownable_init(msg.sender);
         factory = _factory;
+        tokenDecimals = 6;
     }
 
     // ============ External Functions ============
@@ -92,7 +94,7 @@ contract NoxEscrowReputation is
     ) external override onlyEscrowContract {
         if (!Nox.isInitialized(baseReputationHandle)) revert BaseReputationNotConfigured();
 
-        euint256 maxPayout = Nox.toEuint256(1000 * 10**6); // $1,000 cUSDC cap to mitigate whale-bloat
+        euint256 maxPayout = Nox.toEuint256(1000 * (10**uint256(tokenDecimals))); // $1,000 cUSDC cap to mitigate whale-bloat
         ebool isGreaterOrEqual = Nox.ge(payout, maxPayout);
         euint256 cappedPayout = Nox.select(isGreaterOrEqual, maxPayout, payout);
 
@@ -177,6 +179,14 @@ contract NoxEscrowReputation is
         address oldFactory = factory;
         factory = _newFactory;
         emit FactoryUpdated(oldFactory, _newFactory);
+    }
+
+    /**
+     * @notice Set token decimals for reputation scaling cap.
+     * @param _decimals Token decimals (e.g. 6 for cUSDC, 18 for WETH/USDT).
+     */
+    function setTokenDecimals(uint8 _decimals) external onlyOwner {
+        tokenDecimals = _decimals;
     }
 
     // Required by UUPS

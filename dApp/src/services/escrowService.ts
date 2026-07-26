@@ -8,7 +8,7 @@ import { encryptText, decryptText, uploadToPinata, encryptAndUploadFile } from "
 import addresses from "../contracts/addresses.json";
 
 // Canonical Nox Contract Manager address on Sepolia/Local Stack Emulator
-export const NOX_CONTRACT_MANAGER = addresses.noxContractManager || import.meta.env.VITE_NOX_CONTRACT_MANAGER || "0x24ef36ec5b626d7dcd09a98f3083c2758f0f77bf";
+export const NOX_CONTRACT_MANAGER = import.meta.env.VITE_NOX_CONTRACT_MANAGER || addresses.noxContractManager || "";
 
 // Default Gateway ports for Local Nox Stack
 export const DEFAULT_NOX_GATEWAY = "http://127.0.0.1:8080";
@@ -43,7 +43,7 @@ export function calculateFreelancerEarnings(milestoneBudget: number, feeDiscount
 }
 
 // Configurable Subgraph URL for Live Network/Sepolia Integration
-export const NOX_SUBGRAPH_URL = import.meta.env.VITE_NOX_SUBGRAPH_URL || "https://example.com/subgraphs/id/none";
+export const NOX_SUBGRAPH_URL = import.meta.env.VITE_NOX_SUBGRAPH_URL || "";
 
 // Shareable Escrow Contract interface representing on-chain details
 export interface EscrowContract {

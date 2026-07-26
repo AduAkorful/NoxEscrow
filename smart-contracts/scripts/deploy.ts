@@ -131,7 +131,10 @@ async function main() {
   } else {
     console.log("🔌 Connecting directly to the public network...");
     const { ethers } = await import("ethers");
-    const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL || "https://sepolia.infura.io/v3/dummy");
+    if (!process.env.SEPOLIA_RPC_URL) {
+      throw new Error("❌ Error: SEPOLIA_RPC_URL environment variable is required when deploying to non-local networks.");
+    }
+    const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
     const privateKey = process.env.PRIVATE_KEY || "";
     if (!privateKey) {
       throw new Error("❌ Error: PRIVATE_KEY environment variable is required.");
@@ -142,13 +145,13 @@ async function main() {
   console.log(`🌐 Network: ${networkName}`);
   console.log(`👤 Deployer Address: ${deployer.address}\n`);
 
-  const noxContractManagerAddress = "0x24ef36ec5b626d7dcd09a98f3083c2758f0f77bf";
+  const noxContractManagerAddress = process.env.NOX_CONTRACT_MANAGER || "0x24ef36ec5b626d7dcd09a98f3083c2758f0f77bf";
 
   const gatewayUrl = process.env.NOX_GATEWAY_URL || `http://127.0.0.1:${process.env.NOX_HANDLE_GATEWAY_HOST_PORT || "8080"}`;
 
   // 2. Deploy Canonical Wrapped Token (Mock for development, custom wrapper ConfidentialUSDCToken for Sepolia)
   let cUSDCAddress: string;
-  const publicUSDCAddress = "0x2F6F07CDcf3588944Bf4C42aC74ff24bF56e7590";
+  const publicUSDCAddress = process.env.PUBLIC_USDC_ADDRESS || "0x2F6F07CDcf3588944Bf4C42aC74ff24bF56e7590";
 
   if (!isLocal) {
     console.log(`📦 Deploying custom cUSDC wrapper contract pointing to public USDC (${publicUSDCAddress})...`);

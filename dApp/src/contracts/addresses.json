@@ -1,7 +1,7 @@
 {
-  "factory": "0x0382FDF0eB7FA6d08181595ce6e03481Cc622Ba5",
-  "cUSDC": "0x041135abE59B11aFCB127b627B6e8F0284f90566",
-  "teeArbiter": "0x74B4134C8d527a8D8AE8cb9503ab2043bCfC0ffd",
+  "factory": "",
+  "cUSDC": "",
+  "teeArbiter": "",
   "gatewayUrl": "https://gateway-testnets.noxprotocol.dev",
-  "noxContractManager": "0x24ef36ec5b626d7dcd09a98f3083c2758f0f77bf"
+  "noxContractManager": ""
 }

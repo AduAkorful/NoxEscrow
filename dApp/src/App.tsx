@@ -67,21 +67,41 @@ function App() {
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
-  // --- Global Keyboard Shortcuts Listener (Cmd+K / ?) ---
+  // --- Global Keyboard Shortcuts Listener ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const isInput = ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName);
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setShowShortcutsHUD(prev => !prev);
+        return;
       }
-      if (e.key === '?' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+      if (isInput) return;
+
+      const key = e.key.toLowerCase();
+      if (key === '?' || key === 'h') {
         e.preventDefault();
         setShowShortcutsHUD(prev => !prev);
+      } else if (key === 'c') {
+        e.preventDefault();
+        if (!authenticated && loginPrivy) {
+          loginPrivy();
+        }
+      } else if (key === 't') {
+        e.preventDefault();
+        setViewMode(prev => prev === 'client' ? 'freelancer' : 'client');
+      } else if (key === 'd') {
+        e.preventDefault();
+        if (authenticated && privyLogout) {
+          privyLogout();
+        }
+      } else if (e.key === 'Escape') {
+        setShowShortcutsHUD(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [authenticated, loginPrivy, privyLogout, setViewMode]);
 
   // --- API & E2E Config Constants from Env ---
   const pinataJWT = import.meta.env.VITE_PINATA_JWT || "";
@@ -89,10 +109,10 @@ function App() {
   const supabaseKey = import.meta.env.VITE_SUPABASE_KEY || "";
 
   // --- Contract Deployment Config Constants from Env/addresses.json ---
-  const factoryAddress = import.meta.env.VITE_NOX_ESCROW_FACTORY || addresses.factory || "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
-  const cUSDCAddress = import.meta.env.VITE_CUSDC_TOKEN || addresses.cUSDC || "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+  const factoryAddress = import.meta.env.VITE_NOX_ESCROW_FACTORY || addresses.factory || "";
+  const cUSDCAddress = import.meta.env.VITE_CUSDC_TOKEN || addresses.cUSDC || "";
   const gatewayUrl = import.meta.env.VITE_GATEWAY_URL || addresses.gatewayUrl || DEFAULT_NOX_GATEWAY;
-  const publicUSDCAddress = import.meta.env.VITE_PUBLIC_USDC_TOKEN || "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
+  const publicUSDCAddress = import.meta.env.VITE_PUBLIC_USDC_TOKEN || (addresses as any).publicUSDC || "";
 
   // --- Router Navigation and Location Hooks ---
   const location = useLocation();
@@ -550,6 +570,7 @@ function App() {
                 setDeliverableFiles={setDraftFiles => setDeliverableFiles(setDraftFiles)}
                 vaultKey={vaultKey}
                 onDeriveKey={triggerKeyDerivation}
+                addToast={addToast}
                 getWeb3Signer={getWeb3Signer}
                 gatewayUrl={gatewayUrl}
                 loadOnChainContracts={loadOnChainContracts}

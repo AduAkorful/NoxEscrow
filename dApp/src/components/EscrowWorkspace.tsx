@@ -42,6 +42,7 @@ interface EscrowWorkspaceProps {
   setDeliverableFiles: React.Dispatch<React.SetStateAction<File[]>>;
   vaultKey?: string | null;
   onDeriveKey?: () => void;
+  addToast?: (message: string, type?: "success" | "error" | "info") => void;
   getWeb3Signer?: () => Promise<ethers.JsonRpcSigner>;
   gatewayUrl?: string;
   loadOnChainContracts?: (allowInteractiveDecrypt: boolean) => Promise<void>;
@@ -68,6 +69,7 @@ export function EscrowWorkspace({
   setDeliverableFiles,
   vaultKey,
   onDeriveKey,
+  addToast,
   getWeb3Signer,
   gatewayUrl,
   loadOnChainContracts
@@ -418,7 +420,7 @@ export function EscrowWorkspace({
       }
     } catch (err) {
       console.error("Failed to send encrypted message:", err);
-      alert("Error sending E2E encrypted message. Please try again.");
+      if (addToast) addToast("Error sending E2E encrypted message. Please try again.", "error");
       setMessages(prev => prev.filter(m => m.id !== tempId));
       setNewMessage(textToSend);
     } finally {
@@ -450,7 +452,7 @@ export function EscrowWorkspace({
       await loadReviews();
     } catch (err) {
       console.error("Failed to submit review:", err);
-      alert("Error submitting review. Please try again.");
+      if (addToast) addToast("Error submitting review. Please try again.", "error");
     } finally {
       setIsSubmittingReview(false);
     }
@@ -503,7 +505,7 @@ export function EscrowWorkspace({
 
   const handleDownloadFile = async (cid: string, keyHex: string, name: string, type: string) => {
     if (!keyHex) {
-      alert("Decryption key not available for this milestone.");
+      if (addToast) addToast("Decryption key not available for this milestone.", "error");
       return;
     }
     try {
@@ -517,7 +519,7 @@ export function EscrowWorkspace({
       document.body.removeChild(link);
     } catch (err) {
       console.error("Failed to download file:", err);
-      alert("Error decrypting/downloading file. Ensure you are connected to the correct wallet.");
+      if (addToast) addToast("Error decrypting/downloading file. Ensure you are connected to the correct wallet.", "error");
     } finally {
       setDownloadingFileCid(null);
     }

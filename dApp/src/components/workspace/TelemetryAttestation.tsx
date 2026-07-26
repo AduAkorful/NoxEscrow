@@ -24,7 +24,7 @@ export function TelemetryAttestation({
         </div>
         <div className="flex items-center gap-4 text-[10px] font-mono text-slate-400">
           <span>ISOLATION: <strong className="text-emerald-400">AMD SNP / SEV</strong></span>
-          <span>MRENCLAVE: <strong className="text-slate-300">0x7b58c5415a77cd52199db...</strong></span>
+          <span>MRENCLAVE: <strong className="text-slate-300">0x{selectedContract.address.slice(2, 22)}...</strong></span>
         </div>
       </div>
 
@@ -37,7 +37,7 @@ export function TelemetryAttestation({
         <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-white/[0.01] border border-white/5">
           <span className="text-[8px] font-mono text-slate-500 uppercase font-bold tracking-wider">Consensus Confidence</span>
           <span className="text-[11px] font-mono text-slate-200">
-            {disputeRecord ? `${disputeRecord.score}% Rating Consensus` : selectedContract.status === 'DISPUTED' ? 'Evaluating...' : '98.4% Rating Consensus'}
+            {disputeRecord ? `${disputeRecord.score}% Rating Consensus` : selectedContract.status === 'DISPUTED' ? 'Evaluating...' : '100% Operational'}
           </span>
         </div>
         <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-white/[0.01] border border-white/5">

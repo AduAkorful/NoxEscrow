@@ -30,6 +30,7 @@ interface EscrowPageProps {
   setDeliverableFiles: React.Dispatch<React.SetStateAction<File[]>>;
   vaultKey?: string | null;
   onDeriveKey?: () => void;
+  addToast?: (message: string, type?: "success" | "error" | "info") => void;
   getWeb3Signer?: () => Promise<ethers.JsonRpcSigner>;
   gatewayUrl?: string;
   loadOnChainContracts?: (allowInteractiveDecrypt: boolean) => Promise<void>;
@@ -55,6 +56,7 @@ export function EscrowPage({
   setDeliverableFiles,
   vaultKey,
   onDeriveKey,
+  addToast,
   getWeb3Signer,
   gatewayUrl,
   loadOnChainContracts
@@ -113,6 +115,7 @@ export function EscrowPage({
         setDeliverableFiles={setDeliverableFiles}
         vaultKey={vaultKey}
         onDeriveKey={onDeriveKey}
+        addToast={addToast}
         getWeb3Signer={getWeb3Signer}
         gatewayUrl={gatewayUrl}
         loadOnChainContracts={loadOnChainContracts}

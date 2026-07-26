@@ -15,7 +15,7 @@ import {
   AlertCircle,
   X
 } from 'lucide-react';
-import { getInitials } from './FreelancerMarketplace';
+import { getInitials } from '../utils/getInitials';
 import type { FreelancerProfile } from './FreelancerMarketplace';
 import { 
   getFreelancerProfilesFromSupabase, 

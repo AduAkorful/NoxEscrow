@@ -48,6 +48,8 @@ contract NoxEscrowFactory is
         address _treasury
     ) external override initializer {
         if (_escrowImplementation == address(0)) revert InvalidImplementation();
+        if (_reputationRegistry == address(0)) revert InvalidRegistry();
+        if (_cUSDCToken == address(0)) revert InvalidToken();
         if (_canonicalTeeArbiter == address(0)) revert InvalidArbiter();
         if (_treasury == address(0)) revert InvalidTreasury();
 

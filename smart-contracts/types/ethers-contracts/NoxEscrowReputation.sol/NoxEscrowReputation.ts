@@ -6,7 +6,7 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   
 
   export interface NoxEscrowReputationInterface extends Interface {
-    getFunction(nameOrSignature: "UPGRADE_INTERFACE_VERSION" | "addCompletedMilestone" | "baseReputationHandle" | "factory" | "getReputation" | "initialize" | "owner" | "penalizeLostDispute" | "proxiableUUID" | "renounceOwnership" | "setBaseReputation" | "setFactory" | "transferOwnership" | "upgradeToAndCall"): FunctionFragment;
+    getFunction(nameOrSignature: "UPGRADE_INTERFACE_VERSION" | "addCompletedMilestone" | "baseReputationHandle" | "factory" | "getReputation" | "initialize" | "owner" | "penalizeLostDispute" | "proxiableUUID" | "renounceOwnership" | "setBaseReputation" | "setFactory" | "setTokenDecimals" | "tokenDecimals" | "transferOwnership" | "upgradeToAndCall"): FunctionFragment;
 
     getEvent(nameOrSignatureOrTopic: "BaseReputationConfigured" | "FactoryUpdated" | "Initialized" | "OwnershipTransferred" | "ReputationUpdated" | "Upgraded"): EventFragment;
 
@@ -22,6 +22,8 @@ encodeFunctionData(functionFragment: 'proxiableUUID', values?: undefined): strin
 encodeFunctionData(functionFragment: 'renounceOwnership', values?: undefined): string;
 encodeFunctionData(functionFragment: 'setBaseReputation', values: [BytesLike, BytesLike]): string;
 encodeFunctionData(functionFragment: 'setFactory', values: [AddressLike]): string;
+encodeFunctionData(functionFragment: 'setTokenDecimals', values: [BigNumberish]): string;
+encodeFunctionData(functionFragment: 'tokenDecimals', values?: undefined): string;
 encodeFunctionData(functionFragment: 'transferOwnership', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'upgradeToAndCall', values: [AddressLike, BytesLike]): string;
 
@@ -37,6 +39,8 @@ decodeFunctionResult(functionFragment: 'proxiableUUID', data: BytesLike): Result
 decodeFunctionResult(functionFragment: 'renounceOwnership', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'setBaseReputation', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'setFactory', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'setTokenDecimals', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'tokenDecimals', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'transferOwnership', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'upgradeToAndCall', data: BytesLike): Result;
   }
@@ -244,6 +248,22 @@ decodeFunctionResult(functionFragment: 'upgradeToAndCall', data: BytesLike): Res
     
 
     
+    setTokenDecimals: TypedContractMethod<
+      [_decimals: BigNumberish, ],
+      [void],
+      'nonpayable'
+    >
+    
+
+    
+    tokenDecimals: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
+    
     transferOwnership: TypedContractMethod<
       [newOwner: AddressLike, ],
       [void],
@@ -321,6 +341,16 @@ getFunction(nameOrSignature: 'setFactory'): TypedContractMethod<
       [_newFactory: AddressLike, ],
       [void],
       'nonpayable'
+    >;
+getFunction(nameOrSignature: 'setTokenDecimals'): TypedContractMethod<
+      [_decimals: BigNumberish, ],
+      [void],
+      'nonpayable'
+    >;
+getFunction(nameOrSignature: 'tokenDecimals'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
     >;
 getFunction(nameOrSignature: 'transferOwnership'): TypedContractMethod<
       [newOwner: AddressLike, ],

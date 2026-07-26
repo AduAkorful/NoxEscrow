@@ -15,4 +15,3 @@ COPY src/ ./src/
 
 # Standard iExec enclave execution entrypoint
 ENTRYPOINT ["node", "/app/src/enclave-script.js"]
-```

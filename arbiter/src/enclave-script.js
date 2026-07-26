@@ -10,9 +10,9 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const PRIVATE_KEY = process.env.TEE_ARBITER_PRIVATE_KEY;
-const RPC_URL = process.env.RPC_URL || "http://127.0.0.1:8545";
-const NOX_GATEWAY_URL = process.env.NOX_GATEWAY_URL || `http://127.0.0.1:${process.env.NOX_HANDLE_GATEWAY_HOST_PORT || "8080"}`;
-const NOX_SUBGRAPH_URL = process.env.NOX_SUBGRAPH_URL || "https://example.com/subgraphs/id/none";
+const RPC_URL = process.env.RPC_URL;
+const NOX_GATEWAY_URL = process.env.NOX_GATEWAY_URL;
+const NOX_SUBGRAPH_URL = process.env.NOX_SUBGRAPH_URL;
 
 // ABI for resolveDispute on NoxEscrowContract
 const escrowABI = [
@@ -164,7 +164,7 @@ async function main() {
 
   console.log(`🔗 Connecting to Nox Gateway: ${NOX_GATEWAY_URL}`);
   const handleClient = await createEthersHandleClient(wallet, {
-    smartContractAddress: process.env.NOX_CONTRACT_MANAGER || "0x24ef36ec5b626d7dcd09a98f3083c2758f0f77bf",
+    smartContractAddress: process.env.NOX_CONTRACT_MANAGER,
     gatewayUrl: NOX_GATEWAY_URL,
     subgraphUrl: NOX_SUBGRAPH_URL
   });
@@ -204,7 +204,7 @@ async function main() {
   try {
     const fs = await import("fs");
     const path = await import("path");
-    const dbPath = path.resolve("/home/aduakorful/dev/NoxEscrow/arbiter/local-db.json");
+    const dbPath = path.resolve(process.cwd(), "local-db.json");
     if (fs.existsSync(dbPath)) {
       const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
       const record = data.find(
@@ -331,8 +331,8 @@ async function main() {
         console.log("\n🤖 Initializing Google Gemini 2.5 Flash client via local Application Default Credentials (ADC) Vertex AI...");
         ai = new GoogleGenAI({
           vertex: true,
-          project: "project-7fba3d65-5e52-4996-b38",
-          location: "us-central1"
+          project: process.env.VERTEX_PROJECT_ID,
+          location: process.env.VERTEX_LOCATION
         });
       }
 
@@ -371,30 +371,41 @@ ${freelancerStatement}
 
       console.log("⏳ Sending evaluation request to Gemini API (gemini-2.5-flash)...");
       
-      const result = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { text: userContext }
-            ]
-          }
-        ],
-        config: {
-          systemInstruction: systemPrompt,
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "OBJECT",
-            properties: {
-              reasoning: { type: "STRING" },
-              score: { type: "INTEGER" },
-              verdict: { type: "STRING", enum: ["PAY_FREELANCER", "REFUND_CLIENT"] }
-            },
-            required: ["reasoning", "score", "verdict"]
-          }
+      let result;
+      const maxRetries = 3;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          result = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  { text: userContext }
+                ]
+              }
+            ],
+            config: {
+              systemInstruction: systemPrompt,
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "OBJECT",
+                properties: {
+                  reasoning: { type: "STRING" },
+                  score: { type: "INTEGER" },
+                  verdict: { type: "STRING", enum: ["PAY_FREELANCER", "REFUND_CLIENT"] }
+                },
+                required: ["reasoning", "score", "verdict"]
+              }
+            }
+          });
+          break;
+        } catch (apiError) {
+          console.warn(`⚠️ Gemini API attempt ${attempt}/${maxRetries} failed:`, apiError.message);
+          if (attempt === maxRetries) throw apiError;
+          await new Promise(res => setTimeout(res, attempt * 2000));
         }
-      });
+      }
 
       const responseText = result.text;
 
@@ -482,7 +493,8 @@ ${freelancerStatement}
             "Authorization": `Bearer ${supabaseKey}`,
             "Content-Type": "application/json",
             "Prefer": "resolution=merge-duplicates"
-          }
+          },
+          timeout: 10000
         }
       );
       console.log("✔️ Live Gemini evaluation record persisted to Supabase!");
