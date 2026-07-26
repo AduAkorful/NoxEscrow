@@ -53,18 +53,15 @@ export async function updateEscrowDeliverable(
   milestoneIndex: number,
   devsCid: string
 ): Promise<void> {
-  const url = `${supabaseUrl}/rest/v1/escrow_metadata`;
+  const url = `${supabaseUrl}/rest/v1/escrow_metadata?escrow_address=eq.${escrowAddress.toLowerCase()}&milestone_index=eq.${milestoneIndex}`;
   const response = await fetch(url, {
-    method: "POST",
+    method: "PATCH",
     headers: {
       "apikey": supabaseKey,
       "Authorization": `Bearer ${supabaseKey}`,
-      "Content-Type": "application/json",
-      "Prefer": "resolution=merge-duplicates"
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      escrow_address: escrowAddress.toLowerCase(),
-      milestone_index: milestoneIndex,
       devs_cid: devsCid
     })
   });

@@ -752,6 +752,10 @@ export async function unwrapToken(
   // 1. Encrypt unwrap amount using Nox KMS
   const amountEnc = await encryptNoxInput(signer, amount, "uint256", cUSDCAddress, gatewayUrl);
 
+  if (!NOX_CONTRACT_MANAGER || !ethers.isAddress(NOX_CONTRACT_MANAGER)) {
+    throw new Error("Nox Contract Manager address is not configured in environment variables or addresses.json.");
+  }
+
   // Grant wrapper contract permission to read the encrypted unwrap amount handle
   const noxContractManager = new ethers.Contract(NOX_CONTRACT_MANAGER, [
     "function allow(bytes32 handle, address contractAddress) external"

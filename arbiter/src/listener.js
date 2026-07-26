@@ -1,6 +1,8 @@
 import { ethers } from "ethers";
 import axios from "axios";
 import http from "http";
+import path from "path";
+import { fork } from "child_process";
 
 // Environment variables strictly required or validated
 const RPC_URL = process.env.RPC_URL;
@@ -279,11 +281,38 @@ async function main() {
   // Run immediately once on start to initialize or catch up
   pollForEvents();
 
-  // Simple HTTP Server for Render free-tier health checks
+  // HTTP Server for Render health checks and local /trigger-task task runner
   const PORT = process.env.PORT || 3000;
   const server = http.createServer((req, res) => {
-    res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end("NoxEscrow Webhook Listener Active\n");
+    if (req.method === "POST" && req.url === "/trigger-task") {
+      let body = "";
+      req.on("data", chunk => { body += chunk; });
+      req.on("end", () => {
+        try {
+          console.log("📥 [Task Runner] Received /trigger-task execution payload:", body);
+          const payload = JSON.parse(body);
+          
+          const scriptPath = path.resolve("src/enclave-script.js");
+          const child = fork(scriptPath, [JSON.stringify(payload)], {
+            env: { ...process.env }
+          });
+
+          child.on("exit", (code) => {
+            console.log(`🤖 [Task Runner] Enclave evaluation process exited with code ${code}`);
+          });
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ status: "triggered", payload }));
+        } catch (err) {
+          console.error("❌ [Task Runner] Error executing trigger-task:", err.message);
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+    } else {
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end("NoxEscrow Webhook Listener & Task Runner Active\n");
+    }
   });
   
   server.listen(PORT, () => {

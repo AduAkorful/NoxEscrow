@@ -113,6 +113,22 @@ async function main() {
   console.log("🚀  NoxEscrow Protocol — Automated Deployer Suite  🚀");
   console.log("=========================================================\n");
 
+  const localEnvPath = path.resolve(__dirname, "../.env");
+  if (fs.existsSync(localEnvPath)) {
+    const lines = fs.readFileSync(localEnvPath, "utf8").split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
+        const [k, ...v] = trimmed.split("=");
+        const key = k.trim();
+        const val = v.join("=").trim().replace(/^["']|["']$/g, "");
+        if (key && !process.env[key]) {
+          process.env[key] = val;
+        }
+      }
+    }
+  }
+
   // 1. Connect to the network / Nox stack
   console.log("🔌 Resolving network connection...");
   const networkName = hre.network.name;

@@ -32,9 +32,9 @@ services:
 
       # Google Cloud Vertex AI & ADC Authentication Configuration
       - key: VERTEX_PROJECT_ID
-        value: "project-7fba3d65-5e52-4996-b38" # Automatically set to your active project ID!
+        value: "project-eedabfd1-816e-4b2e-b15" # Automatically set to your active project ID!
       - key: VERTEX_LOCATION
-        value: "us-central1"
+        value: "global"
       - key: GOOGLE_APPLICATION_CREDENTIALS
         value: "/etc/secrets/gcp-key.json"
 
