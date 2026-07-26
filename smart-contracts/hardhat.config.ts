@@ -3,6 +3,9 @@ import noxPlugin from "@iexec-nox/nox-hardhat-plugin";
 import hardhatEthersPlugin from "@nomicfoundation/hardhat-ethers";
 import { defineConfig } from "hardhat/config";
 
+const rawKey = process.env.PRIVATE_KEY;
+const accounts = rawKey ? [rawKey.startsWith("0x") ? rawKey : `0x${rawKey}`] : [];
+
 export default defineConfig({
   plugins: [hardhatToolboxMochaEthers, noxPlugin, hardhatEthersPlugin],
   solidity: {
@@ -22,7 +25,7 @@ export default defineConfig({
     sepolia: {
       type: "http",
       url: process.env.SEPOLIA_RPC_URL || "https://rpc.sepolia.org",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts,
     },
   },
   etherscan: {

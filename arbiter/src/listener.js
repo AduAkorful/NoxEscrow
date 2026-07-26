@@ -55,9 +55,12 @@ async function reconcileDisputes(escrowClones, triggeredDisputes) {
       chunk.map(async (cloneAddress) => {
         try {
           const escrowContract = new ethers.Contract(cloneAddress, escrowABI, provider);
-          const status = await escrowContract.status();
+          const status = Number(await escrowContract.status());
           
-          if (Number(status) === 2) { // 2 = DISPUTED status enum
+          if (status === 3 || status === 4) { // 3 = COMPLETED, 4 = REFUNDED
+            escrowClones.delete(cloneAddress);
+            console.log(`🧹 [Reconciler] Pruned settled escrow clone from active scan list: ${cloneAddress}`);
+          } else if (status === 2) { // 2 = DISPUTED status enum
             const milestoneIndex = await escrowContract.activeMilestoneIndex();
             const milestoneIndexStr = milestoneIndex.toString();
             const key = `${cloneAddress.toLowerCase()}_${milestoneIndexStr}`;
@@ -107,7 +110,7 @@ console.log("==========================================================\n");
 const DISPUTE_OPENED_TOPIC = ethers.id("DisputeOpened(uint256,uint256,uint256)");
 const ESCROW_CREATED_TOPIC = ethers.id("EscrowCreated(address,address,address,uint256)");
 
-async function handleDisputeOpened(log) {
+async function handleDisputeOpened(log, triggeredDisputes) {
   try {
     const contractAddress = log.address;
     console.log(`\n🔔 Event detected! Log address: ${contractAddress}`);
@@ -126,6 +129,20 @@ async function handleDisputeOpened(log) {
     const parsedLog = escrowContract.interface.parseLog(log);
     
     const { milestoneIndex, requirementsHash, deliverableHash } = parsedLog.args;
+    const milestoneIndexStr = milestoneIndex.toString();
+    const key = `${contractAddress.toLowerCase()}_${milestoneIndexStr}`;
+    const now = Date.now();
+    const lastTriggered = triggeredDisputes ? (triggeredDisputes.get(key) || 0) : 0;
+
+    if (now - lastTriggered < RECONCILE_COOLDOWN) {
+      console.log(`ℹ️ Dispute for ${key} was triggered recently (${Math.round((now - lastTriggered) / 1000)}s ago). Skipping duplicate trigger.`);
+      return;
+    }
+
+    if (triggeredDisputes) {
+      triggeredDisputes.set(key, now);
+    }
+
     console.log(`👉 Milestone Index: ${milestoneIndex}`);
     console.log(`👉 Requirements Handle: 0x${requirementsHash.toString(16)}`);
     console.log(`👉 Deliverable Handle: 0x${deliverableHash.toString(16)}`);
@@ -134,7 +151,7 @@ async function handleDisputeOpened(log) {
     console.log("⏳ Forwarding dispute details to the iExec TEE task runner...");
     const response = await axios.post(IEXEC_RUNNER_ENDPOINT, {
       escrowAddress: contractAddress,
-      milestoneIndex: milestoneIndex.toString(),
+      milestoneIndex: milestoneIndexStr,
       reqsHandle: `0x${BigInt(requirementsHash).toString(16).padStart(64, "0")}`,
       devsHandle: `0x${BigInt(deliverableHash).toString(16).padStart(64, "0")}`
     }, { timeout: RUNNER_TIMEOUT });
@@ -174,23 +191,27 @@ async function main() {
     console.error("⚠️ Warning: Failed to load existing escrow clones from factory on startup:", err.message);
   }
 
+  const CONFIRMATION_BLOCKS = 6;
+
   async function pollForEvents() {
     if (isPolling) return;
     isPolling = true;
     try {
-      const latestBlock = await provider.getBlockNumber();
+      const chainLatest = await provider.getBlockNumber();
+      const safeLatest = chainLatest - CONFIRMATION_BLOCKS;
+
+      if (safeLatest <= 0) return;
       
       if (lastProcessedBlock === null) {
-        lastProcessedBlock = latestBlock;
-        console.log(`📡 Block polling initialized. Starting from block: ${lastProcessedBlock}`);
-        return;
+        lastProcessedBlock = Math.max(0, safeLatest - 100);
+        console.log(`📡 Block polling initialized with ${CONFIRMATION_BLOCKS}-block safety depth. Starting from block: ${lastProcessedBlock}`);
       }
 
-      if (latestBlock > lastProcessedBlock) {
+      if (safeLatest > lastProcessedBlock) {
         const fromBlock = lastProcessedBlock + 1;
-        const toBlock = Math.min(latestBlock, fromBlock + 99); // Max 100 blocks per request
+        const toBlock = Math.min(safeLatest, fromBlock + 99); // Max 100 blocks per request
         
-        console.log(`🔍 Polling blocks ${fromBlock} to ${toBlock} (latest: ${latestBlock})...`);
+        console.log(`🔍 Polling blocks ${fromBlock} to ${toBlock} (safe tip: ${safeLatest}, chain tip: ${chainLatest})...`);
         
         // 1. Check for any newly created escrow clones from the factory
         const escrowCreatedLogs = await provider.getLogs({
@@ -223,7 +244,7 @@ async function main() {
 
           for (const log of disputeLogs) {
             if (escrowClones.has(log.address.toLowerCase())) {
-              await handleDisputeOpened(log);
+              await handleDisputeOpened(log, triggeredDisputes);
             }
           }
         } else {

@@ -85,14 +85,13 @@ export function TEECourtroom({
   }, [metadata, disputeReason, escrowAddress, clientAddress, freelancerAddress]);
 
   const [inputVal, setInputVal] = useState('');
-  const [clientClaimPercent, setClientClaimPercent] = useState(48);
-  const [freelancerClaimPercent, setFreelancerClaimPercent] = useState(52);
-  const [confidence, setConfidence] = useState(72);
+  const [clientClaimPercent, setClientClaimPercent] = useState(0);
+  const [freelancerClaimPercent, setFreelancerClaimPercent] = useState(0);
+  const [confidence, setConfidence] = useState(0);
   const [teeLogs, setTeeLogs] = useState<string[]>([
     "[00:01] Attesting arbitrator hardware keys...",
     "[00:03] Secure SGX sandbox initialized...",
-    "[00:07] Decrypted deliverable file payload (AES-GCM-256)...",
-    "[00:12] Analyzing test scripts and dependency mapping..."
+    "[00:07] Awaiting off-chain iExec TEE evaluation execution..."
   ]);
 
   const logsEndRef = useRef<HTMLDivElement>(null);

@@ -93,6 +93,7 @@ let cachedSignerAddress: string = "";
 export function clearHandleClientCache() {
   cachedHandleClient = null;
   cachedSignerAddress = "";
+  chatKeyMemoryCache.clear();
 }
 
 export async function getOrCreateHandleClient(
@@ -168,7 +169,7 @@ export async function decryptMilestoneChatKey(
   milestoneIndex: number = 0,
   gatewayUrl: string = DEFAULT_NOX_GATEWAY
 ): Promise<string> {
-  const cacheKey = escrowAddress.toLowerCase();
+  const cacheKey = `${escrowAddress.toLowerCase()}_ms_${milestoneIndex}`;
   const existing = chatKeyMemoryCache.get(cacheKey);
   if (existing) {
     return existing;
@@ -571,8 +572,9 @@ export async function submitMilestoneDeliverable(
         try {
           const encResult = await encryptAndUploadFile(file, randomHexKey, metadataConfig.pinataJWT);
           fileCids.push(encResult);
-        } catch (fErr) {
-          console.warn("Pinata file upload failed:", fErr);
+        } catch (fErr: any) {
+          console.error("Pinata file upload failed:", fErr);
+          throw new Error(`Failed to upload attached file "${file.name}" to IPFS: ${fErr.message || "Pinata upload error"}`);
         }
       }
     }

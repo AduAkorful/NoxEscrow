@@ -13,5 +13,9 @@ RUN npm ci --omit=dev
 # Copy source scripts
 COPY src/ ./src/
 
+# Enforce non-root execution
+RUN addgroup -S arbiter && adduser -S arbiter -G arbiter
+USER arbiter
+
 # Standard iExec enclave execution entrypoint
 ENTRYPOINT ["node", "/app/src/enclave-script.js"]

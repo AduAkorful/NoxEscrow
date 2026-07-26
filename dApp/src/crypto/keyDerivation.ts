@@ -7,9 +7,13 @@ export const SIGN_MESSAGE = "Initialize your NoxEscrow Secure Environment. Signi
  * @param walletAddress Optional wallet address to salt key derivation uniquely per account.
  * @returns A promise resolving to a 256-bit (32-byte) hex-encoded key string.
  */
-export async function deriveEncryptionKey(signature: string, walletAddress?: string): Promise<string> {
+export async function deriveEncryptionKey(signature: string, walletAddress: string): Promise<string> {
   if (!globalThis.crypto?.subtle) {
     throw new Error("WebCrypto is unavailable. Open NoxEscrow from a secure browser context.");
+  }
+
+  if (!walletAddress || !walletAddress.startsWith("0x")) {
+    throw new Error("A valid wallet address is required to uniquely derive encryption key.");
   }
 
   const encoder = new TextEncoder();
@@ -24,9 +28,7 @@ export async function deriveEncryptionKey(signature: string, walletAddress?: str
     ["deriveBits", "deriveKey"]
   );
 
-  const saltString = walletAddress
-    ? `noxescrow-protocol-salt-${walletAddress.toLowerCase()}`
-    : "noxescrow-protocol-salt";
+  const saltString = `noxescrow-protocol-salt-${walletAddress.toLowerCase()}`;
   const saltBuffer = encoder.encode(saltString);
 
   // Derive a stable symmetric AES-GCM key

@@ -45,6 +45,15 @@ contract NoxEscrowContract is Initializable, ReentrancyGuard, INoxEscrowContract
 
     mapping(uint256 => Milestone) public milestones;
 
+    // ============ Internal Helpers ============
+
+    function _resetCancelRequests() internal {
+        clientCancelRequested = false;
+        freelancerCancelRequested = false;
+        clientCancelRequestTime = 0;
+        freelancerCancelRequestTime = 0;
+    }
+
     // ============ Constructor ============
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -183,20 +192,28 @@ contract NoxEscrowContract is Initializable, ReentrancyGuard, INoxEscrowContract
             status = Status.COMPLETED;
         }
 
+        _resetCancelRequests();
+
         emit MilestoneApproved(currentMilestoneIndex);
 
         euint256 fee;
         euint256 netPayout;
 
-        if (platformFeeBps > 0 && protocolTreasury != address(0)) {
+        address currentTreasury = INoxEscrowFactory(factory).treasury();
+        uint256 currentFeeBps = INoxEscrowFactory(factory).platformFeeBps();
+
+        if (currentFeeBps > 0 && currentTreasury != address(0)) {
             fee = Nox.div(
-                Nox.mul(activeMilestone.payoutHandle, Nox.toEuint256(platformFeeBps)),
+                Nox.mul(activeMilestone.payoutHandle, Nox.toEuint256(currentFeeBps)),
                 Nox.toEuint256(10000)
             );
             netPayout = Nox.sub(activeMilestone.payoutHandle, fee);
 
+            Nox.allowThis(fee);
+            Nox.allowThis(netPayout);
+
             Nox.allowTransient(fee, address(cUSDCToken));
-            cUSDCToken.confidentialTransfer(protocolTreasury, fee);
+            cUSDCToken.confidentialTransfer(currentTreasury, fee);
 
             emit PlatformFeeCollected(currentMilestoneIndex, fee);
         } else {
@@ -231,6 +248,8 @@ contract NoxEscrowContract is Initializable, ReentrancyGuard, INoxEscrowContract
         status = Status.DISPUTED;
         disputeOpenTime = block.timestamp;
 
+        _resetCancelRequests();
+
         euint256 devHash = activeMilestone.isSubmitted ? activeMilestone.deliverableHash : Nox.toEuint256(0);
 
         Nox.allow(activeMilestone.payoutHandle, teeArbiter);
@@ -254,6 +273,7 @@ contract NoxEscrowContract is Initializable, ReentrancyGuard, INoxEscrowContract
         uint256 currentMilestoneIndex = activeMilestoneIndex;
 
         activeMilestoneIndex++;
+        _resetCancelRequests();
         
         if (ruleInFavorOfFreelancer) {
             if (activeMilestoneIndex == totalMilestones) {
@@ -267,15 +287,21 @@ contract NoxEscrowContract is Initializable, ReentrancyGuard, INoxEscrowContract
             euint256 fee;
             euint256 netPayout;
 
-            if (platformFeeBps > 0 && protocolTreasury != address(0)) {
+            address currentTreasury = INoxEscrowFactory(factory).treasury();
+            uint256 currentFeeBps = INoxEscrowFactory(factory).platformFeeBps();
+
+            if (currentFeeBps > 0 && currentTreasury != address(0)) {
                 fee = Nox.div(
-                    Nox.mul(activeMilestone.payoutHandle, Nox.toEuint256(platformFeeBps)),
+                    Nox.mul(activeMilestone.payoutHandle, Nox.toEuint256(currentFeeBps)),
                     Nox.toEuint256(10000)
                 );
                 netPayout = Nox.sub(activeMilestone.payoutHandle, fee);
 
+                Nox.allowThis(fee);
+                Nox.allowThis(netPayout);
+
                 Nox.allowTransient(fee, address(cUSDCToken));
-                cUSDCToken.confidentialTransfer(protocolTreasury, fee);
+                cUSDCToken.confidentialTransfer(currentTreasury, fee);
 
                 emit PlatformFeeCollected(currentMilestoneIndex, fee);
             } else {
@@ -307,7 +333,9 @@ contract NoxEscrowContract is Initializable, ReentrancyGuard, INoxEscrowContract
                 }
             }
 
-            reputationRegistry.penalizeLostDispute(freelancer);
+            if (activeMilestone.isSubmitted) {
+                reputationRegistry.penalizeLostDispute(freelancer);
+            }
         }
     }
 
@@ -326,9 +354,16 @@ contract NoxEscrowContract is Initializable, ReentrancyGuard, INoxEscrowContract
         
         if (!activeMilestone.isSettled) {
             activeMilestone.isSettled = true;
-            address activeRecipient = activeMilestone.isSubmitted ? freelancer : client;
-            Nox.allowTransient(activeMilestone.payoutHandle, address(cUSDCToken));
-            cUSDCToken.confidentialTransfer(activeRecipient, activeMilestone.payoutHandle);
+            if (activeMilestone.isSubmitted) {
+                Nox.allowTransient(activeMilestone.payoutHandle, address(cUSDCToken));
+                cUSDCToken.confidentialTransfer(freelancer, activeMilestone.payoutHandle);
+
+                Nox.allowTransient(activeMilestone.payoutHandle, address(reputationRegistry));
+                reputationRegistry.addCompletedMilestone(freelancer, activeMilestone.payoutHandle, 5);
+            } else {
+                Nox.allowTransient(activeMilestone.payoutHandle, address(cUSDCToken));
+                cUSDCToken.confidentialTransfer(client, activeMilestone.payoutHandle);
+            }
         }
 
         uint256 total = totalMilestones;
@@ -344,6 +379,7 @@ contract NoxEscrowContract is Initializable, ReentrancyGuard, INoxEscrowContract
         }
 
         status = Status.REFUNDED;
+        _resetCancelRequests();
         emit DisputeResolved(activeMilestoneIndex, false);
     }
 

@@ -237,17 +237,16 @@ function App() {
     clearHandleClientCache();
 
     if (authenticated && connectedAddress) {
+      if (walletAddress && walletAddress.toLowerCase() !== connectedAddress.toLowerCase()) {
+        // Reset sensitive derived state on account switch to prevent key bleed
+        setVaultKey(null);
+      }
       setWalletAddress(connectedAddress);
       localStorage.setItem('nox_connected_wallet', connectedAddress);
     } else if (ready && !authenticated) {
-      const win = window as any;
-      if (win.ethereum && win.ethereum.selectedAddress) {
-        const addr = win.ethereum.selectedAddress;
-        setWalletAddress(addr);
-      } else {
-        setWalletAddress(null);
-        setVaultKey(null);
-      }
+      setWalletAddress(null);
+      setVaultKey(null);
+      localStorage.removeItem('nox_connected_wallet');
     }
   }, [ready, authenticated, connectedAddress]);
 
