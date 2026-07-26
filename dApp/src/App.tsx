@@ -221,6 +221,8 @@ function App() {
       const cachedKey = localStorage.getItem(`nox_vault_key_${connectedAddress.toLowerCase()}`);
       if (cachedKey) {
         setVaultKey(cachedKey);
+      } else {
+        setVaultKey(null);
       }
     } else if (ready && !authenticated) {
       const win = window as any;
@@ -228,7 +230,11 @@ function App() {
         const addr = win.ethereum.selectedAddress;
         setWalletAddress(addr);
         const cachedKey = localStorage.getItem(`nox_vault_key_${addr.toLowerCase()}`);
-        if (cachedKey) setVaultKey(cachedKey);
+        if (cachedKey) {
+          setVaultKey(cachedKey);
+        } else {
+          setVaultKey(null);
+        }
       } else {
         setWalletAddress(null);
         setVaultKey(null);

@@ -165,6 +165,12 @@ export function EscrowWorkspace({
   const [, setIsChatKeyDeriving] = useState(false);
   const chatKeyDerivedRef = useRef(false);
 
+  // Reset key caches when selected contract address changes to prevent key carryover leak
+  useEffect(() => {
+    chatKeyDerivedRef.current = false;
+    setChatKey(null);
+  }, [selectedContract.address]);
+
   // Derive chat key lazily when vaultKey is unlocked (once per workspace open)
   useEffect(() => {
     if (chatKeyDerivedRef.current || !vaultKey || !getWeb3Signer || !selectedContract.address) return;
@@ -785,6 +791,7 @@ export function EscrowWorkspace({
           freelancerAddress={selectedContract.role === 'FREELANCER' ? 'Self' : selectedContract.counterparty}
           disputeReason={disputeStatement}
           disputeRecord={disputeRecord}
+          milestoneIndex={selectedContract.milestonesCompleted}
           simulationMode={import.meta.env.DEV}
           onResolve={async (ruling) => {
             alert(`TEE Enclave consensus finalized: Dispute settled. Ruling: ${ruling}. Escrow state updated.`);

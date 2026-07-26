@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, Terminal, ShieldAlert, Award } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
 interface ChatMessage {
   sender: 'CLIENT' | 'FREELANCER' | 'TEE_SYSTEM';
@@ -15,6 +16,7 @@ interface TEECourtroomProps {
   onResolve: (ruling: 'CLIENT' | 'FREELANCER') => void;
   simulationMode?: boolean;
   disputeRecord?: any;
+  milestoneIndex?: number;
 }
 
 export function TEECourtroom({
@@ -24,32 +26,66 @@ export function TEECourtroom({
   disputeReason,
   onResolve,
   simulationMode = false,
-  disputeRecord = null
+  disputeRecord = null,
+  milestoneIndex
 }: TEECourtroomProps) {
   void clientAddress;
   void freelancerAddress;
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      sender: 'TEE_SYSTEM',
-      text: `⚠️ DISPUTE DETECTED. Secure enclave court initiated for escrow ${escrowAddress.slice(0, 10)}...`,
-      timestamp: '14:22:01'
-    },
-    {
-      sender: 'CLIENT',
-      text: `The contractor failed to satisfy the milestone requirements. The API responses are malformed and delayed.`,
-      timestamp: '14:22:45'
-    },
-    {
-      sender: 'TEE_SYSTEM',
-      text: `🔬 Evidence parsed: client claims non-compliance of milestone specs.`,
-      timestamp: '14:23:00'
-    },
-    {
-      sender: 'FREELANCER',
-      text: `I submitted the correct deliverables, and verified all test cases pass locally. The client is trying to avoid payment.`,
-      timestamp: '14:23:15'
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [metadata, setMetadata] = useState<any>(null);
+
+  useEffect(() => {
+    if (!escrowAddress || milestoneIndex === undefined) return;
+    
+    async function fetchMetadata() {
+      try {
+        const { data, error } = await supabase
+          .from('escrow_metadata')
+          .select('*')
+          .eq('escrow_address', escrowAddress.toLowerCase())
+          .eq('milestone_index', milestoneIndex)
+          .single();
+        if (!error && data) {
+          setMetadata(data);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch escrow metadata for courtroom:", err);
+      }
     }
-  ]);
+    fetchMetadata();
+  }, [escrowAddress, milestoneIndex]);
+
+  useEffect(() => {
+    const clientMsg = metadata?.client_statement && metadata.client_statement !== "None provided."
+      ? metadata.client_statement
+      : disputeReason || "The contractor failed to satisfy the milestone requirements. The API responses are malformed and delayed.";
+    const freelancerMsg = metadata?.freelancer_statement && metadata.freelancer_statement !== "None provided."
+      ? metadata.freelancer_statement
+      : "I submitted the correct deliverables, and verified all test cases pass locally. The client is trying to avoid payment.";
+
+    setMessages([
+      {
+        sender: 'TEE_SYSTEM',
+        text: `⚠️ DISPUTE DETECTED. Secure enclave court initiated for escrow ${escrowAddress.slice(0, 10)}...`,
+        timestamp: '14:22:01'
+      },
+      {
+        sender: 'CLIENT',
+        text: clientMsg,
+        timestamp: '14:22:45'
+      },
+      {
+        sender: 'TEE_SYSTEM',
+        text: `🔬 Evidence parsed: client claims non-compliance of milestone specs.`,
+        timestamp: '14:23:00'
+      },
+      {
+        sender: 'FREELANCER',
+        text: freelancerMsg,
+        timestamp: '14:23:15'
+      }
+    ]);
+  }, [metadata, disputeReason, escrowAddress]);
 
   const [inputVal, setInputVal] = useState('');
   const [clientClaimPercent, setClientClaimPercent] = useState(48);
@@ -212,21 +248,27 @@ export function TEECourtroom({
         </div>
 
         {/* Action inputs */}
-        <form onSubmit={handleSendMessage} className="flex gap-2">
-          <input 
-            type="text" 
-            placeholder="Provide counter-evidence or chat to enclave..."
-            value={inputVal}
-            onChange={(e) => setInputVal(e.target.value)}
-            className="flex-1 bg-[#05070F] border border-white/5 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-200 focus:border-[#00F2FE]/45 focus:outline-none transition-smooth"
-          />
-          <button 
-            type="submit"
-            className="w-10 h-10 rounded-xl border border-[#00F2FE]/30 bg-[#00F2FE]/5 text-[#00F2FE] hover:bg-[#00F2FE]/25 flex items-center justify-center transition-smooth cursor-pointer active:scale-95"
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </form>
+        {!simulationMode ? (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 font-mono text-[10px] uppercase font-bold text-center rounded-xl tracking-wider">
+            🔒 COURT ROOM STATEMENTS ARE LOCKED FOR TEE ENCLAVE ASSESSMENT
+          </div>
+        ) : (
+          <form onSubmit={handleSendMessage} className="flex gap-2">
+            <input 
+              type="text" 
+              placeholder="Provide counter-evidence or chat to enclave..."
+              value={inputVal}
+              onChange={(e) => setInputVal(e.target.value)}
+              className="flex-1 bg-[#05070F] border border-white/5 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-200 focus:border-[#00F2FE]/45 focus:outline-none transition-smooth"
+            />
+            <button 
+              type="submit"
+              className="w-10 h-10 rounded-xl border border-[#00F2FE]/30 bg-[#00F2FE]/5 text-[#00F2FE] hover:bg-[#00F2FE]/25 flex items-center justify-center transition-smooth cursor-pointer active:scale-95"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </form>
+        )}
       </div>
 
       {/* AI consensus telemetry (5 cols) */}
