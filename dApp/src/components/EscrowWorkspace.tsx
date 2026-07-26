@@ -693,6 +693,7 @@ export function EscrowWorkspace({
           deliverableFiles={deliverableFiles}
           setDeliverableFiles={setDeliverableFiles}
           handleSubmitDeliverable={handleSubmitDeliverable}
+          handleReleaseMilestone={handleReleaseMilestone}
           deliverableText={deliverableText}
           deliverableAttachedFiles={deliverableAttachedFiles}
           ratingInput={ratingInput}

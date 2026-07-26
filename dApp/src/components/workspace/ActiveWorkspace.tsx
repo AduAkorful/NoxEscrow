@@ -1,5 +1,5 @@
 import React from 'react';
-import { Lock, Paperclip, AlertTriangle, Activity, ShieldCheck, Terminal, Unlock, Trash2 } from 'lucide-react';
+import { Lock, Paperclip, AlertTriangle, Activity, ShieldCheck, Terminal, Unlock, Trash2, CheckCircle2, Clock } from 'lucide-react';
 import { type EscrowContract } from '../../services/escrowService';
 
 interface ActiveWorkspaceProps {
@@ -23,6 +23,7 @@ interface ActiveWorkspaceProps {
   deliverableFiles: File[];
   setDeliverableFiles: React.Dispatch<React.SetStateAction<File[]>>;
   handleSubmitDeliverable: (contractAddress?: string) => Promise<void>;
+  handleReleaseMilestone: (contractAddress?: string) => Promise<void>;
   deliverableText: string;
   deliverableAttachedFiles: { name: string; type: string; cid: string }[];
   ratingInput: number;
@@ -52,6 +53,7 @@ export function ActiveWorkspace({
   deliverableFiles,
   setDeliverableFiles,
   handleSubmitDeliverable,
+  handleReleaseMilestone,
   deliverableText,
   deliverableAttachedFiles,
   ratingInput,
@@ -77,10 +79,16 @@ export function ActiveWorkspace({
                 <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-wider">
                   <span className="flex items-center gap-1.5">
                     <span className={`w-1.5 h-1.5 rounded-full ${timeLeft.isExpired ? 'bg-[#00E676] drop-shadow-[0_0_4px_#00E676]' : 'bg-amber-400 animate-pulse drop-shadow-[0_0_4px_rgba(245,158,11,0.5)]'}`}></span>
-                    {timeLeft.isExpired ? 'Auto-Release Window Expired' : 'Auto-Release Review Countdown'}
+                    {timeLeft.isExpired 
+                      ? 'Auto-Release Window Expired' 
+                      : viewMode === 'client' 
+                        ? 'Client Review Countdown' 
+                        : 'Client Review Window'}
                   </span>
                   <span className="text-[9px] text-slate-500">
-                    {timeLeft.isExpired ? 'Freelancer may trigger release' : 'Auto-release pending'}
+                    {timeLeft.isExpired 
+                      ? (viewMode === 'freelancer' ? 'You may claim auto-release' : 'Freelancer may claim release') 
+                      : (viewMode === 'client' ? 'Approve or dispute before timer expires' : 'Auto-release when timer expires')}
                   </span>
                 </div>
                 <div className="flex gap-4 items-center justify-center py-2 border-y border-white/5">
@@ -250,90 +258,124 @@ export function ActiveWorkspace({
                 </div>
               </div>
 
-              {viewMode === 'freelancer' ? (
+              {              viewMode === 'freelancer' ? (
                 /* Freelancer Action Console */
-                <div className="space-y-4">
-                  {(!walletAddress || walletAddress.toLowerCase() !== (selectedContract.role === 'FREELANCER' ? walletAddress.toLowerCase() : selectedContract.counterparty.toLowerCase())) && (
-                    <div className="p-3.5 bg-amber-950/20 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-xs font-mono text-amber-300">
-                      <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                      <div className="leading-relaxed">
-                        <span className="font-bold uppercase block text-[10px] text-amber-400 mb-0.5">Wallet Role Mismatch</span>
-                        Your connected wallet is the <strong>Client</strong> for this contract. Switch your Web3 wallet (MetaMask/Rabby) to the assigned <strong>Freelancer wallet</strong> ({selectedContract.role === 'FREELANCER' ? walletAddress?.slice(0,6) : selectedContract.counterparty.slice(0,6)}...{selectedContract.role === 'FREELANCER' ? walletAddress?.slice(-4) : selectedContract.counterparty.slice(-4)}) to submit deliverables on-chain.
+                selectedContract.activeMilestoneSubmitted ? (
+                  <div className="space-y-4">
+                    {timeLeft?.isExpired ? (
+                      <div className="p-5 bg-emerald-950/15 border border-emerald-500/30 rounded-xl space-y-4">
+                        <div className="flex items-center gap-2 text-emerald-400 font-mono text-xs font-bold uppercase">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          <span>Review Window Expired — Auto-Release Ready</span>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                          The client did not raise any dispute during the review window. You are authorized to claim the full milestone payout on-chain.
+                        </p>
+                        <button
+                          onClick={() => handleReleaseMilestone(selectedContract.address)}
+                          disabled={isLoading}
+                          className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth cursor-pointer shadow-lg flex items-center justify-center gap-2 rounded-xl"
+                        >
+                          <Unlock className="w-4 h-4" />
+                          {isLoading ? "Executing Payout..." : "Claim Auto-Release Payout"}
+                        </button>
                       </div>
-                    </div>
-                  )}
-
-                  <label className="block text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">Submit Code Deliverable / Git diff</label>
-                  <textarea 
-                    rows={3}
-                    placeholder="Tested Collapsible sidebar. Full GPU acceleration and responsive Chrome/Safari/Firefox compatibility."
-                    value={deliverableInput} 
-                    onChange={(e) => setDeliverableInput(e.target.value)}
-                    className="w-full bg-[#05070F] border border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:border-[#7F00FF]/40 focus:outline-none transition-smooth resize-none"
-                  />
-
-                  {/* Encrypted Deliverables Uploader */}
-                  <div className="flex flex-col gap-2">
-                    <label className="font-mono text-[9px] text-slate-400 uppercase tracking-widest font-bold">Attach Deliverable Files (Optional)</label>
-                    <div 
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        setIsDragging(true);
-                      }}
-                      onDragLeave={() => setIsDragging(false)}
-                      onDrop={() => setIsDragging(false)}
-                      className={`relative border border-dashed p-4 rounded-xl flex flex-col items-center gap-1.5 transition-smooth cursor-pointer ${
-                        isDragging 
-                          ? "border-[#00F2FE] bg-[#00F2FE]/5 shadow-[0_0_15px_rgba(0,242,254,0.15)] scale-[1.02]" 
-                          : "border-white/10 hover:border-[#00F2FE]/40 bg-white/[0.01] hover:bg-white/[0.02]"
-                      }`}
-                    >
-                      <input 
-                        type="file" 
-                        multiple 
-                        onChange={(e) => {
-                          if (e.target.files) {
-                            setDeliverableFiles(prev => [...prev, ...Array.from(e.target.files || [])]);
-                          }
-                        }}
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                      />
-                      <Paperclip className={`w-4 h-4 transition-smooth ${isDragging ? "text-[#7F00FF] scale-110" : "text-[#00F2FE]"}`} />
-                      <span className="text-[10px] font-mono text-slate-400">
-                        {isDragging ? "Drop your files here!" : "Drag & drop files or click to upload"}
-                      </span>
-                    </div>
-
-                    {deliverableFiles.length > 0 && (
-                      <div className="flex flex-col gap-2 bg-[#05070F]/50 border border-white/5 p-3 rounded-xl max-h-32 overflow-y-auto custom-scrollbar">
-                        {deliverableFiles.map((file, idx) => (
-                          <div key={idx} className="flex justify-between items-center bg-[#070913]/80 border border-white/5 px-3 py-1.5 rounded-lg">
-                            <div className="flex items-center gap-2 overflow-hidden">
-                              <Paperclip className="w-3 h-3 text-[#00F2FE] flex-shrink-0" />
-                              <span className="font-mono text-[10px] text-slate-300 truncate max-w-[160px]">{file.name}</span>
-                              <span className="font-mono text-[8px] text-slate-500 flex-shrink-0">({(file.size / 1024).toFixed(1)} KB)</span>
-                            </div>
-                            <button 
-                              onClick={() => setDeliverableFiles(prev => prev.filter((_, i) => i !== idx))}
-                              className="text-slate-500 hover:text-red-400 transition-smooth cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ))}
+                    ) : (
+                      <div className="p-5 bg-[#070913] border border-[#00F2FE]/25 rounded-xl space-y-3">
+                        <div className="flex items-center gap-2 text-[#00F2FE] font-mono text-xs font-bold uppercase">
+                          <Clock className="w-4 h-4 text-[#00F2FE]" />
+                          <span>Deliverable Submitted — Client Review In Progress</span>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                          Your milestone deliverable has been encrypted and submitted on-chain. The client is reviewing your submission. You can claim auto-release if the timer expires without objection.
+                        </p>
                       </div>
                     )}
                   </div>
+                ) : (
+                  <div className="space-y-4">
+                    {(!walletAddress || walletAddress.toLowerCase() !== (selectedContract.role === 'FREELANCER' ? walletAddress.toLowerCase() : selectedContract.counterparty.toLowerCase())) && (
+                      <div className="p-3.5 bg-amber-950/20 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-xs font-mono text-amber-300">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                        <div className="leading-relaxed">
+                          <span className="font-bold uppercase block text-[10px] text-amber-400 mb-0.5">Wallet Role Mismatch</span>
+                          Your connected wallet is the <strong>Client</strong> for this contract. Switch your Web3 wallet (MetaMask/Rabby) to the assigned <strong>Freelancer wallet</strong> ({selectedContract.role === 'FREELANCER' ? walletAddress?.slice(0,6) : selectedContract.counterparty.slice(0,6)}...{selectedContract.role === 'FREELANCER' ? walletAddress?.slice(-4) : selectedContract.counterparty.slice(-4)}) to submit deliverables on-chain.
+                        </div>
+                      </div>
+                    )}
 
-                  <button
-                    onClick={() => handleSubmitDeliverable(selectedContract.address)}
-                    disabled={isLoading || (!deliverableInput.trim() && deliverableFiles.length === 0)}
-                    className="w-full py-4.5 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth hover:shadow-[0_0_20px_rgba(0,242,254,0.45)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2.5 rounded-xl border border-transparent"
-                  >
-                    <Terminal className="w-4 h-4" />
-                    {isLoading ? "Signing handle..." : "Submit Deliverable (Enter)"}
-                  </button>
-                </div>
+                    <label className="block text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">Submit Code Deliverable / Git diff</label>
+                    <textarea 
+                      rows={3}
+                      placeholder="Tested Collapsible sidebar. Full GPU acceleration and responsive Chrome/Safari/Firefox compatibility."
+                      value={deliverableInput} 
+                      onChange={(e) => setDeliverableInput(e.target.value)}
+                      className="w-full bg-[#05070F] border border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:border-[#7F00FF]/40 focus:outline-none transition-smooth resize-none"
+                    />
+
+                    {/* Encrypted Deliverables Uploader */}
+                    <div className="flex flex-col gap-2">
+                      <label className="font-mono text-[9px] text-slate-400 uppercase tracking-widest font-bold">Attach Deliverable Files (Optional)</label>
+                      <div 
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setIsDragging(true);
+                        }}
+                        onDragLeave={() => setIsDragging(false)}
+                        onDrop={() => setIsDragging(false)}
+                        className={`relative border border-dashed p-4 rounded-xl flex flex-col items-center gap-1.5 transition-smooth cursor-pointer ${
+                          isDragging 
+                            ? "border-[#00F2FE] bg-[#00F2FE]/5 shadow-[0_0_15px_rgba(0,242,254,0.15)] scale-[1.02]" 
+                            : "border-white/10 hover:border-[#00F2FE]/40 bg-white/[0.01] hover:bg-white/[0.02]"
+                        }`}
+                      >
+                        <input 
+                          type="file" 
+                          multiple 
+                          onChange={(e) => {
+                            if (e.target.files) {
+                              setDeliverableFiles(prev => [...prev, ...Array.from(e.target.files || [])]);
+                            }
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                        <Paperclip className={`w-4 h-4 transition-smooth ${isDragging ? "text-[#7F00FF] scale-110" : "text-[#00F2FE]"}`} />
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {isDragging ? "Drop your files here!" : "Drag & drop files or click to upload"}
+                        </span>
+                      </div>
+
+                      {deliverableFiles.length > 0 && (
+                        <div className="flex flex-col gap-2 bg-[#05070F]/50 border border-white/5 p-3 rounded-xl max-h-32 overflow-y-auto custom-scrollbar">
+                          {deliverableFiles.map((file, idx) => (
+                            <div key={idx} className="flex justify-between items-center bg-[#070913]/80 border border-white/5 px-3 py-1.5 rounded-lg">
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                <Paperclip className="w-3 h-3 text-[#00F2FE] flex-shrink-0" />
+                                <span className="font-mono text-[10px] text-slate-300 truncate max-w-[160px]">{file.name}</span>
+                                <span className="font-mono text-[8px] text-slate-500 flex-shrink-0">({(file.size / 1024).toFixed(1)} KB)</span>
+                              </div>
+                              <button 
+                                onClick={() => setDeliverableFiles(prev => prev.filter((_, i) => i !== idx))}
+                                className="text-slate-500 hover:text-red-400 transition-smooth cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => handleSubmitDeliverable(selectedContract.address)}
+                      disabled={isLoading || (!deliverableInput.trim() && deliverableFiles.length === 0)}
+                      className="w-full py-4.5 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth hover:shadow-[0_0_20px_rgba(0,242,254,0.45)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2.5 rounded-xl border border-transparent"
+                    >
+                      <Terminal className="w-4 h-4" />
+                      {isLoading ? "Signing handle..." : "Submit Deliverable (Enter)"}
+                    </button>
+                  </div>
+                )
               ) : (
                 /* Client Action Console */
                 <div className="space-y-5">

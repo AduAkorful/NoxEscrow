@@ -284,12 +284,18 @@ export async function fetchUserEscrows(
             }
             accumulatedBudget += payoutValue;
 
-            let decryptedKeyHex = "";
-            if (handleClient && allowInteractiveDecrypt) {
+            let decryptedKeyHex = chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}_req`) || "";
+            if (!decryptedKeyHex && signer) {
               try {
+                handleClient = handleClient || await createEthersHandleClient(signer as any, {
+                  smartContractAddress: NOX_CONTRACT_MANAGER,
+                  gatewayUrl: gatewayUrl as any,
+                  subgraphUrl: NOX_SUBGRAPH_URL,
+                });
                 const decryptedReq = await handleClient.decrypt(milestoneInfo.requirementsHash);
                 const decryptedKeyBigInt = decryptedReq.value as bigint;
                 decryptedKeyHex = decryptedKeyBigInt.toString(16).padStart(64, "0");
+                chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_ms_${m}_req`, decryptedKeyHex);
               } catch (reqErr) {
                 console.warn(`Failed to decrypt requirement handle for milestone ${m}:`, reqErr);
               }
@@ -303,10 +309,18 @@ export async function fetchUserEscrows(
                   contractTitle = metadata.title;
                 }
                 if (metadata.reqs_cid && decryptedKeyHex) {
-                  const reqsUrl = `https://gateway.pinata.cloud/ipfs/${metadata.reqs_cid}`;
-                  const resp = await fetch(reqsUrl);
-                  if (resp.ok) {
-                    const payload = await resp.json();
+                  const reqsUrl = metadata.reqs_cid.startsWith("data:")
+                    ? metadata.reqs_cid
+                    : `https://gateway.pinata.cloud/ipfs/${metadata.reqs_cid}`;
+                  let payload: any = null;
+                  if (reqsUrl.startsWith("data:")) {
+                    const base64Data = reqsUrl.split(",")[1];
+                    payload = JSON.parse(atob(base64Data));
+                  } else {
+                    const resp = await fetch(reqsUrl);
+                    if (resp.ok) payload = await resp.json();
+                  }
+                  if (payload) {
                     const rawDecrypted = await decryptText(payload.ciphertext, decryptedKeyHex, payload.iv);
                     if (rawDecrypted && rawDecrypted.trim().startsWith('{')) {
                       try {
@@ -328,35 +342,53 @@ export async function fetchUserEscrows(
             requirements.push(reqText || `${contractTitle} - Milestone ${m + 1}`);
 
             let deliverableText = "";
-            let devKeyHex = "";
-            if (milestoneInfo.isSubmitted && handleClient && allowInteractiveDecrypt) {
-              try {
-                const decryptedDev = await handleClient.decrypt(milestoneInfo.deliverableHash);
-                const devKeyBigInt = decryptedDev.value as bigint;
-                devKeyHex = devKeyBigInt.toString(16).padStart(64, "0");
+            let devKeyHex = chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}_dev`) || "";
+            if (milestoneInfo.isSubmitted) {
+              if (!devKeyHex && signer) {
+                try {
+                  handleClient = handleClient || await createEthersHandleClient(signer as any, {
+                    smartContractAddress: NOX_CONTRACT_MANAGER,
+                    gatewayUrl: gatewayUrl as any,
+                    subgraphUrl: NOX_SUBGRAPH_URL,
+                  });
+                  const decryptedDev = await handleClient.decrypt(milestoneInfo.deliverableHash);
+                  const devKeyBigInt = decryptedDev.value as bigint;
+                  devKeyHex = devKeyBigInt.toString(16).padStart(64, "0");
+                  chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_ms_${m}_dev`, devKeyHex);
+                } catch (devErr) {
+                  console.warn(`Failed to decrypt deliverable handle for milestone ${m}:`, devErr);
+                }
+              }
 
-                if (useE2E && metadata) {
-                  if (metadata.devs_cid && devKeyHex) {
-                    const devsUrl = `https://gateway.pinata.cloud/ipfs/${metadata.devs_cid}`;
+              if (useE2E && metadata && metadata.devs_cid && devKeyHex) {
+                try {
+                  const devsUrl = metadata.devs_cid.startsWith("data:")
+                    ? metadata.devs_cid
+                    : `https://gateway.pinata.cloud/ipfs/${metadata.devs_cid}`;
+                  let payload: any = null;
+                  if (devsUrl.startsWith("data:")) {
+                    const base64Data = devsUrl.split(",")[1];
+                    payload = JSON.parse(atob(base64Data));
+                  } else {
                     const resp = await fetch(devsUrl);
-                    if (resp.ok) {
-                      const payload = await resp.json();
-                      const rawDecrypted = await decryptText(payload.ciphertext, devKeyHex, payload.iv);
-                      if (rawDecrypted && rawDecrypted.trim().startsWith('{')) {
-                        try {
-                          const parsedObj = JSON.parse(rawDecrypted.trim());
-                          deliverableText = parsedObj.text || rawDecrypted;
-                        } catch {
-                          deliverableText = rawDecrypted;
-                        }
-                      } else {
+                    if (resp.ok) payload = await resp.json();
+                  }
+                  if (payload) {
+                    const rawDecrypted = await decryptText(payload.ciphertext, devKeyHex, payload.iv);
+                    if (rawDecrypted && rawDecrypted.trim().startsWith('{')) {
+                      try {
+                        const parsedObj = JSON.parse(rawDecrypted.trim());
+                        deliverableText = parsedObj.text || rawDecrypted;
+                      } catch {
                         deliverableText = rawDecrypted;
                       }
+                    } else {
+                      deliverableText = rawDecrypted;
                     }
                   }
+                } catch (devMetaErr) {
+                  console.warn(`Failed to fetch/decrypt deliverable payload for milestone ${m}:`, devMetaErr);
                 }
-              } catch (devErr) {
-                console.warn(`Failed to decrypt deliverable for milestone ${m}:`, devErr);
               }
             }
             deliverables.push(deliverableText);
@@ -490,6 +522,7 @@ export async function initializeEscrowMilestones(
 
       // Encrypt the key itself with Nox KMS
       reqsEnc = await encryptNoxInput(signer, keyBigInt, "uint256", escrowAddress, gatewayUrl);
+      chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_ms_${i}_req`, randomHexKey);
 
       // Encrypt attached files
       const fileCids: { name: string; type: string; cid: string }[] = [];
@@ -584,6 +617,7 @@ export async function submitMilestoneDeliverable(
 
     // Encrypt the key itself with Nox KMS
     devEnc = await encryptNoxInput(signer, keyBigInt, "uint256", escrowAddress, gatewayUrl);
+    chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_ms_${milestoneIndex}_dev`, randomHexKey);
 
     // Encrypt attached files
     const fileCids: { name: string; type: string; cid: string }[] = [];

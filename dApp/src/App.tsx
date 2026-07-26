@@ -240,7 +240,10 @@ function App() {
     clearHandleClientCache();
 
     if (authenticated && connectedAddress) {
-      if (walletAddress && walletAddress.toLowerCase() !== connectedAddress.toLowerCase()) {
+      const savedVaultKey = sessionStorage.getItem('nox_vault_key_' + connectedAddress.toLowerCase());
+      if (savedVaultKey) {
+        setVaultKey(savedVaultKey);
+      } else if (walletAddress && walletAddress.toLowerCase() !== connectedAddress.toLowerCase()) {
         // Reset sensitive derived state on account switch to prevent key bleed
         setVaultKey(null);
       }
@@ -314,10 +317,17 @@ function App() {
       setSigner(s);
       const signature = await s.signMessage(SIGN_MESSAGE);
       const key = await deriveEncryptionKey(signature, walletAddress);
+      
       setVaultKey(key);
+      sessionStorage.setItem('nox_vault_key_' + walletAddress.toLowerCase(), key);
+      
       setSuccessMessage("🔐 Cryptographic key successfully derived! Environment unlocked.");
       
-      loadOnChainContracts(true);
+      try {
+        await loadOnChainContracts(false);
+      } catch (loadErr) {
+        console.warn("Contract reload warning:", loadErr);
+      }
       checkAdminStatus();
       loadFactoryParams();
       return key;
@@ -365,6 +375,9 @@ function App() {
     } finally {
       clearHandleClientCache();
       localStorage.removeItem('nox_connected_wallet');
+      if (walletAddress) {
+        sessionStorage.removeItem('nox_vault_key_' + walletAddress.toLowerCase());
+      }
       setWalletAddress(null);
       setVaultKey(null);
     }
