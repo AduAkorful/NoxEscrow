@@ -26,9 +26,9 @@ interface EscrowWorkspaceProps {
   ratingInput: number;
   setRatingInput: (val: number) => void;
   isLoading: boolean;
-  handleRaiseDispute: () => Promise<void>;
-  handleSubmitDeliverable: () => Promise<void>;
-  handleReleaseMilestone: () => Promise<void>;
+  handleRaiseDispute: (address?: string) => Promise<void>;
+  handleSubmitDeliverable: (address?: string) => Promise<void>;
+  handleReleaseMilestone: (address?: string) => Promise<void>;
   handleMutualCancel?: (address?: string) => Promise<void>;
   handleInitializeDeployedEscrow?: (
     escrowAddress: string,
@@ -781,7 +781,7 @@ export function EscrowWorkspace({
                 onClick={() => {
                   setShowDisputeConfirm(false);
                   setDisputeConsentChecked(false);
-                  handleRaiseDispute();
+                  handleRaiseDispute(selectedContract.address);
                 }}
                 className="flex-1 py-3 bg-red-500 text-white hover:bg-red-600 rounded-xl font-mono text-[10px] uppercase font-bold transition-smooth cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-[0_0_15px_rgba(255,23,68,0.4)]"
               >
@@ -823,7 +823,7 @@ export function EscrowWorkspace({
               <button
                 onClick={() => {
                   setShowReleaseConfirm(false);
-                  handleReleaseMilestone();
+                  handleReleaseMilestone(selectedContract.address);
                 }}
                 className="flex-1 py-3 bg-[#00F2FE] text-[#05070F] hover:bg-[#33F5FF] rounded-xl font-mono text-[10px] uppercase font-bold transition-smooth cursor-pointer hover:shadow-[0_0_15px_rgba(0,242,254,0.4)]"
               >

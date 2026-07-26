@@ -276,8 +276,11 @@ export function PortfolioFeed({
                 className="uniswap-card p-5 flex flex-col justify-between gap-4 hover:border-[#38BDF8]/40 transition-all cursor-pointer group relative overflow-hidden"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex flex-col gap-1">
-                    <span className="font-mono text-xs font-bold text-white group-hover:text-[#38BDF8] transition-colors flex items-center gap-1.5">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <span className="font-sans text-sm font-bold text-white group-hover:text-[#38BDF8] transition-colors truncate">
+                      {escrow.title || "Confidential Escrow Agreement"}
+                    </span>
+                    <span className="font-mono text-[11px] text-[#38BDF8] font-semibold">
                       {escrow.address.slice(0, 10)}...{escrow.address.slice(-6)}
                     </span>
                     <span className="text-[11px] text-slate-400 truncate max-w-[220px]">
@@ -285,7 +288,7 @@ export function PortfolioFeed({
                     </span>
                   </div>
 
-                  <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold font-mono uppercase tracking-wider ${
+                  <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold font-mono uppercase tracking-wider shrink-0 ${
                     escrow.status === 'ACTIVE' ? 'bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/20' :
                     escrow.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                     escrow.status === 'DISPUTED' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
@@ -298,7 +301,18 @@ export function PortfolioFeed({
                 {/* Requirements / Scope snippet */}
                 {escrow.requirements.length > 0 && (
                   <p className="text-xs text-slate-300 line-clamp-2 bg-[#0B0E17]/60 p-2.5 rounded-xl border border-white/[0.04]">
-                    {escrow.requirements[0]}
+                    {(() => {
+                      const reqStr = escrow.requirements[0];
+                      if (reqStr && reqStr.trim().startsWith('{')) {
+                        try {
+                          const parsed = JSON.parse(reqStr.trim());
+                          return parsed.text || reqStr;
+                        } catch {
+                          return reqStr;
+                        }
+                      }
+                      return reqStr;
+                    })()}
                   </p>
                 )}
 

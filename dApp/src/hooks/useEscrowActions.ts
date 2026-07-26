@@ -232,8 +232,15 @@ export function useEscrowActions({
     }
   }, [walletAddress, factoryAddress, cUSDCAddress, gatewayUrl, pinataJWT, supabaseUrl, supabaseKey, getWeb3Signer, addToast, setErrorMessage, setSuccessMessage]);
 
-  const handleSubmitDeliverable = useCallback(async () => {
-    if (!selectedContract) return;
+  const handleSubmitDeliverable = useCallback(async (contractAddress?: string) => {
+    const target = contractAddress
+      ? contractsList.find(c => c.address.toLowerCase() === contractAddress.toLowerCase()) || selectedContract
+      : selectedContract;
+
+    if (!target) {
+      console.warn("handleSubmitDeliverable: No active contract selected.");
+      return;
+    }
     setErrorMessage(null);
     setSuccessMessage(null);
     setIsLoading(true);
@@ -243,8 +250,8 @@ export function useEscrowActions({
       setSuccessMessage("Encrypting and submitting milestone deliverable on-chain...");
       await submitMilestoneDeliverable(
         signer,
-        selectedContract.address,
-        selectedContract.milestonesCompleted,
+        target.address,
+        target.milestonesCompleted,
         deliverableInput,
         gatewayUrl,
         {
@@ -256,7 +263,7 @@ export function useEscrowActions({
       );
       
       setContractsList(prev => prev.map(c => {
-        if (c.address.toLowerCase() === selectedContract.address.toLowerCase()) {
+        if (c.address.toLowerCase() === target.address.toLowerCase()) {
           return { 
             ...c, 
             activeMilestoneSubmitted: true
@@ -268,15 +275,23 @@ export function useEscrowActions({
       setSuccessMessage("✔️ Deliverable submitted successfully!");
       setDeliverableInput("");
       setDeliverableFiles([]);
+      await loadOnChainContracts();
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to submit deliverable.');
     } finally {
       setIsLoading(false);
     }
-  }, [selectedContract, deliverableInput, deliverableFiles, gatewayUrl, pinataJWT, supabaseUrl, supabaseKey, getWeb3Signer, setErrorMessage, setSuccessMessage]);
+  }, [selectedContract, contractsList, deliverableInput, deliverableFiles, gatewayUrl, pinataJWT, supabaseUrl, supabaseKey, getWeb3Signer, loadOnChainContracts, setErrorMessage, setSuccessMessage]);
 
-  const handleReleaseMilestone = useCallback(async () => {
-    if (!selectedContract) return;
+  const handleReleaseMilestone = useCallback(async (contractAddress?: string) => {
+    const target = contractAddress
+      ? contractsList.find(c => c.address.toLowerCase() === contractAddress.toLowerCase()) || selectedContract
+      : selectedContract;
+
+    if (!target) {
+      console.warn("handleReleaseMilestone: No active contract selected.");
+      return;
+    }
     setErrorMessage(null);
     setSuccessMessage(null);
     setIsLoading(true);
@@ -284,7 +299,7 @@ export function useEscrowActions({
     try {
       const signer = await getWeb3Signer();
       setSuccessMessage("Releasing cUSDC milestone payout and submitting rating...");
-      await releaseEscrowMilestone(signer, selectedContract.address, ratingInput);
+      await releaseEscrowMilestone(signer, target.address, ratingInput);
       
       setSuccessMessage("✔️ Milestone approved and released!");
       
@@ -295,10 +310,17 @@ export function useEscrowActions({
     } finally {
       setIsLoading(false);
     }
-  }, [selectedContract, ratingInput, getWeb3Signer, loadOnChainContracts, setErrorMessage, setSuccessMessage]);
+  }, [selectedContract, contractsList, ratingInput, getWeb3Signer, loadOnChainContracts, setErrorMessage, setSuccessMessage]);
 
-  const handleRaiseDispute = useCallback(async () => {
-    if (!selectedContract) return;
+  const handleRaiseDispute = useCallback(async (contractAddress?: string) => {
+    const target = contractAddress
+      ? contractsList.find(c => c.address.toLowerCase() === contractAddress.toLowerCase()) || selectedContract
+      : selectedContract;
+
+    if (!target) {
+      console.warn("handleRaiseDispute: No active contract selected.");
+      return;
+    }
     setErrorMessage(null);
     setSuccessMessage(null);
     setIsLoading(true);
@@ -309,33 +331,33 @@ export function useEscrowActions({
       
       const useE2E = supabaseUrl && supabaseKey;
       if (useE2E && disputeStatement.trim()) {
-        const role = selectedContract.role === 'CLIENT' ? 'client' : 'freelancer';
+        const role = target.role === 'CLIENT' ? 'client' : 'freelancer';
         try {
           await updateEscrowStatement(
             supabaseUrl,
             supabaseKey,
-            selectedContract.address,
-            selectedContract.milestonesCompleted,
+            target.address,
+            target.milestonesCompleted,
             disputeStatement.trim(),
-            selectedContract.role
+            target.role
           );
         } catch (dbErr) {
           console.warn("Failed to sync dispute statement to Supabase, caching locally:", dbErr);
           savePendingSync({
             id: Math.random().toString(),
             type: "STATEMENT",
-            escrowAddress: selectedContract.address,
-            milestoneIndex: selectedContract.milestonesCompleted,
+            escrowAddress: target.address,
+            milestoneIndex: target.milestonesCompleted,
             data: { role, statement: disputeStatement.trim() }
           });
         }
       }
 
       setSuccessMessage("Transitioning state on-chain. Granting TEE Arbiter read keys...");
-      await raiseEscrowDispute(signer, selectedContract.address);
+      await raiseEscrowDispute(signer, target.address);
       
       setContractsList(prev => prev.map(c => {
-        if (c.address.toLowerCase() === selectedContract.address.toLowerCase()) {
+        if (c.address.toLowerCase() === target.address.toLowerCase()) {
           return { ...c, status: 'DISPUTED' };
         }
         return c;
@@ -343,12 +365,13 @@ export function useEscrowActions({
 
       setSuccessMessage("⚠️ Formal Dispute Raised! Enclave AI Arbiter process initiated.");
       setDisputeStatement("");
+      await loadOnChainContracts();
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to raise dispute.');
     } finally {
       setIsLoading(false);
     }
-  }, [selectedContract, disputeStatement, supabaseUrl, supabaseKey, getWeb3Signer, setErrorMessage, setSuccessMessage]);
+  }, [selectedContract, contractsList, disputeStatement, supabaseUrl, supabaseKey, getWeb3Signer, loadOnChainContracts, setErrorMessage, setSuccessMessage]);
 
   const handleMutualCancel = useCallback(async (contractAddress?: string) => {
     const targetAddress = contractAddress || selectedContract?.address;

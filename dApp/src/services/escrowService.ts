@@ -307,7 +307,17 @@ export async function fetchUserEscrows(
                   const resp = await fetch(reqsUrl);
                   if (resp.ok) {
                     const payload = await resp.json();
-                    reqText = await decryptText(payload.ciphertext, decryptedKeyHex, payload.iv);
+                    const rawDecrypted = await decryptText(payload.ciphertext, decryptedKeyHex, payload.iv);
+                    if (rawDecrypted && rawDecrypted.trim().startsWith('{')) {
+                      try {
+                        const parsedObj = JSON.parse(rawDecrypted.trim());
+                        reqText = parsedObj.text || rawDecrypted;
+                      } catch {
+                        reqText = rawDecrypted;
+                      }
+                    } else {
+                      reqText = rawDecrypted;
+                    }
                   }
                 }
               } catch (metaErr) {
@@ -331,7 +341,17 @@ export async function fetchUserEscrows(
                     const resp = await fetch(devsUrl);
                     if (resp.ok) {
                       const payload = await resp.json();
-                      deliverableText = await decryptText(payload.ciphertext, devKeyHex, payload.iv);
+                      const rawDecrypted = await decryptText(payload.ciphertext, devKeyHex, payload.iv);
+                      if (rawDecrypted && rawDecrypted.trim().startsWith('{')) {
+                        try {
+                          const parsedObj = JSON.parse(rawDecrypted.trim());
+                          deliverableText = parsedObj.text || rawDecrypted;
+                        } catch {
+                          deliverableText = rawDecrypted;
+                        }
+                      } else {
+                        deliverableText = rawDecrypted;
+                      }
                     }
                   }
                 }

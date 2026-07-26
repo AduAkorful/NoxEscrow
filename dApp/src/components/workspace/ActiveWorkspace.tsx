@@ -22,7 +22,7 @@ interface ActiveWorkspaceProps {
   setIsDragging: (val: boolean) => void;
   deliverableFiles: File[];
   setDeliverableFiles: React.Dispatch<React.SetStateAction<File[]>>;
-  handleSubmitDeliverable: () => Promise<void>;
+  handleSubmitDeliverable: (contractAddress?: string) => Promise<void>;
   deliverableText: string;
   deliverableAttachedFiles: { name: string; type: string; cid: string }[];
   ratingInput: number;
@@ -326,7 +326,7 @@ export function ActiveWorkspace({
                   </div>
 
                   <button
-                    onClick={handleSubmitDeliverable}
+                    onClick={() => handleSubmitDeliverable(selectedContract.address)}
                     disabled={isLoading || (!deliverableInput.trim() && deliverableFiles.length === 0)}
                     className="w-full py-4.5 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth hover:shadow-[0_0_20px_rgba(0,242,254,0.45)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2.5 rounded-xl border border-transparent"
                   >

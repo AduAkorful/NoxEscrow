@@ -15,9 +15,9 @@ interface EscrowPageProps {
   ratingInput: number;
   setRatingInput: (val: number) => void;
   isLoading: boolean;
-  handleRaiseDispute: () => Promise<void>;
-  handleSubmitDeliverable: () => Promise<void>;
-  handleReleaseMilestone: () => Promise<void>;
+  handleRaiseDispute: (address?: string) => Promise<void>;
+  handleSubmitDeliverable: (address?: string) => Promise<void>;
+  handleReleaseMilestone: (address?: string) => Promise<void>;
   handleMutualCancel?: (address?: string) => Promise<void>;
   handleInitializeDeployedEscrow?: (
     escrowAddress: string,
