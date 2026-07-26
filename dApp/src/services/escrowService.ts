@@ -156,7 +156,35 @@ export function bytes32HashToString(val: bigint): string {
   return new TextDecoder().decode(textBytes);
 }
 
-const chatKeyMemoryCache = new Map<string, string>();
+const memoryCacheMap = new Map<string, string>();
+const chatKeyMemoryCache = {
+  get(key: string): string | undefined {
+    if (memoryCacheMap.has(key)) {
+      return memoryCacheMap.get(key);
+    }
+    if (typeof window !== "undefined" && window.sessionStorage) {
+      const stored = sessionStorage.getItem("nox_cache_" + key);
+      if (stored) {
+        memoryCacheMap.set(key, stored);
+        return stored;
+      }
+    }
+    return undefined;
+  },
+  set(key: string, val: string) {
+    memoryCacheMap.set(key, val);
+    if (typeof window !== "undefined" && window.sessionStorage && val) {
+      try {
+        sessionStorage.setItem("nox_cache_" + key, val);
+      } catch {
+        // ignore quota error
+      }
+    }
+  },
+  clear() {
+    memoryCacheMap.clear();
+  }
+};
 
 /**
  * Lazily decrypt a single milestone's requirements handle to derive the shared
@@ -285,7 +313,7 @@ export async function fetchUserEscrows(
             accumulatedBudget += payoutValue;
 
             let decryptedKeyHex = chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}_req`) || "";
-            if (!decryptedKeyHex && signer) {
+            if (!decryptedKeyHex && allowInteractiveDecrypt && signer) {
               try {
                 handleClient = handleClient || await createEthersHandleClient(signer as any, {
                   smartContractAddress: NOX_CONTRACT_MANAGER,
@@ -335,7 +363,7 @@ export async function fetchUserEscrows(
             let deliverableText = "";
             let devKeyHex = chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}_dev`) || "";
             if (milestoneInfo.isSubmitted) {
-              if (!devKeyHex && signer) {
+              if (!devKeyHex && allowInteractiveDecrypt && signer) {
                 try {
                   handleClient = handleClient || await createEthersHandleClient(signer as any, {
                     smartContractAddress: NOX_CONTRACT_MANAGER,

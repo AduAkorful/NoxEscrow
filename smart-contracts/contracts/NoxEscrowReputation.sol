@@ -92,7 +92,11 @@ contract NoxEscrowReputation is
         euint256 payout,
         uint256 rating
     ) external override onlyEscrowContract {
-        if (!Nox.isInitialized(baseReputationHandle)) revert BaseReputationNotConfigured();
+        if (!Nox.isInitialized(baseReputationHandle)) {
+            baseReputationHandle = Nox.toEuint256(1000);
+            Nox.allowThis(baseReputationHandle);
+            Nox.allowPublicDecryption(baseReputationHandle);
+        }
 
         euint256 maxPayout = Nox.toEuint256(1000 * (10**uint256(tokenDecimals))); // $1,000 cUSDC cap to mitigate whale-bloat
         ebool isGreaterOrEqual = Nox.ge(payout, maxPayout);
@@ -131,7 +135,11 @@ contract NoxEscrowReputation is
     function penalizeLostDispute(
         address freelancer
     ) external override onlyEscrowContract {
-        if (!Nox.isInitialized(baseReputationHandle)) revert BaseReputationNotConfigured();
+        if (!Nox.isInitialized(baseReputationHandle)) {
+            baseReputationHandle = Nox.toEuint256(1000);
+            Nox.allowThis(baseReputationHandle);
+            Nox.allowPublicDecryption(baseReputationHandle);
+        }
 
         euint256 currentRep = reputationScores[freelancer];
         euint256 nextRep;
