@@ -86,4 +86,6 @@ interface INoxEscrowFactory {
     function treasury() external view returns (address);
 
     function setTreasury(address _newTreasury) external;
+
+    function owner() external view returns (address);
 }

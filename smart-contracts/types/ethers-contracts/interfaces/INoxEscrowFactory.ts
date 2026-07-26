@@ -6,7 +6,7 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   
 
   export interface INoxEscrowFactoryInterface extends Interface {
-    getFunction(nameOrSignature: "allEscrows" | "canonicalTeeArbiter" | "createEscrow" | "escrowsCount" | "initialize" | "isEscrowContract" | "mutualCancelWindow" | "platformFeeBps" | "setCanonicalTeeArbiter" | "setEscrowImplementation" | "setMutualCancelWindow" | "setPlatformFeeBps" | "setReputationRegistry" | "setReviewWindow" | "setTreasury" | "setUSDCToken" | "treasury"): FunctionFragment;
+    getFunction(nameOrSignature: "allEscrows" | "canonicalTeeArbiter" | "createEscrow" | "escrowsCount" | "initialize" | "isEscrowContract" | "mutualCancelWindow" | "owner" | "platformFeeBps" | "setCanonicalTeeArbiter" | "setEscrowImplementation" | "setMutualCancelWindow" | "setPlatformFeeBps" | "setReputationRegistry" | "setReviewWindow" | "setTreasury" | "setUSDCToken" | "treasury"): FunctionFragment;
 
     getEvent(nameOrSignatureOrTopic: "CanonicalArbiterUpdated" | "EscrowCreated" | "ImplementationUpdated" | "MutualCancelWindowUpdated" | "PlatformFeeUpdated" | "ReputationRegistryUpdated" | "ReviewWindowUpdated" | "TokenUpdated" | "TreasuryUpdated"): EventFragment;
 
@@ -17,6 +17,7 @@ encodeFunctionData(functionFragment: 'escrowsCount', values?: undefined): string
 encodeFunctionData(functionFragment: 'initialize', values: [AddressLike, AddressLike, AddressLike, AddressLike, AddressLike]): string;
 encodeFunctionData(functionFragment: 'isEscrowContract', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'mutualCancelWindow', values?: undefined): string;
+encodeFunctionData(functionFragment: 'owner', values?: undefined): string;
 encodeFunctionData(functionFragment: 'platformFeeBps', values?: undefined): string;
 encodeFunctionData(functionFragment: 'setCanonicalTeeArbiter', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'setEscrowImplementation', values: [AddressLike]): string;
@@ -35,6 +36,7 @@ decodeFunctionResult(functionFragment: 'escrowsCount', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'initialize', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'isEscrowContract', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'mutualCancelWindow', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'owner', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'platformFeeBps', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'setCanonicalTeeArbiter', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'setEscrowImplementation', data: BytesLike): Result;
@@ -246,6 +248,14 @@ decodeFunctionResult(functionFragment: 'treasury', data: BytesLike): Result;
     
 
     
+    owner: TypedContractMethod<
+      [],
+      [string],
+      'view'
+    >
+    
+
+    
     platformFeeBps: TypedContractMethod<
       [],
       [bigint],
@@ -361,6 +371,11 @@ getFunction(nameOrSignature: 'isEscrowContract'): TypedContractMethod<
 getFunction(nameOrSignature: 'mutualCancelWindow'): TypedContractMethod<
       [],
       [bigint],
+      'view'
+    >;
+getFunction(nameOrSignature: 'owner'): TypedContractMethod<
+      [],
+      [string],
       'view'
     >;
 getFunction(nameOrSignature: 'platformFeeBps'): TypedContractMethod<

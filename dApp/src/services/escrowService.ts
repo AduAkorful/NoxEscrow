@@ -155,10 +155,12 @@ export function bytes32HashToString(val: bigint): string {
   return new TextDecoder().decode(textBytes);
 }
 
+const chatKeyMemoryCache = new Map<string, string>();
+
 /**
  * Lazily decrypt a single milestone's requirements handle to derive the shared
  * symmetric chat key. This triggers ONE wallet authorization prompt (to create
- * the handle client) and then caches it for subsequent decrypts.
+ * the handle client) and then caches it in memory for subsequent decrypts.
  */
 export async function decryptMilestoneChatKey(
   signer: ethers.JsonRpcSigner,
@@ -166,8 +168,8 @@ export async function decryptMilestoneChatKey(
   milestoneIndex: number = 0,
   gatewayUrl: string = DEFAULT_NOX_GATEWAY
 ): Promise<string> {
-  const cacheKey = `nox_chat_key_${escrowAddress.toLowerCase()}`;
-  const existing = sessionStorage.getItem(cacheKey);
+  const cacheKey = escrowAddress.toLowerCase();
+  const existing = chatKeyMemoryCache.get(cacheKey);
   if (existing) {
     return existing;
   }
@@ -180,7 +182,7 @@ export async function decryptMilestoneChatKey(
   const decryptedKeyBigInt = decryptedReq.value as bigint;
   const derivedKeyHex = decryptedKeyBigInt.toString(16).padStart(64, "0");
   
-  sessionStorage.setItem(cacheKey, derivedKeyHex);
+  chatKeyMemoryCache.set(cacheKey, derivedKeyHex);
   return derivedKeyHex;
 }
 
@@ -450,8 +452,9 @@ export async function initializeEscrowMilestones(
   const useE2E = metadataConfig && metadataConfig.pinataJWT && metadataConfig.supabaseUrl && metadataConfig.supabaseKey;
 
   for (let i = 0; i < payouts.length; i++) {
-    // 1. Payout volume is always encrypted via Nox KMS directly
-    const payoutEnc = await encryptNoxInput(signer, BigInt(payouts[i]), "uint256", escrowAddress, gatewayUrl);
+    // 1. Payout volume is always encrypted via Nox KMS directly (ensuring integer input for BigInt)
+    const safePayoutInt = Math.round(payouts[i]);
+    const payoutEnc = await encryptNoxInput(signer, BigInt(safePayoutInt), "uint256", escrowAddress, gatewayUrl);
     encryptedPayouts.push(payoutEnc.handle);
     payoutProofs.push(payoutEnc.handleProof);
 

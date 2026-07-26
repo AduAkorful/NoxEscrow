@@ -110,24 +110,25 @@ async function downloadFromIPFS(cid) {
     `https://dweb.link/ipfs/${cid}`
   ];
 
-  let lastError = null;
-  for (const url of gateways) {
-    try {
-      console.log(`📥 Attempting download from IPFS: ${url}`);
-      const headers = {};
-      if (pinataJwt && url.includes("pinata.cloud")) {
-        headers["Authorization"] = `Bearer ${pinataJwt}`;
-      }
-      const resp = await axios.get(url, { headers, timeout: 12000 });
-      if (resp.status === 200 && resp.data) {
-        return resp.data;
-      }
-    } catch (err) {
-      console.warn(`⚠️ Gateway download failed: ${url}. Error: ${err.message}`);
-      lastError = err;
+  const fetchGateway = async (url) => {
+    const headers = {};
+    if (pinataJwt && url.includes("pinata.cloud")) {
+      headers["Authorization"] = `Bearer ${pinataJwt}`;
     }
+    const resp = await axios.get(url, { headers, timeout: 10000 });
+    if (resp.status === 200 && resp.data) {
+      return resp.data;
+    }
+    throw new Error(`Non-200 response from gateway ${url}`);
+  };
+
+  try {
+    console.log(`📥 Downloading IPFS payload in parallel across ${gateways.length} gateways...`);
+    const data = await Promise.any(gateways.map(url => fetchGateway(url)));
+    return data;
+  } catch (err) {
+    throw new Error(`Failed to download from all IPFS gateways for CID ${cid}.`);
   }
-  throw new Error(`Failed to download from all IPFS gateways. Last error: ${lastError ? lastError.message : "unknown"}`);
 }
 
 async function main() {

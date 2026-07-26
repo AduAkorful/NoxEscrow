@@ -179,6 +179,10 @@ contract NoxEscrowFactory is
         emit TreasuryUpdated(oldTreasury, _newTreasury);
     }
 
+    function owner() public view override(OwnableUpgradeable, INoxEscrowFactory) returns (address) {
+        return super.owner();
+    }
+
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     uint256[50] private __gap;

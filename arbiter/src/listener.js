@@ -46,40 +46,48 @@ const escrowABI = [
 
 async function reconcileDisputes(escrowClones, triggeredDisputes) {
   console.log(`\n🔄 [Reconciler] Running active dispute reconciliation scan over ${escrowClones.size} whitelisted contracts...`);
-  for (const cloneAddress of escrowClones) {
-    try {
-      const escrowContract = new ethers.Contract(cloneAddress, escrowABI, provider);
-      const status = await escrowContract.status();
-      
-      if (Number(status) === 2) { // 2 = DISPUTED status enum
-        const milestoneIndex = await escrowContract.activeMilestoneIndex();
-        const milestoneIndexStr = milestoneIndex.toString();
-        const key = `${cloneAddress.toLowerCase()}_${milestoneIndexStr}`;
-        const lastTriggered = triggeredDisputes.get(key) || 0;
-        const now = Date.now();
-        
-        if (now - lastTriggered > RECONCILE_COOLDOWN) { // Cooldown check
-          console.log(`⚠️ [Reconciler] Detected active unresolved dispute on contract ${cloneAddress} Milestone ${milestoneIndexStr}. Re-triggering TEE Arbiter...`);
-          const milestoneInfo = await escrowContract.milestones(milestoneIndex);
-          const { requirementsHash, deliverableHash } = milestoneInfo;
+  const cloneList = Array.from(escrowClones);
+  const chunkSize = 10;
+
+  for (let i = 0; i < cloneList.length; i += chunkSize) {
+    const chunk = cloneList.slice(i, i + chunkSize);
+    await Promise.all(
+      chunk.map(async (cloneAddress) => {
+        try {
+          const escrowContract = new ethers.Contract(cloneAddress, escrowABI, provider);
+          const status = await escrowContract.status();
           
-          const reqsHex = typeof requirementsHash === "string" ? requirementsHash : `0x${BigInt(requirementsHash).toString(16).padStart(64, "0")}`;
-          const devsHex = typeof deliverableHash === "string" ? deliverableHash : `0x${BigInt(deliverableHash).toString(16).padStart(64, "0")}`;
-          
-          triggeredDisputes.set(key, now);
-          
-          const response = await axios.post(IEXEC_RUNNER_ENDPOINT, {
-            escrowAddress: cloneAddress,
-            milestoneIndex: milestoneIndexStr,
-            reqsHandle: reqsHex,
-            devsHandle: devsHex
-          }, { timeout: RUNNER_TIMEOUT });
-          console.log(`🚀 [Reconciler] TEE execution triggered successfully! Response:`, response.status === 200 ? "Success" : response.statusText);
+          if (Number(status) === 2) { // 2 = DISPUTED status enum
+            const milestoneIndex = await escrowContract.activeMilestoneIndex();
+            const milestoneIndexStr = milestoneIndex.toString();
+            const key = `${cloneAddress.toLowerCase()}_${milestoneIndexStr}`;
+            const lastTriggered = triggeredDisputes.get(key) || 0;
+            const now = Date.now();
+            
+            if (now - lastTriggered > RECONCILE_COOLDOWN) { // Cooldown check
+              console.log(`⚠️ [Reconciler] Detected active unresolved dispute on contract ${cloneAddress} Milestone ${milestoneIndexStr}. Re-triggering TEE Arbiter...`);
+              const milestoneInfo = await escrowContract.milestones(milestoneIndex);
+              const { requirementsHash, deliverableHash } = milestoneInfo;
+              
+              const reqsHex = typeof requirementsHash === "string" ? requirementsHash : `0x${BigInt(requirementsHash).toString(16).padStart(64, "0")}`;
+              const devsHex = typeof deliverableHash === "string" ? deliverableHash : `0x${BigInt(deliverableHash).toString(16).padStart(64, "0")}`;
+              
+              triggeredDisputes.set(key, now);
+              
+              const response = await axios.post(IEXEC_RUNNER_ENDPOINT, {
+                escrowAddress: cloneAddress,
+                milestoneIndex: milestoneIndexStr,
+                reqsHandle: reqsHex,
+                devsHandle: devsHex
+              }, { timeout: RUNNER_TIMEOUT });
+              console.log(`🚀 [Reconciler] TEE execution triggered successfully! Response:`, response.status === 200 ? "Success" : response.statusText);
+            }
+          }
+        } catch (err) {
+          console.warn(`⚠️ [Reconciler] Failed to scan or reconcile clone ${cloneAddress}:`, err.message);
         }
-      }
-    } catch (err) {
-      console.warn(`⚠️ [Reconciler] Failed to scan or reconcile clone ${cloneAddress}:`, err.message);
-    }
+      })
+    );
   }
 }
 
@@ -208,14 +216,15 @@ async function main() {
         // 2. Check for formal disputes raised on any registered escrow clones
         if (escrowClones.size > 0) {
           const disputeLogs = await provider.getLogs({
-            address: Array.from(escrowClones),
             topics: [DISPUTE_OPENED_TOPIC],
             fromBlock,
             toBlock
           });
 
           for (const log of disputeLogs) {
-            await handleDisputeOpened(log);
+            if (escrowClones.has(log.address.toLowerCase())) {
+              await handleDisputeOpened(log);
+            }
           }
         } else {
           console.log("ℹ️ Skipping dispute polling (no active escrow clones registered).");

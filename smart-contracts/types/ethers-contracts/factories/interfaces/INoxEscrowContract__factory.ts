@@ -78,11 +78,6 @@
   },
   {
     "inputs": [],
-    "name": "ReentrancyGuardReentrantCall",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "ReviewWindowExpired",
     "type": "error"
   },

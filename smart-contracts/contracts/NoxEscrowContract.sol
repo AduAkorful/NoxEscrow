@@ -3,6 +3,7 @@ pragma solidity ^0.8.35;
 
 import {Nox, euint256, externalEuint256, ebool} from "@iexec-nox/nox-protocol-contracts/contracts/sdk/Nox.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC7984} from "@iexec-nox/nox-confidential-contracts/contracts/interfaces/IERC7984.sol";
 import {INoxEscrowReputation} from "./interfaces/INoxEscrowReputation.sol";
 import {INoxEscrowContract} from "./interfaces/INoxEscrowContract.sol";
@@ -13,11 +14,10 @@ import {INoxEscrowFactory} from "./interfaces/INoxEscrowFactory.sol";
  * @notice Core state machine governing a milestone-based freelance escrow contract lifecycle.
  * Protects budget, requirements, and deliverables confidentiality on-chain using iExec Nox.
  */
-contract NoxEscrowContract is Initializable, INoxEscrowContract {
+contract NoxEscrowContract is Initializable, ReentrancyGuard, INoxEscrowContract {
     // ============ Constants ============
 
     uint256 public constant DISPUTE_TIMEOUT = 14 days;
-    bytes32 private constant REENTRANCY_GUARD_SLOT = keccak256("noxescrow.reentrancy.guard.slot");
 
     // ============ Storage Layout ============
 
@@ -44,24 +44,6 @@ contract NoxEscrowContract is Initializable, INoxEscrowContract {
     uint256 public platformFeeBps;
 
     mapping(uint256 => Milestone) public milestones;
-
-    // ============ Modifiers ============
-
-    modifier nonReentrant() {
-        bool entered;
-        bytes32 slot = REENTRANCY_GUARD_SLOT;
-        assembly {
-            entered := tload(slot)
-        }
-        if (entered) revert ReentrancyGuardReentrantCall();
-        assembly {
-            tstore(slot, 1)
-        }
-        _;
-        assembly {
-            tstore(slot, 0)
-        }
-    }
 
     // ============ Constructor ============
 
@@ -330,6 +312,9 @@ contract NoxEscrowContract is Initializable, INoxEscrowContract {
     }
 
     function emergencyResolveDispute() external override nonReentrant {
+        if (msg.sender != client && msg.sender != freelancer && msg.sender != teeArbiter && msg.sender != INoxEscrowFactory(factory).owner()) {
+            revert Unauthorized();
+        }
         if (status != Status.DISPUTED) revert InvalidState();
         if (block.timestamp <= disputeOpenTime + DISPUTE_TIMEOUT) {
             revert DisputeTimeoutNotExpired();
@@ -341,12 +326,13 @@ contract NoxEscrowContract is Initializable, INoxEscrowContract {
         
         if (!activeMilestone.isSettled) {
             activeMilestone.isSettled = true;
+            address activeRecipient = activeMilestone.isSubmitted ? freelancer : client;
             Nox.allowTransient(activeMilestone.payoutHandle, address(cUSDCToken));
-            cUSDCToken.confidentialTransfer(client, activeMilestone.payoutHandle);
+            cUSDCToken.confidentialTransfer(activeRecipient, activeMilestone.payoutHandle);
         }
 
         uint256 total = totalMilestones;
-        for (uint256 i = activeMilestoneIndex; i < total; ) {
+        for (uint256 i = activeMilestoneIndex + 1; i < total; ) {
             if (!milestones[i].isSettled) {
                 milestones[i].isSettled = true;
                 Nox.allowTransient(milestones[i].payoutHandle, address(cUSDCToken));

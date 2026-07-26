@@ -24,7 +24,7 @@ export type { INoxEscrowReputation } from './interfaces/INoxEscrowReputation.js'
 export { INoxEscrowReputation__factory } from './factories/interfaces/INoxEscrowReputation__factory.js';
 export type { MockERC20 } from './mocks/MockERC20.js';
 export { MockERC20__factory } from './factories/mocks/MockERC20__factory.js';
-export type { NoxProxy } from './mocks/NoxProxy.js';
-export { NoxProxy__factory } from './factories/mocks/NoxProxy__factory.js';
 export type { MockERC7984 } from './mocks/MockERC7984.js';
 export { MockERC7984__factory } from './factories/mocks/MockERC7984__factory.js';
+export type { NoxProxy } from './mocks/NoxProxy.js';
+export { NoxProxy__factory } from './factories/mocks/NoxProxy__factory.js';

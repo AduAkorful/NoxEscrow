@@ -58,7 +58,6 @@ interface INoxEscrowContract {
     error MutualCancellationNotRequested();
     error DisputeTimeoutNotExpired();
     error InvalidTreasury();
-    error ReentrancyGuardReentrantCall();
 
     // ============ Functions ============
 
