@@ -64,6 +64,12 @@ export function useEscrowActions({
   const loadOnChainContracts = useCallback(async (allowInteractiveDecrypt: boolean = false) => {
     if (!walletAddress) return;
     
+    if (!factoryAddress || factoryAddress === "0x0000000000000000000000000000000000000000") {
+      setErrorMessage("Protocol Factory Contract Address is not configured in environment variables or addresses.json.");
+      setContractsList([]);
+      return;
+    }
+
     setIsFetchingContracts(true);
     setErrorMessage(null);
 
@@ -138,11 +144,27 @@ export function useEscrowActions({
     try {
       const signer = await getWeb3Signer();
       
-      const payouts = draftMilestonePayouts.split(',').map(p => Number(p.trim()));
-      const requirements = draftMilestoneReqs.split(';').map(r => r.trim());
+      if (!draftFreelancer || !ethers.isAddress(draftFreelancer)) {
+        throw new Error("Invalid freelancer address. Please enter a valid 0x EVM address.");
+      }
+
+      const payouts = draftMilestonePayouts
+        .split(',')
+        .map(p => p.trim())
+        .filter(Boolean)
+        .map(p => Number(p));
+
+      const requirements = draftMilestoneReqs
+        .split(';')
+        .map(r => r.trim())
+        .filter(Boolean);
+
+      if (payouts.some(p => isNaN(p) || p <= 0)) {
+        throw new Error("Invalid payout amount: All milestone budgets must be positive numbers.");
+      }
 
       if (payouts.length !== draftTotalMilestones || requirements.length !== draftTotalMilestones) {
-        throw new Error("Length mismatch: Number of payouts and requirements must match total milestones count.");
+        throw new Error(`Length mismatch: Entered ${payouts.length} payouts and ${requirements.length} requirements, but contract specifies ${draftTotalMilestones} milestones.`);
       }
 
       const escrowAddress = await deployEscrowClone(

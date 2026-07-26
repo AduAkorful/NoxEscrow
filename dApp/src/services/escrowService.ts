@@ -2,7 +2,7 @@ import { createEthersHandleClient } from "@iexec-nox/handle";
 import { ethers } from "ethers";
 import { NoxEscrowFactoryABI } from "../contracts/NoxEscrowFactory";
 import { NoxEscrowContractABI } from "../contracts/NoxEscrowContract";
-import { MockERC7984ABI } from "../contracts/MockERC7984";
+import { ERC7984ABI } from "../contracts/ERC7984";
 import { getEscrowMetadata, insertEscrowMetadata, updateEscrowDeliverable, savePendingSync } from "./metadataService";
 import { encryptText, decryptText, uploadToPinata, encryptAndUploadFile } from "../crypto/fileUploader";
 import addresses from "../contracts/addresses.json";
@@ -89,6 +89,11 @@ export async function getWeb3Signer(): Promise<ethers.JsonRpcSigner> {
 
 let cachedHandleClient: any = null;
 let cachedSignerAddress: string = "";
+
+export function clearHandleClientCache() {
+  cachedHandleClient = null;
+  cachedSignerAddress = "";
+}
 
 export async function getOrCreateHandleClient(
   signer: ethers.JsonRpcSigner,
@@ -415,7 +420,7 @@ export async function approveEscrowOperator(
   escrowAddress: string,
   expirySeconds: number = 3600
 ) {
-  const token = new ethers.Contract(cUSDCAddress, MockERC7984ABI, signer);
+  const token = new ethers.Contract(cUSDCAddress, ERC7984ABI, signer);
   const expiry = BigInt(Math.floor(Date.now() / 1000) + expirySeconds);
   const tx = await token.setOperator(escrowAddress, expiry);
   await tx.wait();
@@ -772,7 +777,7 @@ export async function getConfidentialUSDCBalance(
   userAddress: string,
   gatewayUrl: string = DEFAULT_NOX_GATEWAY
 ): Promise<bigint> {
-  const token = new ethers.Contract(cUSDCAddress, MockERC7984ABI, signer);
+  const token = new ethers.Contract(cUSDCAddress, ERC7984ABI, signer);
   const balanceHandle = await token.confidentialBalanceOf(userAddress);
 
   if (balanceHandle === "0x0000000000000000000000000000000000000000000000000000000000000000" || !balanceHandle) {

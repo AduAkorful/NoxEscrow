@@ -130,6 +130,9 @@ describe("NoxEscrow Core Protocol Suite", function () {
       console.log("LOG: Linking reputation registry...");
       await factory.setReputationRegistry(reputationAddress);
 
+      // Set tokenDecimals to 0 for unscaled test amounts
+      await reputation.setTokenDecimals(0);
+
       // Safely set the base reputation handle (1000) using EIP-712 proof
       console.log("LOG: Setting base reputation...");
       const baseRepEnc = await encryptInputWithSigner(client, 1000n, "uint256", reputationAddress);

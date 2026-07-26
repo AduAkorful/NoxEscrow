@@ -8,6 +8,8 @@ const FACTORY_ADDRESS = process.env.ESCROW_FACTORY_ADDRESS;
 const IEXEC_RUNNER_ENDPOINT = process.env.IEXEC_RUNNER_ENDPOINT;
 const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL || "15000", 10);
 const RECONCILIATION_INTERVAL = parseInt(process.env.RECONCILIATION_INTERVAL || "300000", 10);
+const RUNNER_TIMEOUT = parseInt(process.env.IEXEC_RUNNER_TIMEOUT || "45000", 10);
+const RECONCILE_COOLDOWN = parseInt(process.env.RECONCILE_COOLDOWN || "120000", 10);
 
 if (!RPC_URL) {
   console.error("❌ ERROR: RPC_URL environment variable is required.");
@@ -42,8 +44,6 @@ const escrowABI = [
   "function milestones(uint256) view returns (bytes32 requirementsHash, bytes32 deliverableHash, bytes32 payoutHandle, uint128 submissionTime, bool isSubmitted, bool isSettled)"
 ];
 
-const RECONCILIATION_INTERVAL = parseInt(process.env.RECONCILIATION_INTERVAL || "300000", 10);
-
 async function reconcileDisputes(escrowClones, triggeredDisputes) {
   console.log(`\n🔄 [Reconciler] Running active dispute reconciliation scan over ${escrowClones.size} whitelisted contracts...`);
   for (const cloneAddress of escrowClones) {
@@ -58,7 +58,7 @@ async function reconcileDisputes(escrowClones, triggeredDisputes) {
         const lastTriggered = triggeredDisputes.get(key) || 0;
         const now = Date.now();
         
-        if (now - lastTriggered > 15 * 60 * 1000) { // 15 mins cooldown
+        if (now - lastTriggered > RECONCILE_COOLDOWN) { // Cooldown check
           console.log(`⚠️ [Reconciler] Detected active unresolved dispute on contract ${cloneAddress} Milestone ${milestoneIndexStr}. Re-triggering TEE Arbiter...`);
           const milestoneInfo = await escrowContract.milestones(milestoneIndex);
           const { requirementsHash, deliverableHash } = milestoneInfo;
@@ -73,7 +73,7 @@ async function reconcileDisputes(escrowClones, triggeredDisputes) {
             milestoneIndex: milestoneIndexStr,
             reqsHandle: reqsHex,
             devsHandle: devsHex
-          }, { timeout: 10000 });
+          }, { timeout: RUNNER_TIMEOUT });
           console.log(`🚀 [Reconciler] TEE execution triggered successfully! Response:`, response.status === 200 ? "Success" : response.statusText);
         }
       }
@@ -129,7 +129,7 @@ async function handleDisputeOpened(log) {
       milestoneIndex: milestoneIndex.toString(),
       reqsHandle: `0x${BigInt(requirementsHash).toString(16).padStart(64, "0")}`,
       devsHandle: `0x${BigInt(deliverableHash).toString(16).padStart(64, "0")}`
-    }, { timeout: 10000 });
+    }, { timeout: RUNNER_TIMEOUT });
 
     console.log(`🚀 iExec TEE execution triggered successfully! Response:`, response.status === 200 ? "Success" : response.statusText);
   } catch (error) {

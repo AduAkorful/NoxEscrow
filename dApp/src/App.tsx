@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { deriveEncryptionKey, SIGN_MESSAGE } from './crypto/keyDerivation';
 import { 
-  DEFAULT_NOX_GATEWAY
+  DEFAULT_NOX_GATEWAY,
+  clearHandleClientCache
 } from './services/escrowService';
 import { 
   AlertTriangle,
@@ -229,16 +230,19 @@ function App() {
 
   const isLoading = isEscrowLoading || isAdminLoading;
 
-  // Sync Privy connection with application walletAddress state & vaultKey persistence across tabs
+  // Sync Privy connection with application walletAddress state & vaultKey persistence
   useEffect(() => {
-    if (!ready) return; // Wait for Privy session to hydrate from localStorage
+    if (!ready) return; // Wait for Privy session to hydrate
+
+    clearHandleClientCache();
 
     if (authenticated && connectedAddress) {
       setWalletAddress(connectedAddress);
       localStorage.setItem('nox_connected_wallet', connectedAddress);
 
-      // Restore vault key from localStorage if previously derived for this wallet
-      const cachedKey = localStorage.getItem(`nox_vault_key_${connectedAddress.toLowerCase()}`);
+      // Restore vault key from sessionStorage if previously derived for this wallet in current session
+      const cachedKey = sessionStorage.getItem(`nox_vault_key_${connectedAddress.toLowerCase()}`) ||
+                        localStorage.getItem(`nox_vault_key_${connectedAddress.toLowerCase()}`);
       if (cachedKey) {
         setVaultKey(cachedKey);
       } else {
@@ -249,7 +253,8 @@ function App() {
       if (win.ethereum && win.ethereum.selectedAddress) {
         const addr = win.ethereum.selectedAddress;
         setWalletAddress(addr);
-        const cachedKey = localStorage.getItem(`nox_vault_key_${addr.toLowerCase()}`);
+        const cachedKey = sessionStorage.getItem(`nox_vault_key_${addr.toLowerCase()}`) ||
+                          localStorage.getItem(`nox_vault_key_${addr.toLowerCase()}`);
         if (cachedKey) {
           setVaultKey(cachedKey);
         } else {
@@ -319,7 +324,7 @@ function App() {
       const signature = await s.signMessage(SIGN_MESSAGE);
       const key = await deriveEncryptionKey(signature);
       setVaultKey(key);
-      localStorage.setItem(`nox_vault_key_${walletAddress.toLowerCase()}`, key);
+      sessionStorage.setItem(`nox_vault_key_${walletAddress.toLowerCase()}`, key);
       setSuccessMessage("🔐 Cryptographic key successfully derived! Environment unlocked.");
       
       loadOnChainContracts(true);
@@ -369,8 +374,10 @@ function App() {
       console.warn("Disconnect error:", err);
     } finally {
       if (walletAddress) {
+        sessionStorage.removeItem(`nox_vault_key_${walletAddress.toLowerCase()}`);
         localStorage.removeItem(`nox_vault_key_${walletAddress.toLowerCase()}`);
       }
+      clearHandleClientCache();
       localStorage.removeItem('nox_connected_wallet');
       setWalletAddress(null);
       setVaultKey(null);

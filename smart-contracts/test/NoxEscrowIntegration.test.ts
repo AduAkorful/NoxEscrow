@@ -124,6 +124,9 @@ describe("NoxEscrow Full-Stack E2E Integration", function () {
     // Link Reputation Registry in Factory
     await factory.setReputationRegistry(reputationAddress);
 
+    // Set tokenDecimals to 0 for unscaled test amounts
+    await reputation.setTokenDecimals(0);
+
     // Initialize Base Reputation score (1000)
     const baseRepEnc = await encryptInputWithSigner(client, 1000n, "uint256", reputationAddress, gatewayUrl);
     await reputation.connect(client).setBaseReputation(baseRepEnc.handle, baseRepEnc.handleProof);
