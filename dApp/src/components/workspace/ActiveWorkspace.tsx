@@ -61,6 +61,10 @@ export function ActiveWorkspace({
   setShowReleaseConfirm,
   milestoneBudget
 }: ActiveWorkspaceProps) {
+  const isPastMilestone = selectedMilestoneIndex < selectedContract.milestonesCompleted;
+  const isCurrentMilestone = selectedMilestoneIndex === selectedContract.milestonesCompleted;
+  const isFutureMilestone = selectedMilestoneIndex > selectedContract.milestonesCompleted;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {/* Task specifications */}
@@ -68,7 +72,23 @@ export function ActiveWorkspace({
         <div>
           <span className="font-mono text-[9px] uppercase tracking-widest text-[#7F00FF] font-bold block mb-4">Milestone Specifications</span>
           <div className="space-y-4 font-mono">
-            {timeLeft && (
+            {isPastMilestone ? (
+              <div className="p-4 border border-emerald-500/20 bg-emerald-950/15 rounded-xl text-emerald-400 font-mono text-xs flex items-center justify-between">
+                <span className="flex items-center gap-1.5 font-bold uppercase text-[10px]">
+                  <CheckCircle2 className="w-4 h-4 text-[#00E676]" />
+                  Milestone {selectedMilestoneIndex + 1} Settled
+                </span>
+                <span className="text-[9px] text-slate-400">Payout released on-chain</span>
+              </div>
+            ) : isFutureMilestone ? (
+              <div className="p-4 border border-slate-800 bg-slate-900/30 rounded-xl text-slate-400 font-mono text-xs flex items-center justify-between">
+                <span className="flex items-center gap-1.5 font-bold uppercase text-[10px]">
+                  <Lock className="w-4 h-4 text-slate-500" />
+                  Milestone {selectedMilestoneIndex + 1} Locked
+                </span>
+                <span className="text-[9px] text-slate-500">Unlocks after Milestone {selectedContract.milestonesCompleted + 1} completion</span>
+              </div>
+            ) : isCurrentMilestone && selectedContract.activeMilestoneSubmitted && timeLeft ? (
               <div className={`p-4 border rounded-xl flex flex-col gap-2 font-mono transition-smooth ${
                 timeLeft.isExpired 
                   ? 'bg-emerald-950/15 border-emerald-500/20 text-emerald-400' 
@@ -122,11 +142,19 @@ export function ActiveWorkspace({
                   )}
                 </div>
               </div>
-            )}
+            ) : isCurrentMilestone ? (
+              <div className="p-4 border border-amber-500/20 bg-amber-950/10 rounded-xl text-amber-300 font-mono text-xs flex items-center justify-between">
+                <span className="flex items-center gap-1.5 font-bold uppercase text-[10px]">
+                  <Clock className="w-4 h-4 text-amber-400" />
+                  Awaiting Work Submission
+                </span>
+                <span className="text-[9px] text-slate-400">Freelancer has not yet submitted deliverable on-chain</span>
+              </div>
+            ) : null}
 
             <div className="bg-[#070913] p-5 border border-[#7F00FF]/25 rounded-xl relative overflow-hidden shadow-[0_0_15px_rgba(127,0,255,0.05)]">
               <Lock className="w-4 h-4 text-[#7F00FF] absolute top-3 right-3 opacity-50" />
-              <span className="text-[10px] text-slate-500 block mb-2 font-bold tracking-wider">ACTIVE TARGET REQUIREMENTS</span>
+              <span className="text-[10px] text-slate-500 block mb-2 font-bold tracking-wider">TARGET REQUIREMENTS</span>
               <p className="text-xs text-slate-200 leading-relaxed font-sans">
                 {reqText}
               </p>
@@ -155,7 +183,19 @@ export function ActiveWorkspace({
             </div>
             <div className="flex justify-between items-center border-b border-white/5 pb-3 pt-1">
               <span className="text-slate-500 text-xs">MILESTONE_STATUS:</span>
-              <span className="text-[#00F2FE] text-xs font-bold font-mono bg-[#00F2FE]/5 border border-[#00F2FE]/10 px-2 py-0.5 rounded">ACTIVE_LOCKED</span>
+              <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded border ${
+                isPastMilestone 
+                  ? 'text-[#00E676] bg-emerald-950/20 border-emerald-500/30' 
+                  : isCurrentMilestone 
+                    ? (selectedContract.activeMilestoneSubmitted ? 'text-[#00F2FE] bg-[#00F2FE]/10 border-[#00F2FE]/30' : 'text-amber-400 bg-amber-950/20 border-amber-500/30')
+                    : 'text-slate-500 bg-slate-900/40 border-slate-700/30'
+              }`}>
+                {isPastMilestone 
+                  ? 'SETTLED_COMPLETED' 
+                  : isCurrentMilestone 
+                    ? (selectedContract.activeMilestoneSubmitted ? 'ACTIVE_SUBMITTED' : 'ACTIVE_LOCKED')
+                    : 'LOCKED_PENDING'}
+              </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-slate-500 text-xs">BUDGET_SECURED:</span>
@@ -167,7 +207,7 @@ export function ActiveWorkspace({
         </div>
 
         {/* Dispute actions */}
-        {selectedContract.milestonesCompleted < selectedContract.totalMilestones && (
+        {isCurrentMilestone && selectedContract.status === 'ACTIVE' && selectedContract.milestonesCompleted < selectedContract.totalMilestones && (
           <div className="mt-8 border-t border-white/5 pt-5 flex flex-col gap-4">
             <span className="font-mono text-[9px] uppercase tracking-widest text-[#FF1744]/70 font-bold block">TEE Arbiter Dispute Statement Context</span>
             <textarea
@@ -258,8 +298,60 @@ export function ActiveWorkspace({
                 </div>
               </div>
 
-              {              viewMode === 'freelancer' ? (
-                /* Freelancer Action Console */
+              {isPastMilestone ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-emerald-950/10 border border-emerald-900/25 rounded-xl text-xs font-mono text-[#00E676] flex gap-3 shadow-[0_0_15px_rgba(0,230,118,0.03)]">
+                    <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-[#00E676] drop-shadow-[0_0_5px_#00E676]" />
+                    <div className="flex flex-col gap-0.5">
+                      <strong className="block tracking-wider uppercase">Milestone {selectedMilestoneIndex + 1} Settled & Released</strong>
+                      <span className="font-sans text-[11px] text-slate-400">Payout successfully unlocked to contractor on-chain.</span>
+                    </div>
+                  </div>
+
+                  {deliverableText && (
+                    <div className="bg-[#070913] p-5 border border-[#00E676]/25 rounded-xl relative overflow-hidden">
+                      <Terminal className="w-4 h-4 text-[#00E676] absolute top-3 right-3 opacity-50" />
+                      <span className="text-[10px] text-slate-500 block mb-2 font-bold tracking-wider uppercase">ARCHIVED FREELANCER DELIVERABLE</span>
+                      <p className="text-xs text-slate-200 leading-relaxed font-sans mb-3 whitespace-pre-wrap">
+                        {deliverableText}
+                      </p>
+                      {deliverableAttachedFiles.length > 0 && (
+                        <div className="border-t border-white/5 pt-3 flex flex-col gap-2">
+                          <span className="text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider">Attached Deliverable Files:</span>
+                          {deliverableAttachedFiles.map((file, idx) => (
+                            <div key={idx} className="flex justify-between items-center bg-white/[0.02] border border-white/5 px-3 py-1.5 rounded-lg text-[10px] font-mono text-slate-300">
+                              <span className="truncate max-w-[160px]">{file.name}</span>
+                              <button
+                                onClick={() => handleDownloadFile(
+                                  file.cid, 
+                                  selectedContract.deliverableKeys?.[selectedMilestoneIndex] || "", 
+                                  file.name, 
+                                  file.type
+                                )}
+                                disabled={downloadingFileCid === file.cid}
+                                className="text-[#00E676] hover:text-emerald-300 transition-smooth hover:underline cursor-pointer disabled:opacity-50 font-bold"
+                              >
+                                {downloadingFileCid === file.cid ? "Decrypting..." : "Download"}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : isFutureMilestone ? (
+                <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-xl space-y-2 text-xs font-mono text-slate-400">
+                  <div className="flex items-center gap-2 text-slate-300 font-bold uppercase">
+                    <Lock className="w-4 h-4 text-slate-500" />
+                    <span>Milestone {selectedMilestoneIndex + 1} Locked</span>
+                  </div>
+                  <p className="text-xs text-slate-400 font-sans leading-relaxed">
+                    This milestone is currently locked. Complete Milestone {selectedContract.milestonesCompleted + 1} first to advance the contract.
+                  </p>
+                </div>
+              ) : viewMode === 'freelancer' ? (
+                /* Freelancer Action Console for Current Milestone */
                 selectedContract.activeMilestoneSubmitted ? (
                   <div className="space-y-4">
                     {timeLeft?.isExpired ? (
@@ -377,9 +469,9 @@ export function ActiveWorkspace({
                   </div>
                 )
               ) : (
-                /* Client Action Console */
-                <div className="space-y-5">
-                  {selectedContract.activeMilestoneSubmitted && (
+                /* Client Action Console for Current Milestone */
+                selectedContract.activeMilestoneSubmitted ? (
+                  <div className="space-y-5">
                     <div className="bg-[#070913] p-5 border border-[#00F2FE]/25 rounded-xl relative overflow-hidden shadow-[0_0_15px_rgba(0,242,254,0.05)]">
                       <Terminal className="w-4 h-4 text-[#00F2FE] absolute top-3 right-3 opacity-50" />
                       <span className="text-[10px] text-slate-500 block mb-2 font-bold tracking-wider">SUBMITTED FREELANCER DELIVERABLES</span>
@@ -400,7 +492,7 @@ export function ActiveWorkspace({
                                   file.type
                                 )}
                                 disabled={downloadingFileCid === file.cid}
-                                className="text-[#00F2FE] hover:text-[#33F5FF] transition-smooth hover:underline cursor-pointer disabled:opacity-50"
+                                className="text-[#00F2FE] hover:text-[#33F5FF] transition-smooth hover:underline cursor-pointer disabled:opacity-50 font-bold"
                               >
                                 {downloadingFileCid === file.cid ? "Decrypting..." : "Download"}
                               </button>
@@ -409,36 +501,46 @@ export function ActiveWorkspace({
                         </div>
                       )}
                     </div>
-                  )}
 
-                  <label className="block text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">Approve & Release Milestone</label>
-                  <p className="text-[12px] text-slate-400 leading-relaxed font-sans">
-                    Award contractor reputation rating (1-5 stars) to execute the release payout on-chain.
-                  </p>
-                  <div className="flex gap-3">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        onClick={() => setRatingInput(star)}
-                        className={`w-12 h-12 border font-mono text-sm rounded-xl transition-smooth cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95 ${
-                          ratingInput === star 
-                            ? 'bg-[#00F2FE] text-[#05070F] font-extrabold border-[#00F2FE] shadow-[0_0_15px_rgba(0,242,254,0.3)]' 
-                            : 'border-white/5 text-slate-400 hover:text-white bg-[#05070F] hover:border-white/20'
-                        }`}
-                      >
-                        {star}★
-                      </button>
-                    ))}
+                    <label className="block text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">Approve & Release Milestone</label>
+                    <p className="text-[12px] text-slate-400 leading-relaxed font-sans">
+                      Award contractor reputation rating (1-5 stars) to execute the release payout on-chain.
+                    </p>
+                    <div className="flex gap-3">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          onClick={() => setRatingInput(star)}
+                          className={`w-12 h-12 border font-mono text-sm rounded-xl transition-smooth cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95 ${
+                            ratingInput === star 
+                              ? 'bg-[#00F2FE] text-[#05070F] font-extrabold border-[#00F2FE] shadow-[0_0_15px_rgba(0,242,254,0.3)]' 
+                              : 'border-white/5 text-slate-400 hover:text-white bg-[#05070F] hover:border-white/20'
+                          }`}
+                        >
+                          {star}★
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setShowReleaseConfirm(true)}
+                      disabled={isLoading}
+                      className="w-full py-4.5 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth hover:shadow-[0_0_20px_rgba(0,242,254,0.45)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2.5 rounded-xl border border-transparent"
+                    >
+                      <Unlock className="w-4 h-4" />
+                      {isLoading ? "Executing transactions..." : "Release Milestone Payout"}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setShowReleaseConfirm(true)}
-                    disabled={isLoading}
-                    className="w-full py-4.5 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth hover:shadow-[0_0_20px_rgba(0,242,254,0.45)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2.5 rounded-xl border border-transparent"
-                  >
-                    <Unlock className="w-4 h-4" />
-                    {isLoading ? "Executing transactions..." : "Release Milestone Payout"}
-                  </button>
-                </div>
+                ) : (
+                  <div className="p-5 bg-amber-950/10 border border-amber-500/20 rounded-xl space-y-2 text-xs font-mono text-amber-300">
+                    <div className="flex items-center gap-2 font-bold uppercase">
+                      <Clock className="w-4 h-4 text-amber-400" />
+                      <span>Awaiting Freelancer Deliverable</span>
+                    </div>
+                    <p className="text-xs text-slate-300 font-sans leading-relaxed">
+                      The freelancer is currently working on Milestone {selectedMilestoneIndex + 1}. Once they submit their deliverable, you will be able to review decrypted files, rate performance, and release payout on-chain.
+                    </p>
+                  </div>
+                )
               )}
             </div>
           )}

@@ -322,16 +322,7 @@ export async function fetchUserEscrows(
                   }
                   if (payload) {
                     const rawDecrypted = await decryptText(payload.ciphertext, decryptedKeyHex, payload.iv);
-                    if (rawDecrypted && rawDecrypted.trim().startsWith('{')) {
-                      try {
-                        const parsedObj = JSON.parse(rawDecrypted.trim());
-                        reqText = parsedObj.text || rawDecrypted;
-                      } catch {
-                        reqText = rawDecrypted;
-                      }
-                    } else {
-                      reqText = rawDecrypted;
-                    }
+                    reqText = rawDecrypted;
                   }
                 }
               } catch (metaErr) {
@@ -375,16 +366,7 @@ export async function fetchUserEscrows(
                   }
                   if (payload) {
                     const rawDecrypted = await decryptText(payload.ciphertext, devKeyHex, payload.iv);
-                    if (rawDecrypted && rawDecrypted.trim().startsWith('{')) {
-                      try {
-                        const parsedObj = JSON.parse(rawDecrypted.trim());
-                        deliverableText = parsedObj.text || rawDecrypted;
-                      } catch {
-                        deliverableText = rawDecrypted;
-                      }
-                    } else {
-                      deliverableText = rawDecrypted;
-                    }
+                    deliverableText = rawDecrypted;
                   }
                 } catch (devMetaErr) {
                   console.warn(`Failed to fetch/decrypt deliverable payload for milestone ${m}:`, devMetaErr);
