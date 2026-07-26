@@ -1,0 +1,407 @@
+import React from 'react';
+import { Lock, Paperclip, AlertTriangle, Activity, ShieldCheck, Terminal, Unlock, Trash2 } from 'lucide-react';
+import { type EscrowContract } from '../../services/escrowService';
+
+interface ActiveWorkspaceProps {
+  selectedContract: EscrowContract;
+  selectedMilestoneIndex: number;
+  viewMode: 'client' | 'freelancer';
+  walletAddress: string | null;
+  timeLeft: { days: number; hours: number; minutes: number; seconds: number; isExpired: boolean } | null;
+  reqText: string;
+  reqAttachedFiles: { name: string; type: string; cid: string }[];
+  handleDownloadFile: (cid: string, keyHex: string, name: string, type: string) => Promise<void>;
+  downloadingFileCid: string | null;
+  disputeStatement: string;
+  setDisputeStatement: (val: string) => void;
+  setShowDisputeConfirm: (val: boolean) => void;
+  isLoading: boolean;
+  deliverableInput: string;
+  setDeliverableInput: (val: string) => void;
+  isDragging: boolean;
+  setIsDragging: (val: boolean) => void;
+  deliverableFiles: File[];
+  setDeliverableFiles: React.Dispatch<React.SetStateAction<File[]>>;
+  handleSubmitDeliverable: () => Promise<void>;
+  deliverableText: string;
+  deliverableAttachedFiles: { name: string; type: string; cid: string }[];
+  ratingInput: number;
+  setRatingInput: (val: number) => void;
+  setShowReleaseConfirm: (val: boolean) => void;
+  milestoneBudget: number;
+}
+
+export function ActiveWorkspace({
+  selectedContract,
+  selectedMilestoneIndex,
+  viewMode,
+  walletAddress,
+  timeLeft,
+  reqText,
+  reqAttachedFiles,
+  handleDownloadFile,
+  downloadingFileCid,
+  disputeStatement,
+  setDisputeStatement,
+  setShowDisputeConfirm,
+  isLoading,
+  deliverableInput,
+  setDeliverableInput,
+  isDragging,
+  setIsDragging,
+  deliverableFiles,
+  setDeliverableFiles,
+  handleSubmitDeliverable,
+  deliverableText,
+  deliverableAttachedFiles,
+  ratingInput,
+  setRatingInput,
+  setShowReleaseConfirm,
+  milestoneBudget
+}: ActiveWorkspaceProps) {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Task specifications */}
+      <div className="border border-white/5 bg-white/[0.01] p-6 rounded-xl flex flex-col justify-between hover:border-white/10 transition-smooth">
+        <div>
+          <span className="font-mono text-[9px] uppercase tracking-widest text-[#7F00FF] font-bold block mb-4">Milestone Specifications</span>
+          <div className="space-y-4 font-mono">
+            {timeLeft && (
+              <div className={`p-4 border rounded-xl flex flex-col gap-2 font-mono transition-smooth ${
+                timeLeft.isExpired 
+                  ? 'bg-emerald-950/15 border-emerald-500/20 text-emerald-400' 
+                  : (timeLeft.days === 0 && timeLeft.hours < 12)
+                    ? 'bg-red-950/15 border-red-500/20 text-red-400 animate-pulse'
+                    : 'bg-amber-950/15 border-amber-500/20 text-amber-400'
+              }`}>
+                <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-wider">
+                  <span className="flex items-center gap-1.5">
+                    <span className={`w-1.5 h-1.5 rounded-full ${timeLeft.isExpired ? 'bg-[#00E676] drop-shadow-[0_0_4px_#00E676]' : 'bg-amber-400 animate-pulse drop-shadow-[0_0_4px_rgba(245,158,11,0.5)]'}`}></span>
+                    {timeLeft.isExpired ? 'Auto-Release Window Expired' : 'Auto-Release Review Countdown'}
+                  </span>
+                  <span className="text-[9px] text-slate-500">
+                    {timeLeft.isExpired ? 'Freelancer may trigger release' : 'Auto-release pending'}
+                  </span>
+                </div>
+                <div className="flex gap-4 items-center justify-center py-2 border-y border-white/5">
+                  {!timeLeft.isExpired ? (
+                    <>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xl font-bold font-mono">{timeLeft.days}</span>
+                        <span className="text-[8px] text-slate-500 uppercase">Days</span>
+                      </div>
+                      <span className="text-slate-600">:</span>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xl font-bold font-mono">{String(timeLeft.hours).padStart(2, '0')}</span>
+                        <span className="text-[8px] text-slate-500 uppercase">Hrs</span>
+                      </div>
+                      <span className="text-slate-600">:</span>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xl font-bold font-mono">{String(timeLeft.minutes).padStart(2, '0')}</span>
+                        <span className="text-[8px] text-slate-500 uppercase">Min</span>
+                      </div>
+                      <span className="text-slate-600">:</span>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xl font-bold font-mono">{String(timeLeft.seconds).padStart(2, '0')}</span>
+                        <span className="text-[8px] text-slate-500 uppercase">Sec</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center py-1">
+                      <span className="text-sm font-bold font-mono tracking-wide">READY FOR RELEASE BY CONTRACTOR</span>
+                      <span className="text-[8px] text-slate-500 uppercase">No client objections were raised during the review window</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-[#070913] p-5 border border-[#7F00FF]/25 rounded-xl relative overflow-hidden shadow-[0_0_15px_rgba(127,0,255,0.05)]">
+              <Lock className="w-4 h-4 text-[#7F00FF] absolute top-3 right-3 opacity-50" />
+              <span className="text-[10px] text-slate-500 block mb-2 font-bold tracking-wider">ACTIVE TARGET REQUIREMENTS</span>
+              <p className="text-xs text-slate-200 leading-relaxed font-sans">
+                {reqText}
+              </p>
+              {reqAttachedFiles.length > 0 && (
+                <div className="border-t border-white/5 pt-3 mt-3 flex flex-col gap-2">
+                  <span className="text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider">Project Specification Files:</span>
+                  {reqAttachedFiles.map((file, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-white/[0.02] border border-white/5 px-3 py-1.5 rounded-lg text-[10px] font-mono text-slate-300">
+                      <span className="truncate max-w-[160px]">{file.name}</span>
+                      <button
+                        onClick={() => handleDownloadFile(
+                          file.cid, 
+                          selectedContract.milestoneKeys?.[selectedMilestoneIndex] || "", 
+                          file.name, 
+                          file.type
+                        )}
+                        disabled={downloadingFileCid === file.cid}
+                        className="text-[#7F00FF] hover:text-[#9D4EDD] transition-smooth hover:underline cursor-pointer disabled:opacity-50"
+                      >
+                        {downloadingFileCid === file.cid ? "Decrypting..." : "Download"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-between items-center border-b border-white/5 pb-3 pt-1">
+              <span className="text-slate-500 text-xs">MILESTONE_STATUS:</span>
+              <span className="text-[#00F2FE] text-xs font-bold font-mono bg-[#00F2FE]/5 border border-[#00F2FE]/10 px-2 py-0.5 rounded">ACTIVE_LOCKED</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500 text-xs">BUDGET_SECURED:</span>
+              <span className="text-[#00F2FE] text-xs font-extrabold font-mono teal-glow-text">
+                {milestoneBudget.toLocaleString()} cUSDC
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Dispute actions */}
+        {selectedContract.milestonesCompleted < selectedContract.totalMilestones && (
+          <div className="mt-8 border-t border-white/5 pt-5 flex flex-col gap-4">
+            <span className="font-mono text-[9px] uppercase tracking-widest text-[#FF1744]/70 font-bold block">TEE Arbiter Dispute Statement Context</span>
+            <textarea
+              rows={3}
+              placeholder="State your reasons for raising a dispute. This statement will be uploaded encrypted to Supabase/IPFS for the TEE Arbiter evaluation."
+              value={disputeStatement}
+              onChange={(e) => setDisputeStatement(e.target.value)}
+              className="w-full bg-[#05070F] border border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:border-red-500/40 focus:outline-none transition-smooth resize-none"
+            />
+            <button
+              onClick={() => setShowDisputeConfirm(true)}
+              disabled={isLoading}
+              className="w-full py-4 bg-red-950/10 hover:bg-red-950/20 border border-red-900/25 text-[#FF1744] font-mono text-xs tracking-widest uppercase rounded-xl flex items-center justify-center gap-2.5 cursor-pointer font-bold transition-smooth hover:shadow-[0_0_15px_rgba(255,23,68,0.1)] active:scale-[0.98]"
+            >
+              <AlertTriangle className="w-4 h-4" />
+              Raise Dispute (D)
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Actions Console */}
+      <div className="border border-white/5 bg-white/[0.01] p-6 rounded-xl flex flex-col justify-between hover:border-white/10 transition-smooth">
+        <div>
+          <span className="font-mono text-[9px] uppercase tracking-widest text-[#7F00FF] font-bold block mb-4">Actions Console</span>
+          
+          {selectedContract.milestonesCompleted === selectedContract.totalMilestones ? (
+            <div className="p-5 bg-emerald-950/10 border border-emerald-900/25 rounded-xl text-xs font-mono text-[#00E676] flex gap-4 shadow-[0_0_15px_rgba(0,230,118,0.03)]">
+              <ShieldCheck className="w-5 h-5 flex-shrink-0 text-[#00E676] drop-shadow-[0_0_5px_#00E676]" />
+              <div className="flex flex-col gap-1">
+                <strong className="block mb-0.5 tracking-wider uppercase">Escrow Agreement Completed</strong>
+                <span className="font-sans text-[11px] text-slate-400">All milestones successfully verified and settled. Payouts successfully unlocked to contractor.</span>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Real-time Milestone Escrow Financial Ledger Panel */}
+              <div className="bg-[#05070F] border border-white/5 p-4 rounded-xl flex flex-col gap-3">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-3.5 h-3.5 text-[#00F2FE]" />
+                    <span className="font-mono text-[9px] uppercase tracking-wider text-slate-300 font-bold">
+                      Escrow Vault Financial Ledger
+                    </span>
+                  </div>
+                  <span className="font-mono text-[8px] text-emerald-400 uppercase">✓ Hardware Attested</span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2.5 border-y border-white/5 py-3 my-1">
+                  <div className="flex flex-col">
+                    <span className="text-[8px] font-mono text-slate-500 uppercase">Total Locked</span>
+                    <span className="font-mono text-xs font-bold text-white mt-0.5">
+                      {selectedContract.budget.toLocaleString()} cUSDC
+                    </span>
+                  </div>
+                  <div className="flex flex-col text-center border-x border-white/5 px-2">
+                    <span className="text-[8px] font-mono text-slate-500 uppercase">Released</span>
+                    <span className="font-mono text-xs font-bold text-emerald-400 mt-0.5">
+                      {((selectedContract.budget / selectedContract.totalMilestones) * selectedContract.milestonesCompleted).toLocaleString()} cUSDC
+                    </span>
+                  </div>
+                  <div className="flex flex-col text-right">
+                    <span className="text-[8px] font-mono text-slate-500 uppercase">Remaining</span>
+                    <span className="font-mono text-xs font-bold text-[#38BDF8] mt-0.5">
+                      {(selectedContract.status === 'COMPLETED' || selectedContract.status === 'REFUNDED' ? 0 : selectedContract.budget - ((selectedContract.budget / selectedContract.totalMilestones) * selectedContract.milestonesCompleted)).toLocaleString()} cUSDC
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 mt-0.5">
+                  <div className="flex justify-between text-[9px] font-mono">
+                    <span className="text-slate-400 uppercase">Ledger Settlement progress</span>
+                    <span className="text-white font-bold">{Math.round((selectedContract.milestonesCompleted / selectedContract.totalMilestones) * 100)}% Settled</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-900 border border-white/5 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-[#00F2FE] to-[#7F00FF] transition-all duration-500"
+                      style={{ width: `${(selectedContract.milestonesCompleted / selectedContract.totalMilestones) * 100}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-[#0B0E17]/60 border border-white/[0.04] rounded-xl text-[10px] font-sans text-slate-400 leading-normal flex items-start gap-2">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#38BDF8] shrink-0 mt-0.5" />
+                  <span>
+                    <strong>ZK Budget Assurance:</strong> All settlement variables are processed cryptographically on-chain. Decrypted balances are only visible to verified contract counterparties.
+                  </span>
+                </div>
+              </div>
+
+              {viewMode === 'freelancer' ? (
+                /* Freelancer Action Console */
+                <div className="space-y-4">
+                  {(!walletAddress || walletAddress.toLowerCase() !== (selectedContract.role === 'FREELANCER' ? walletAddress.toLowerCase() : selectedContract.counterparty.toLowerCase())) && (
+                    <div className="p-3.5 bg-amber-950/20 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-xs font-mono text-amber-300">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                      <div className="leading-relaxed">
+                        <span className="font-bold uppercase block text-[10px] text-amber-400 mb-0.5">Wallet Role Mismatch</span>
+                        Your connected wallet is the <strong>Client</strong> for this contract. Switch your Web3 wallet (MetaMask/Rabby) to the assigned <strong>Freelancer wallet</strong> ({selectedContract.role === 'FREELANCER' ? walletAddress?.slice(0,6) : selectedContract.counterparty.slice(0,6)}...{selectedContract.role === 'FREELANCER' ? walletAddress?.slice(-4) : selectedContract.counterparty.slice(-4)}) to submit deliverables on-chain.
+                      </div>
+                    </div>
+                  )}
+
+                  <label className="block text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">Submit Code Deliverable / Git diff</label>
+                  <textarea 
+                    rows={3}
+                    placeholder="Tested Collapsible sidebar. Full GPU acceleration and responsive Chrome/Safari/Firefox compatibility."
+                    value={deliverableInput} 
+                    onChange={(e) => setDeliverableInput(e.target.value)}
+                    className="w-full bg-[#05070F] border border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:border-[#7F00FF]/40 focus:outline-none transition-smooth resize-none"
+                  />
+
+                  {/* Encrypted Deliverables Uploader */}
+                  <div className="flex flex-col gap-2">
+                    <label className="font-mono text-[9px] text-slate-400 uppercase tracking-widest font-bold">Attach Deliverable Files (Optional)</label>
+                    <div 
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setIsDragging(true);
+                      }}
+                      onDragLeave={() => setIsDragging(false)}
+                      onDrop={() => setIsDragging(false)}
+                      className={`relative border border-dashed p-4 rounded-xl flex flex-col items-center gap-1.5 transition-smooth cursor-pointer ${
+                        isDragging 
+                          ? "border-[#00F2FE] bg-[#00F2FE]/5 shadow-[0_0_15px_rgba(0,242,254,0.15)] scale-[1.02]" 
+                          : "border-white/10 hover:border-[#00F2FE]/40 bg-white/[0.01] hover:bg-white/[0.02]"
+                      }`}
+                    >
+                      <input 
+                        type="file" 
+                        multiple 
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            setDeliverableFiles(prev => [...prev, ...Array.from(e.target.files || [])]);
+                          }
+                        }}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                      <Paperclip className={`w-4 h-4 transition-smooth ${isDragging ? "text-[#7F00FF] scale-110" : "text-[#00F2FE]"}`} />
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {isDragging ? "Drop your files here!" : "Drag & drop files or click to upload"}
+                      </span>
+                    </div>
+
+                    {deliverableFiles.length > 0 && (
+                      <div className="flex flex-col gap-2 bg-[#05070F]/50 border border-white/5 p-3 rounded-xl max-h-32 overflow-y-auto custom-scrollbar">
+                        {deliverableFiles.map((file, idx) => (
+                          <div key={idx} className="flex justify-between items-center bg-[#070913]/80 border border-white/5 px-3 py-1.5 rounded-lg">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <Paperclip className="w-3 h-3 text-[#00F2FE] flex-shrink-0" />
+                              <span className="font-mono text-[10px] text-slate-300 truncate max-w-[160px]">{file.name}</span>
+                              <span className="font-mono text-[8px] text-slate-500 flex-shrink-0">({(file.size / 1024).toFixed(1)} KB)</span>
+                            </div>
+                            <button 
+                              onClick={() => setDeliverableFiles(prev => prev.filter((_, i) => i !== idx))}
+                              className="text-slate-500 hover:text-red-400 transition-smooth cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleSubmitDeliverable}
+                    disabled={isLoading || (!deliverableInput.trim() && deliverableFiles.length === 0)}
+                    className="w-full py-4.5 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth hover:shadow-[0_0_20px_rgba(0,242,254,0.45)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2.5 rounded-xl border border-transparent"
+                  >
+                    <Terminal className="w-4 h-4" />
+                    {isLoading ? "Signing handle..." : "Submit Deliverable (Enter)"}
+                  </button>
+                </div>
+              ) : (
+                /* Client Action Console */
+                <div className="space-y-5">
+                  {selectedContract.activeMilestoneSubmitted && (
+                    <div className="bg-[#070913] p-5 border border-[#00F2FE]/25 rounded-xl relative overflow-hidden shadow-[0_0_15px_rgba(0,242,254,0.05)]">
+                      <Terminal className="w-4 h-4 text-[#00F2FE] absolute top-3 right-3 opacity-50" />
+                      <span className="text-[10px] text-slate-500 block mb-2 font-bold tracking-wider">SUBMITTED FREELANCER DELIVERABLES</span>
+                      <p className="text-xs text-slate-200 leading-relaxed font-sans mb-3 whitespace-pre-wrap">
+                        {deliverableText || "No description text provided."}
+                      </p>
+                      {deliverableAttachedFiles.length > 0 && (
+                        <div className="border-t border-white/5 pt-3 flex flex-col gap-2">
+                          <span className="text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider">Deliverable Files:</span>
+                          {deliverableAttachedFiles.map((file, idx) => (
+                            <div key={idx} className="flex justify-between items-center bg-white/[0.02] border border-white/5 px-3 py-1.5 rounded-lg text-[10px] font-mono text-slate-300">
+                              <span className="truncate max-w-[160px]">{file.name}</span>
+                              <button
+                                onClick={() => handleDownloadFile(
+                                  file.cid, 
+                                  selectedContract.deliverableKeys?.[selectedMilestoneIndex] || "", 
+                                  file.name, 
+                                  file.type
+                                )}
+                                disabled={downloadingFileCid === file.cid}
+                                className="text-[#00F2FE] hover:text-[#33F5FF] transition-smooth hover:underline cursor-pointer disabled:opacity-50"
+                              >
+                                {downloadingFileCid === file.cid ? "Decrypting..." : "Download"}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <label className="block text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">Approve & Release Milestone</label>
+                  <p className="text-[12px] text-slate-400 leading-relaxed font-sans">
+                    Award contractor reputation rating (1-5 stars) to execute the release payout on-chain.
+                  </p>
+                  <div className="flex gap-3">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setRatingInput(star)}
+                        className={`w-12 h-12 border font-mono text-sm rounded-xl transition-smooth cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95 ${
+                          ratingInput === star 
+                            ? 'bg-[#00F2FE] text-[#05070F] font-extrabold border-[#00F2FE] shadow-[0_0_15px_rgba(0,242,254,0.3)]' 
+                            : 'border-white/5 text-slate-400 hover:text-white bg-[#05070F] hover:border-white/20'
+                        }`}
+                      >
+                        {star}★
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setShowReleaseConfirm(true)}
+                    disabled={isLoading}
+                    className="w-full py-4.5 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth hover:shadow-[0_0_20px_rgba(0,242,254,0.45)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2.5 rounded-xl border border-transparent"
+                  >
+                    <Unlock className="w-4 h-4" />
+                    {isLoading ? "Executing transactions..." : "Release Milestone Payout"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

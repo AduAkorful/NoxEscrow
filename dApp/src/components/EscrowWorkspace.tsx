@@ -1,4 +1,4 @@
-import { X, Lock, AlertTriangle, ShieldCheck, Terminal, Unlock, Paperclip, Trash2, Activity } from 'lucide-react';
+import { X, Lock, AlertTriangle, Unlock, Paperclip } from 'lucide-react';
 import { type EscrowContract, decryptMilestoneChatKey } from '../services/escrowService';
 import { NoxEscrowContractABI } from '../contracts/NoxEscrowContract';
 import { fetchAndDecryptFile, encryptText, decryptText } from '../crypto/fileUploader';
@@ -7,6 +7,13 @@ import { TEECourtroom } from './TEECourtroom';
 import { supabase } from '../services/supabaseClient';
 import { getEscrowDisputeRecord, type EscrowDisputeRecord } from '../services/metadataService';
 import { ethers } from 'ethers';
+
+// Subcomponents
+import { MilestoneProgress } from './workspace/MilestoneProgress';
+import { SigningWorkspace } from './workspace/SigningWorkspace';
+import { ActiveWorkspace } from './workspace/ActiveWorkspace';
+import { CommunicationTunnel } from './workspace/CommunicationTunnel';
+import { TelemetryAttestation } from './workspace/TelemetryAttestation';
 
 interface EscrowWorkspaceProps {
   selectedContract: EscrowContract;
@@ -74,7 +81,7 @@ export function EscrowWorkspace({
   const activeRequirement = selectedContract.requirements[selectedMilestoneIndex] || "All milestones settled!";
   const milestoneBudget = selectedContract.budget / selectedContract.totalMilestones;
 
-  // --- Deployed SIGNING Setup / Recovery states (Finding C) ---
+  // --- Deployed SIGNING Setup / Recovery states ---
   const [resumeTitle, setResumeTitle] = useState(selectedContract.title || "Confidential Escrow Agreement");
   const [resumeMilestones, setResumeMilestones] = useState(() => {
     const items = [];
@@ -127,7 +134,7 @@ export function EscrowWorkspace({
     return () => clearInterval(interval);
   }, [selectedContract.address, selectedContract.milestonesCompleted, selectedContract.status]);
 
-  // Poll on-chain status to auto-refresh when dispute is settled (Finding E)
+  // Poll on-chain status to auto-refresh when dispute is settled
   useEffect(() => {
     if (!selectedContract.address || selectedContract.status !== 'DISPUTED' || !getWeb3Signer) return;
 
@@ -160,7 +167,7 @@ export function EscrowWorkspace({
     };
   }, [selectedContract.address, selectedContract.status, getWeb3Signer, loadOnChainContracts]);
 
-  // Lazy chat key: derived on-demand from on-chain handle (single wallet prompt)
+  // Lazy chat key: derived on-demand from on-chain handle
   const [chatKey, setChatKey] = useState<string | null>(null);
   const [, setIsChatKeyDeriving] = useState(false);
   const chatKeyDerivedRef = useRef(false);
@@ -547,7 +554,6 @@ export function EscrowWorkspace({
     // legacy fallback
   }
 
-
   return (
     <div className="bento-card p-6 md:p-8 flex flex-col gap-8 w-full animate-slide-up">
       {/* Key Locked Notice Banner */}
@@ -627,163 +633,27 @@ export function EscrowWorkspace({
       </div>
 
       {/* Milestone progress pipeline */}
-      <div className="flex flex-col gap-3">
-        <span className="font-mono text-[9px] uppercase tracking-widest text-[#7F00FF] font-bold">Milestone Progress timeline</span>
-        <div className="flex items-center gap-3 overflow-x-auto py-3 px-1 custom-scrollbar">
-          {selectedContract.requirements.map((_, idx) => (
-            <div key={idx} className="flex items-center gap-3 flex-shrink-0">
-              <div 
-                onClick={() => setSelectedMilestoneIndex(idx)}
-                className={`px-4 py-2 border font-mono text-[10px] rounded-xl uppercase font-bold flex items-center gap-2 transition-smooth cursor-pointer ${
-                  idx === selectedMilestoneIndex ? 'border-[#00F2FE] shadow-[0_0_10px_rgba(0,242,254,0.15)] bg-[#00F2FE]/10 text-white' :
-                  idx < selectedContract.milestonesCompleted ? 'bg-emerald-950/10 text-[#00E676] border-emerald-900/35 shadow-[0_0_10px_rgba(0,230,118,0.02)] hover:border-emerald-500/40' :
-                  idx === selectedContract.milestonesCompleted ? 'bg-[#00F2FE]/5 text-[#00F2FE] border-[#00F2FE]/25 shadow-[0_0_15px_rgba(0,242,254,0.03)] animate-pulse hover:border-[#00F2FE]/45' :
-                  'bg-white/[0.01] text-slate-500 border-white/5 hover:border-white/20'
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${
-                  idx < selectedContract.milestonesCompleted ? 'bg-[#00E676] drop-shadow-[0_0_4px_#00E676]' :
-                  idx === selectedContract.milestonesCompleted ? 'bg-[#00F2FE] drop-shadow-[0_0_4px_#00F2FE]' :
-                  'bg-slate-700'
-                }`}></span>
-                Milestone {idx + 1} {idx === selectedMilestoneIndex && "👁️"}
-              </div>
-              {idx < selectedContract.totalMilestones - 1 && (
-                <div className={`w-8 h-[1px] ${
-                  idx < selectedContract.milestonesCompleted ? 'bg-emerald-500/25' : 'bg-white/5'
-                }`}></div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+      <MilestoneProgress 
+        selectedContract={selectedContract}
+        selectedMilestoneIndex={selectedMilestoneIndex}
+        setSelectedMilestoneIndex={setSelectedMilestoneIndex}
+      />
 
       {/* Workspace Details Split or Secure Enclave TEE Courtroom */}
       {selectedContract.status === 'SIGNING' ? (
-        <div className="uniswap-card p-6 md:p-8 border border-[#7F00FF]/25 bg-[#7F00FF]/5 rounded-2xl flex flex-col gap-6 animate-scale-in">
-          <div className="flex items-center gap-3 border-b border-white/[0.08] pb-4">
-            <div className="w-10 h-10 rounded-xl bg-[#7F00FF]/15 flex items-center justify-center border border-[#7F00FF]/30">
-              <Lock className="w-5 h-5 text-[#C084FC] animate-pulse" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                🔒 Escrow Vault Setup & Funding Required
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                This lightweight escrow proxy was deployed on-chain, but its budget has not been locked and milestone specs are uninitialized.
-              </p>
-            </div>
-          </div>
-
-          {viewMode === 'client' ? (
-            <div className="flex flex-col gap-6 font-sans">
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-slate-300">
-                  Project Title / Agreement Name
-                </label>
-                <input 
-                  type="text" 
-                  value={resumeTitle} 
-                  onChange={(e) => setResumeTitle(e.target.value)}
-                  placeholder="e.g. DeFi Smart Contract Security Audit"
-                  className="uniswap-input-box px-4 py-3 text-sm text-white focus:outline-none w-full"
-                />
-              </div>
-
-              <div className="flex flex-col gap-4">
-                <span className="text-xs font-semibold text-slate-300">
-                  Configure Milestone Budgets and Requirements ({selectedContract.totalMilestones} Milestones total)
-                </span>
-                {resumeMilestones.map((milestone, idx) => (
-                  <div key={idx} className="p-4 bg-black/40 border border-white/5 rounded-2xl flex flex-col gap-3">
-                    <span className="font-mono text-[10px] text-slate-500 font-bold uppercase">Milestone {idx + 1}</span>
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                      <div className="sm:col-span-1">
-                        <input 
-                          type="number" 
-                          placeholder="Budget (USDC)" 
-                          value={milestone.payout}
-                          onChange={(e) => {
-                            const newMils = [...resumeMilestones];
-                            newMils[idx].payout = e.target.value;
-                            setResumeMilestones(newMils);
-                          }}
-                          className="uniswap-input-box px-3 py-2 text-xs text-white focus:outline-none w-full text-center"
-                        />
-                      </div>
-                      <div className="sm:col-span-3">
-                        <input 
-                          type="text" 
-                          placeholder="What needs to be delivered for this milestone?" 
-                          value={milestone.requirements}
-                          onChange={(e) => {
-                            const newMils = [...resumeMilestones];
-                            newMils[idx].requirements = e.target.value;
-                            setResumeMilestones(newMils);
-                          }}
-                          className="uniswap-input-box px-3 py-2 text-xs text-white focus:outline-none w-full"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Attachment selector */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Paperclip className="w-3.5 h-3.5 text-[#38BDF8]" /> Confidential File Attachments (Optional)
-                </label>
-                <input 
-                  type="file" 
-                  multiple
-                  onChange={(e) => {
-                    if (e.target.files) {
-                      setResumeFiles(Array.from(e.target.files));
-                    }
-                  }}
-                  className="uniswap-input-box p-2 text-xs text-slate-300 focus:outline-none w-full cursor-pointer file:mr-3 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-white/[0.08] file:text-white hover:file:bg-white/[0.12]"
-                />
-              </div>
-
-              <button
-                disabled={isInitializingDeployed || !resumeMilestones.every(m => m.payout.trim() && !isNaN(Number(m.payout)) && Number(m.payout) > 0 && m.requirements.trim())}
-                onClick={async () => {
-                  if (handleInitializeDeployedEscrow) {
-                    setIsInitializingDeployed(true);
-                    try {
-                      await handleInitializeDeployedEscrow(
-                        selectedContract.address,
-                        resumeMilestones.map(m => Number(m.payout)),
-                        resumeMilestones.map(m => m.requirements),
-                        resumeTitle,
-                        resumeFiles
-                      );
-                    } catch (e) {
-                      console.error("Initialize error:", e);
-                    } finally {
-                      setIsInitializingDeployed(false);
-                    }
-                  }
-                }}
-                className="w-full py-3.5 bg-gradient-to-r from-[#7F00FF] to-[#C084FC] text-white font-mono text-xs font-bold uppercase tracking-wider rounded-xl transition-smooth hover:shadow-[0_0_20px_rgba(127,0,255,0.35)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {isInitializingDeployed ? "Encrypting & Locking Funds..." : "Fund & Initialize Escrow Vault"}
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4 text-center py-6 font-sans items-center justify-center">
-              <div className="relative flex h-3 w-3 mb-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-violet-500"></span>
-              </div>
-              <h4 className="text-sm font-bold text-[#C084FC]">Awaiting Client Setup & Funding</h4>
-              <p className="text-xs text-slate-300 max-w-md leading-relaxed">
-                The client deployed this contract clone proxy on-chain, but has not yet funded the escrow vault or encrypted the milestones requirements. Once funded, this workspace will activate automatically.
-              </p>
-            </div>
-          )}
-        </div>
+        <SigningWorkspace 
+          selectedContract={selectedContract}
+          viewMode={viewMode}
+          resumeTitle={resumeTitle}
+          setResumeTitle={setResumeTitle}
+          resumeMilestones={resumeMilestones}
+          setResumeMilestones={setResumeMilestones}
+          resumeFiles={resumeFiles}
+          setResumeFiles={setResumeFiles}
+          isInitializingDeployed={isInitializingDeployed}
+          setIsInitializingDeployed={setIsInitializingDeployed}
+          handleInitializeDeployedEscrow={handleInitializeDeployedEscrow}
+        />
       ) : selectedContract.status === 'DISPUTED' ? (
         <TEECourtroom
           escrowAddress={selectedContract.address}
@@ -800,575 +670,66 @@ export function EscrowWorkspace({
           }}
         />
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Task specifications */}
-          <div className="border border-white/5 bg-white/[0.01] p-6 rounded-xl flex flex-col justify-between hover:border-white/10 transition-smooth">
-            <div>
-              <span className="font-mono text-[9px] uppercase tracking-widest text-[#7F00FF] font-bold block mb-4">Milestone Specifications</span>
-              <div className="space-y-4 font-mono">
-                {timeLeft && (
-                  <div className={`p-4 border rounded-xl flex flex-col gap-2 font-mono transition-smooth ${
-                    timeLeft.isExpired 
-                      ? 'bg-emerald-950/15 border-emerald-500/20 text-emerald-400' 
-                      : (timeLeft.days === 0 && timeLeft.hours < 12)
-                        ? 'bg-red-950/15 border-red-500/20 text-red-400 animate-pulse'
-                        : 'bg-amber-950/15 border-amber-500/20 text-amber-400'
-                  }`}>
-                    <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-wider">
-                      <span className="flex items-center gap-1.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${timeLeft.isExpired ? 'bg-[#00E676] drop-shadow-[0_0_4px_#00E676]' : 'bg-amber-400 animate-pulse drop-shadow-[0_0_4px_rgba(245,158,11,0.5)]'}`}></span>
-                        {timeLeft.isExpired ? 'Auto-Release Window Expired' : 'Auto-Release Review Countdown'}
-                      </span>
-                      <span className="text-[9px] text-slate-500">
-                        {timeLeft.isExpired ? 'Freelancer may trigger release' : 'Auto-release pending'}
-                      </span>
-                    </div>
-                    <div className="flex gap-4 items-center justify-center py-2 border-y border-white/5">
-                      {!timeLeft.isExpired ? (
-                        <>
-                          <div className="flex flex-col items-center">
-                            <span className="text-xl font-bold font-mono">{timeLeft.days}</span>
-                            <span className="text-[8px] text-slate-500 uppercase">Days</span>
-                          </div>
-                          <span className="text-slate-600">:</span>
-                          <div className="flex flex-col items-center">
-                            <span className="text-xl font-bold font-mono">{String(timeLeft.hours).padStart(2, '0')}</span>
-                            <span className="text-[8px] text-slate-500 uppercase">Hrs</span>
-                          </div>
-                          <span className="text-slate-600">:</span>
-                          <div className="flex flex-col items-center">
-                            <span className="text-xl font-bold font-mono">{String(timeLeft.minutes).padStart(2, '0')}</span>
-                            <span className="text-[8px] text-slate-500 uppercase">Min</span>
-                          </div>
-                          <span className="text-slate-600">:</span>
-                          <div className="flex flex-col items-center">
-                            <span className="text-xl font-bold font-mono">{String(timeLeft.seconds).padStart(2, '0')}</span>
-                            <span className="text-[8px] text-slate-500 uppercase">Sec</span>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="flex flex-col items-center py-1">
-                          <span className="text-sm font-bold font-mono tracking-wide">READY FOR RELEASE BY CONTRACTOR</span>
-                          <span className="text-[8px] text-slate-500 uppercase">No client objections were raised during the review window</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div className="bg-[#070913] p-5 border border-[#7F00FF]/25 rounded-xl relative overflow-hidden shadow-[0_0_15px_rgba(127,0,255,0.05)]">
-                  <Lock className="w-4 h-4 text-[#7F00FF] absolute top-3 right-3 opacity-50" />
-                  <span className="text-[10px] text-slate-500 block mb-2 font-bold tracking-wider">ACTIVE TARGET REQUIREMENTS</span>
-                  <p className="text-xs text-slate-200 leading-relaxed font-sans">
-                    {reqText}
-                  </p>
-                  {reqAttachedFiles.length > 0 && (
-                    <div className="border-t border-white/5 pt-3 mt-3 flex flex-col gap-2">
-                      <span className="text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider">Project Specification Files:</span>
-                      {reqAttachedFiles.map((file, idx) => (
-                        <div key={idx} className="flex justify-between items-center bg-white/[0.02] border border-white/5 px-3 py-1.5 rounded-lg text-[10px] font-mono text-slate-300">
-                          <span className="truncate max-w-[160px]">{file.name}</span>
-                          <button
-                            onClick={() => handleDownloadFile(
-                              file.cid, 
-                              selectedContract.milestoneKeys?.[selectedMilestoneIndex] || "", 
-                              file.name, 
-                              file.type
-                            )}
-                            disabled={downloadingFileCid === file.cid}
-                            className="text-[#7F00FF] hover:text-[#9D4EDD] transition-smooth hover:underline cursor-pointer disabled:opacity-50"
-                          >
-                            {downloadingFileCid === file.cid ? "Decrypting..." : "Download"}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="flex justify-between items-center border-b border-white/5 pb-3 pt-1">
-                  <span className="text-slate-500 text-xs">MILESTONE_STATUS:</span>
-                  <span className="text-[#00F2FE] text-xs font-bold font-mono bg-[#00F2FE]/5 border border-[#00F2FE]/10 px-2 py-0.5 rounded">ACTIVE_LOCKED</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 text-xs">BUDGET_SECURED:</span>
-                  <span className="text-[#00F2FE] text-xs font-extrabold font-mono teal-glow-text">
-                    {milestoneBudget.toLocaleString()} cUSDC
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Dispute actions */}
-            {selectedContract.milestonesCompleted < selectedContract.totalMilestones && (
-              <div className="mt-8 border-t border-white/5 pt-5 flex flex-col gap-4">
-                <span className="font-mono text-[9px] uppercase tracking-widest text-[#FF1744]/70 font-bold block">TEE Arbiter Dispute Statement Context</span>
-                <textarea
-                  rows={3}
-                  placeholder="State your reasons for raising a dispute. This statement will be uploaded encrypted to Supabase/IPFS for the TEE Arbiter evaluation."
-                  value={disputeStatement}
-                  onChange={(e) => setDisputeStatement(e.target.value)}
-                  className="w-full bg-[#05070F] border border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:border-red-500/40 focus:outline-none transition-smooth resize-none"
-                />
-                <button
-                  onClick={() => setShowDisputeConfirm(true)}
-                  disabled={isLoading}
-                  className="w-full py-4 bg-red-950/10 hover:bg-red-950/20 border border-red-900/25 text-[#FF1744] font-mono text-xs tracking-widest uppercase rounded-xl flex items-center justify-center gap-2.5 cursor-pointer font-bold transition-smooth hover:shadow-[0_0_15px_rgba(255,23,68,0.1)] active:scale-[0.98]"
-                >
-                  <AlertTriangle className="w-4 h-4" />
-                  Raise Dispute (D)
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Actions Console */}
-          <div className="border border-white/5 bg-white/[0.01] p-6 rounded-xl flex flex-col justify-between hover:border-white/10 transition-smooth">
-            <div>
-              <span className="font-mono text-[9px] uppercase tracking-widest text-[#7F00FF] font-bold block mb-4">Actions Console</span>
-              
-              {selectedContract.milestonesCompleted === selectedContract.totalMilestones ? (
-                <div className="p-5 bg-emerald-950/10 border border-emerald-900/25 rounded-xl text-xs font-mono text-[#00E676] flex gap-4 shadow-[0_0_15px_rgba(0,230,118,0.03)]">
-                  <ShieldCheck className="w-5 h-5 flex-shrink-0 text-[#00E676] drop-shadow-[0_0_5px_#00E676]" />
-                  <div className="flex flex-col gap-1">
-                    <strong className="block mb-0.5 tracking-wider uppercase">Escrow Agreement Completed</strong>
-                    <span className="font-sans text-[11px] text-slate-400">All milestones successfully verified and settled. Payouts successfully unlocked to contractor.</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Real-time Milestone Escrow Financial Ledger Panel */}
-                  <div className="bg-[#05070F] border border-white/5 p-4 rounded-xl flex flex-col gap-3">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <Activity className="w-3.5 h-3.5 text-[#00F2FE]" />
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-slate-300 font-bold">
-                          Escrow Vault Financial Ledger
-                        </span>
-                      </div>
-                      <span className="font-mono text-[8px] text-emerald-400 uppercase">✓ Hardware Attested</span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2.5 border-y border-white/5 py-3 my-1">
-                      <div className="flex flex-col">
-                        <span className="text-[8px] font-mono text-slate-500 uppercase">Total Locked</span>
-                        <span className="font-mono text-xs font-bold text-white mt-0.5">
-                          {selectedContract.budget.toLocaleString()} cUSDC
-                        </span>
-                      </div>
-                      <div className="flex flex-col text-center border-x border-white/5 px-2">
-                        <span className="text-[8px] font-mono text-slate-500 uppercase">Released</span>
-                        <span className="font-mono text-xs font-bold text-emerald-400 mt-0.5">
-                          {((selectedContract.budget / selectedContract.totalMilestones) * selectedContract.milestonesCompleted).toLocaleString()} cUSDC
-                        </span>
-                      </div>
-                      <div className="flex flex-col text-right">
-                        <span className="text-[8px] font-mono text-slate-500 uppercase">Remaining</span>
-                        <span className="font-mono text-xs font-bold text-[#38BDF8] mt-0.5">
-                          {(selectedContract.status === 'COMPLETED' || selectedContract.status === 'REFUNDED' ? 0 : selectedContract.budget - ((selectedContract.budget / selectedContract.totalMilestones) * selectedContract.milestonesCompleted)).toLocaleString()} cUSDC
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5 mt-0.5">
-                      <div className="flex justify-between text-[9px] font-mono">
-                        <span className="text-slate-400 uppercase">Ledger Settlement progress</span>
-                        <span className="text-white font-bold">{Math.round((selectedContract.milestonesCompleted / selectedContract.totalMilestones) * 100)}% Settled</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-slate-900 border border-white/5 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-[#00F2FE] to-[#7F00FF] transition-all duration-500"
-                          style={{ width: `${(selectedContract.milestonesCompleted / selectedContract.totalMilestones) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="p-2.5 bg-[#0B0E17]/60 border border-white/[0.04] rounded-xl text-[10px] font-sans text-slate-400 leading-normal flex items-start gap-2">
-                      <ShieldCheck className="w-3.5 h-3.5 text-[#38BDF8] shrink-0 mt-0.5" />
-                      <span>
-                        <strong>ZK Budget Assurance:</strong> All settlement variables are processed cryptographically on-chain. Decrypted balances are only visible to verified contract counterparties.
-                      </span>
-                    </div>
-                  </div>
-
-                  {viewMode === 'freelancer' ? (
-                    /* Freelancer Action Console */
-                    <div className="space-y-4">
-                      {(!walletAddress || walletAddress.toLowerCase() !== (selectedContract.role === 'FREELANCER' ? walletAddress.toLowerCase() : selectedContract.counterparty.toLowerCase())) && (
-                        <div className="p-3.5 bg-amber-950/20 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-xs font-mono text-amber-300">
-                          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                          <div className="leading-relaxed">
-                            <span className="font-bold uppercase block text-[10px] text-amber-400 mb-0.5">Wallet Role Mismatch</span>
-                            Your connected wallet is the <strong>Client</strong> for this contract. Switch your Web3 wallet (MetaMask/Rabby) to the assigned <strong>Freelancer wallet</strong> ({selectedContract.role === 'FREELANCER' ? walletAddress?.slice(0,6) : selectedContract.counterparty.slice(0,6)}...{selectedContract.role === 'FREELANCER' ? walletAddress?.slice(-4) : selectedContract.counterparty.slice(-4)}) to submit deliverables on-chain.
-                          </div>
-                        </div>
-                      )}
-
-                      <label className="block text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">Submit Code Deliverable / Git diff</label>
-                      <textarea 
-                        rows={3}
-                        placeholder="Tested Collapsible sidebar. Full GPU acceleration and responsive Chrome/Safari/Firefox compatibility."
-                        value={deliverableInput} 
-                        onChange={(e) => setDeliverableInput(e.target.value)}
-                        className="w-full bg-[#05070F] border border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:border-[#7F00FF]/40 focus:outline-none transition-smooth resize-none"
-                      />
-
-                      {/* Encrypted Deliverables Uploader */}
-                      <div className="flex flex-col gap-2">
-                        <label className="font-mono text-[9px] text-slate-400 uppercase tracking-widest font-bold">Attach Deliverable Files (Optional)</label>
-                        <div 
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            setIsDragging(true);
-                          }}
-                          onDragLeave={() => setIsDragging(false)}
-                          onDrop={() => setIsDragging(false)}
-                          className={`relative border border-dashed p-4 rounded-xl flex flex-col items-center gap-1.5 transition-smooth cursor-pointer ${
-                            isDragging 
-                              ? "border-[#00F2FE] bg-[#00F2FE]/5 shadow-[0_0_15px_rgba(0,242,254,0.15)] scale-[1.02]" 
-                              : "border-white/10 hover:border-[#00F2FE]/40 bg-white/[0.01] hover:bg-white/[0.02]"
-                          }`}
-                        >
-                          <input 
-                            type="file" 
-                            multiple 
-                            onChange={(e) => {
-                              if (e.target.files) {
-                                setDeliverableFiles(prev => [...prev, ...Array.from(e.target.files || [])]);
-                              }
-                            }}
-                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                          />
-                          <Paperclip className={`w-4 h-4 transition-smooth ${isDragging ? "text-[#7F00FF] scale-110" : "text-[#00F2FE]"}`} />
-                          <span className="text-[10px] font-mono text-slate-400">
-                            {isDragging ? "Drop your files here!" : "Drag & drop files or click to upload"}
-                          </span>
-                        </div>
-
-                        {deliverableFiles.length > 0 && (
-                          <div className="flex flex-col gap-2 bg-[#05070F]/50 border border-white/5 p-3 rounded-xl max-h-32 overflow-y-auto custom-scrollbar">
-                            {deliverableFiles.map((file, idx) => (
-                              <div key={idx} className="flex justify-between items-center bg-[#070913]/80 border border-white/5 px-3 py-1.5 rounded-lg">
-                                <div className="flex items-center gap-2 overflow-hidden">
-                                  <Paperclip className="w-3 h-3 text-[#00F2FE] flex-shrink-0" />
-                                  <span className="font-mono text-[10px] text-slate-300 truncate max-w-[160px]">{file.name}</span>
-                                  <span className="font-mono text-[8px] text-slate-500 flex-shrink-0">({(file.size / 1024).toFixed(1)} KB)</span>
-                                </div>
-                                <button 
-                                  onClick={() => setDeliverableFiles(prev => prev.filter((_, i) => i !== idx))}
-                                  className="text-slate-500 hover:text-red-400 transition-smooth cursor-pointer"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <button
-                        onClick={handleSubmitDeliverable}
-                        disabled={isLoading || (!deliverableInput.trim() && deliverableFiles.length === 0)}
-                        className="w-full py-4.5 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth hover:shadow-[0_0_20px_rgba(0,242,254,0.45)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2.5 rounded-xl border border-transparent"
-                      >
-                        <Terminal className="w-4 h-4" />
-                        {isLoading ? "Signing handle..." : "Submit Deliverable (Enter)"}
-                      </button>
-                    </div>
-                  ) : (
-                    /* Client Action Console */
-                    <div className="space-y-5">
-                      {selectedContract.activeMilestoneSubmitted && (
-                        <div className="bg-[#070913] p-5 border border-[#00F2FE]/25 rounded-xl relative overflow-hidden shadow-[0_0_15px_rgba(0,242,254,0.05)]">
-                          <Terminal className="w-4 h-4 text-[#00F2FE] absolute top-3 right-3 opacity-50" />
-                          <span className="text-[10px] text-slate-500 block mb-2 font-bold tracking-wider">SUBMITTED FREELANCER DELIVERABLES</span>
-                          <p className="text-xs text-slate-200 leading-relaxed font-sans mb-3 whitespace-pre-wrap">
-                            {deliverableText || "No description text provided."}
-                          </p>
-                          {deliverableAttachedFiles.length > 0 && (
-                            <div className="border-t border-white/5 pt-3 flex flex-col gap-2">
-                              <span className="text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider">Deliverable Files:</span>
-                              {deliverableAttachedFiles.map((file, idx) => (
-                                <div key={idx} className="flex justify-between items-center bg-white/[0.02] border border-white/5 px-3 py-1.5 rounded-lg text-[10px] font-mono text-slate-300">
-                                  <span className="truncate max-w-[160px]">{file.name}</span>
-                                  <button
-                                    onClick={() => handleDownloadFile(
-                                      file.cid, 
-                                      selectedContract.deliverableKeys?.[selectedMilestoneIndex] || "", 
-                                      file.name, 
-                                      file.type
-                                    )}
-                                    disabled={downloadingFileCid === file.cid}
-                                    className="text-[#00F2FE] hover:text-[#33F5FF] transition-smooth hover:underline cursor-pointer disabled:opacity-50"
-                                  >
-                                    {downloadingFileCid === file.cid ? "Decrypting..." : "Download"}
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      <label className="block text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">Approve & Release Milestone</label>
-                      <p className="text-[12px] text-slate-400 leading-relaxed font-sans">
-                        Award contractor reputation rating (1-5 stars) to execute the release payout on-chain.
-                      </p>
-                      <div className="flex gap-3">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            onClick={() => setRatingInput(star)}
-                            className={`w-12 h-12 border font-mono text-sm rounded-xl transition-smooth cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95 ${
-                              ratingInput === star 
-                                ? 'bg-[#00F2FE] text-[#05070F] font-extrabold border-[#00F2FE] shadow-[0_0_15px_rgba(0,242,254,0.3)]' 
-                                : 'border-white/5 text-slate-400 hover:text-white bg-[#05070F] hover:border-white/20'
-                            }`}
-                          >
-                            {star}★
-                          </button>
-                        ))}
-                      </div>
-                      <button
-                        onClick={() => setShowReleaseConfirm(true)}
-                        disabled={isLoading}
-                        className="w-full py-4.5 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-widest transition-smooth hover:shadow-[0_0_20px_rgba(0,242,254,0.45)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2.5 rounded-xl border border-transparent"
-                      >
-                        <Unlock className="w-4 h-4" />
-                        {isLoading ? "Executing transactions..." : "Release Milestone Payout"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <ActiveWorkspace 
+          selectedContract={selectedContract}
+          selectedMilestoneIndex={selectedMilestoneIndex}
+          viewMode={viewMode}
+          walletAddress={walletAddress}
+          timeLeft={timeLeft}
+          reqText={reqText}
+          reqAttachedFiles={reqAttachedFiles}
+          handleDownloadFile={handleDownloadFile}
+          downloadingFileCid={downloadingFileCid}
+          disputeStatement={disputeStatement}
+          setDisputeStatement={setDisputeStatement}
+          setShowDisputeConfirm={setShowDisputeConfirm}
+          isLoading={isLoading}
+          deliverableInput={deliverableInput}
+          setDeliverableInput={setDeliverableInput}
+          isDragging={isDragging}
+          setIsDragging={setIsDragging}
+          deliverableFiles={deliverableFiles}
+          setDeliverableFiles={setDeliverableFiles}
+          handleSubmitDeliverable={handleSubmitDeliverable}
+          deliverableText={deliverableText}
+          deliverableAttachedFiles={deliverableAttachedFiles}
+          ratingInput={ratingInput}
+          setRatingInput={setRatingInput}
+          setShowReleaseConfirm={setShowReleaseConfirm}
+          milestoneBudget={milestoneBudget}
+        />
       )}
 
-      {/* Workspace Collaboration Section (Step 3.1 & 3.2) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Secure E2E Chat Box */}
-        <div className="border border-white/5 bg-white/[0.01] p-6 rounded-xl flex flex-col gap-4 hover:border-white/10 transition-smooth">
-          <div className="flex items-center justify-between border-b border-white/5 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00F2FE] opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00F2FE]"></span>
-              </span>
-              <span className="font-mono text-[10px] uppercase tracking-widest text-[#00F2FE] font-bold">
-                Private End-to-End Chat
-              </span>
-            </div>
-            <span className="text-[9px] font-mono text-slate-500 uppercase flex items-center gap-1.5">
-              <Lock className="w-3 h-3 text-[#00F2FE]" /> AES-GCM ENCRYPTED
-            </span>
-          </div>
-
-          {/* Chat message display area */}
-          <div ref={chatContainerRef} className="bg-[#020308] border border-white/5 p-4 rounded-xl flex flex-col gap-3 min-h-[220px] max-h-[220px] overflow-y-auto custom-scrollbar">
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center py-6">
-                <Lock className="w-8 h-8 text-slate-600 mb-2 opacity-50" />
-                <span className="font-mono text-[10px] text-slate-500 uppercase tracking-widest">No previous E2E chat found.</span>
-                <span className="font-sans text-[11px] text-slate-600 mt-1 max-w-[280px]">Your messages are encrypted client-side using derived PBKDF2 wallet keys. Only you and your counterparty can read them.</span>
-              </div>
-            ) : (
-              messages.map((msg, idx) => {
-                const isMe = msg.sender.toLowerCase() === walletAddress?.toLowerCase();
-                return (
-                  <div key={idx} className={`flex flex-col max-w-[85%] ${isMe ? 'self-end items-end' : 'self-start items-start'}`}>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="font-mono text-[8px] text-[#00F2FE] font-bold uppercase tracking-wider">
-                        {isMe ? 'Me' : `${msg.sender.slice(0, 6)}...${msg.sender.slice(-4)}`}
-                      </span>
-                      <span className="text-[8px] text-slate-600 font-mono">{msg.time}</span>
-                    </div>
-                    <div className={`px-4 py-2.5 text-xs font-sans rounded-2xl ${
-                      isMe 
-                        ? 'bg-[#7F00FF]/10 text-[#E0AAFF] border border-[#7F00FF]/20 rounded-tr-none' 
-                        : 'bg-white/[0.02] text-slate-200 border border-white/5 rounded-tl-none'
-                    }`}>
-                      {msg.text}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Send message input */}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Type your secure message..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSendMessage(); }}
-              className="flex-1 bg-[#05070F] border border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:border-[#00F2FE]/40 focus:outline-none transition-smooth"
-            />
-            <button
-              onClick={handleSendMessage}
-              disabled={!newMessage.trim() || isSendingMessage}
-              className="px-6 py-3 bg-[#00F2FE] text-[#05070F] font-mono text-xs font-bold uppercase tracking-wider rounded-xl transition-smooth hover:shadow-[0_0_15px_rgba(0,242,254,0.3)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            >
-              {isSendingMessage ? "Sending..." : "Send"}
-            </button>
-          </div>
-        </div>
-
-        {/* Double-Blind Written Reviews */}
-        <div className="border border-white/5 bg-white/[0.01] p-6 rounded-xl flex flex-col gap-4 hover:border-white/10 transition-smooth">
-          <div className="flex items-center justify-between border-b border-white/5 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400 animate-pulse drop-shadow-[0_0_4px_rgba(245,158,11,0.5)]"></span>
-              </span>
-              <span className="font-mono text-[10px] uppercase tracking-widest text-amber-400 font-bold">
-                Double-Blind Written Reviews
-              </span>
-            </div>
-            <span className="text-[9px] font-mono text-slate-500 uppercase flex items-center gap-1.5">
-              <ShieldCheck className="w-3 h-3 text-amber-400" /> PREVENTING RETALIATION
-            </span>
-          </div>
-
-          {/* Existing Reviews List / Status */}
-          {hasSubmittedReview ? (
-            <div className="bg-[#020308] border border-white/5 p-4 rounded-xl flex flex-col gap-3 flex-1 justify-center min-h-[220px]">
-              <div className="flex items-center gap-2 text-amber-400 font-mono text-[10px] uppercase font-bold tracking-wider">
-                <Lock className="w-3.5 h-3.5" />
-                <span>Your Double-Blind feedback has been submitted!</span>
-              </div>
-              {bothReviewsSubmitted ? (
-                <div className="space-y-4 border-t border-white/5 pt-3 mt-1 overflow-y-auto max-h-[140px] custom-scrollbar pr-1">
-                  {decryptedReviews.map((rev, idx) => (
-                    <div key={idx} className="flex flex-col gap-1.5 p-3 rounded-lg bg-white/[0.01] border border-white/5 font-mono text-[10px]">
-                      <div className="flex justify-between text-slate-400 border-b border-white/5 pb-1 mb-1">
-                        <span>REVIEWER: {rev.reviewer.slice(0, 6)}...{rev.reviewer.slice(-4)}</span>
-                        <span className="text-amber-400 font-bold">RATING: {rev.rating}★</span>
-                      </div>
-                      <p className="text-xs text-slate-200 font-sans leading-relaxed">{rev.text}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-3 bg-amber-950/15 border border-amber-500/20 rounded-xl text-amber-400 font-sans text-xs leading-relaxed">
-                  Waiting for the other party to submit their review. All reviews will remain E2E-encrypted and completely hidden until both counterparties submit, preventing retaliatory reviewing patterns.
-                </div>
-              )}
-            </div>
-          ) : (
-            /* Review Submission Form */
-            <div className="flex flex-col gap-3 flex-1 justify-between min-h-[220px]">
-              <div>
-                <p className="text-xs text-slate-400 font-sans leading-normal mb-3">
-                  Submit honest rating feedback for this milestone escrow. Written feedback remains E2E-encrypted and will only be revealed once both parties have submitted.
-                </p>
-                <div className="flex items-center gap-2 mb-3.5">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      onClick={() => setReviewRating(star)}
-                      className={`w-9 h-9 border font-mono text-xs rounded-xl transition-smooth cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95 ${
-                        reviewRating === star 
-                          ? 'bg-amber-400 text-[#05070F] font-extrabold border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]' 
-                          : 'border-white/5 text-slate-400 hover:text-white bg-[#05070F] hover:border-white/20'
-                      }`}
-                    >
-                      {star}★
-                    </button>
-                  ))}
-                </div>
-                <textarea
-                  rows={2}
-                  placeholder="Write your E2E encrypted double-blind written review here..."
-                  value={reviewText}
-                  onChange={(e) => setReviewText(e.target.value)}
-                  className="w-full bg-[#05070F] border border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-slate-200 focus:border-amber-400/40 focus:outline-none transition-smooth resize-none"
-                />
-              </div>
-              <button
-                onClick={handleSubmitReview}
-                disabled={isSubmittingReview || !reviewText.trim()}
-                className="w-full py-3 bg-amber-400 text-[#05070F] font-mono text-xs font-bold uppercase tracking-wider rounded-xl transition-smooth hover:shadow-[0_0_15px_rgba(245,158,11,0.3)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {isSubmittingReview ? "Encrypting & Submitting..." : "Submit Double-Blind Review"}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Workspace Collaboration Section */}
+      {selectedContract.status !== 'SIGNING' && selectedContract.status !== 'DISPUTED' && (
+        <CommunicationTunnel 
+          chatKey={chatKey}
+          walletAddress={walletAddress}
+          messages={messages}
+          newMessage={newMessage}
+          setNewMessage={setNewMessage}
+          isSendingMessage={isSendingMessage}
+          handleSendMessage={handleSendMessage}
+          chatContainerRef={chatContainerRef}
+          hasSubmittedReview={hasSubmittedReview}
+          bothReviewsSubmitted={bothReviewsSubmitted}
+          decryptedReviews={decryptedReviews}
+          reviewRating={reviewRating}
+          setReviewRating={setReviewRating}
+          reviewText={reviewText}
+          setReviewText={setReviewText}
+          isSubmittingReview={isSubmittingReview}
+          handleSubmitReview={handleSubmitReview}
+        />
+      )}
 
       {/* TEE Hardware Attestation & Security Telemetry */}
-      <div className="border border-white/5 bg-[#03050C]/60 backdrop-blur-md p-6 rounded-xl flex flex-col gap-4 hover:border-white/10 transition-smooth">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-white/5 pb-4">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-[#00F2FE] font-bold">
-              TEE_ENCLAVE_ATTESTATION_MONITOR (INTEL_SGX_V2)
-            </span>
-          </div>
-          <div className="flex items-center gap-4 text-[10px] font-mono text-slate-400">
-            <span>ISOLATION: <strong className="text-emerald-400">AMD SNP / SEV</strong></span>
-            <span>MRENCLAVE: <strong className="text-slate-300">0x7b58c5415a77cd52199db...</strong></span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Status Metrics */}
-          <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-white/[0.01] border border-white/5">
-            <span className="text-[8px] font-mono text-slate-500 uppercase font-bold tracking-wider">Arbitration Model</span>
-            <span className="text-[11px] font-mono text-slate-200">{disputeRecord?.model_name || "gemini-2.5-flash"}</span>
-          </div>
-          <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-white/[0.01] border border-white/5">
-            <span className="text-[8px] font-mono text-slate-500 uppercase font-bold tracking-wider">Consensus Confidence</span>
-            <span className="text-[11px] font-mono text-slate-200">
-              {disputeRecord ? `${disputeRecord.score}% Rating Consensus` : selectedContract.status === 'DISPUTED' ? 'Evaluating...' : '98.4% Rating Consensus'}
-            </span>
-          </div>
-          <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-white/[0.01] border border-white/5">
-            <span className="text-[8px] font-mono text-slate-500 uppercase font-bold tracking-wider">Attestation Status</span>
-            <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
-              ✓ VERIFIED_SECURE
-            </span>
-          </div>
-          <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-white/[0.01] border border-white/5">
-            <span className="text-[8px] font-mono text-slate-500 uppercase font-bold tracking-wider">Sandbox Integrity</span>
-            <span className="text-[11px] font-mono text-emerald-400">100% MEMORY_ISOLATED</span>
-          </div>
-        </div>
-
-        {/* Live Terminal Log */}
-        <div className="bg-[#020308] border border-white/5 p-4 rounded-xl font-mono text-[10px] text-slate-400 space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar">
-          {disputeRecord ? (
-            <>
-              <div className="text-yellow-500 font-bold">[TEE_ARBITER] ⚠️ DISPUTE RESOLUTION BROADCASTED ON-CHAIN</div>
-              <div>[MODEL] Active Arbitration Engine: {disputeRecord.model_name || 'gemini-2.5-flash'}</div>
-              <div>[VERDICT] Ruling: <span className={disputeRecord.verdict === 'PAY_FREELANCER' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{disputeRecord.verdict}</span> (Score: {disputeRecord.score}/100)</div>
-              <div className="text-slate-200 font-sans leading-relaxed text-[11px] bg-white/[0.02] p-2.5 rounded-lg border border-white/5 mt-1">
-                💬 <strong>Gemini Reasoning:</strong> "{disputeRecord.reasoning}"
-              </div>
-            </>
-          ) : selectedContract.status === 'DISPUTED' ? (
-            <>
-              <div className="text-yellow-500 font-bold">[LIVE] ⚠️ ON-CHAIN DISPUTE DETECTED: FORWARDING TO TEE RENDER ARBITER...</div>
-              <div>[LISTEN] Deployed Arbiter listening for DisputeOpened logs...</div>
-              <div>[DECRYPT] KMS Handles decrypting requirements & deliverable hashes...</div>
-              <div>[PROMPT] Google Gemini 2.5 Flash evaluating spec match score...</div>
-              <div className="text-[#00F2FE] font-bold animate-pulse">[PROCESSING] Awaiting Gemini 2.5 Flash adjudication response...</div>
-            </>
-          ) : (
-            <>
-              <div className="text-emerald-400">[18:02:11] SECURE TEE ENCLAVE RUNNING: IDLE_MONITORING</div>
-              <div>[18:02:12] MEMORY INTEGRITY SCHEMAS CORRELATED COHERENTLY.</div>
-              <div>[18:02:13] PENDING DISPUTES: 0 ACTIVE. LISTENING FOR CONTRACT DISPUTE TRANSACTIONS...</div>
-            </>
-          )}
-        </div>
-      </div>
+      {selectedContract.status !== 'SIGNING' && (
+        <TelemetryAttestation 
+          selectedContract={selectedContract}
+          disputeRecord={disputeRecord}
+        />
+      )}
 
       {/* Dispute Confirmation Modal */}
       {showDisputeConfirm && (
