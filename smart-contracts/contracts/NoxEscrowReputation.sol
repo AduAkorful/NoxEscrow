@@ -95,7 +95,6 @@ contract NoxEscrowReputation is
         if (!Nox.isInitialized(baseReputationHandle)) {
             baseReputationHandle = Nox.toEuint256(1000);
             Nox.allowThis(baseReputationHandle);
-            Nox.allowPublicDecryption(baseReputationHandle);
         }
 
         euint256 maxPayout = Nox.toEuint256(1000 * (10**uint256(tokenDecimals))); // $1,000 cUSDC cap to mitigate whale-bloat
@@ -120,7 +119,6 @@ contract NoxEscrowReputation is
         }
 
         Nox.allowThis(nextRep);
-        Nox.allowPublicDecryption(nextRep);
         reputationScores[freelancer] = nextRep;
 
         emit ReputationUpdated(freelancer, nextRep);
@@ -138,7 +136,6 @@ contract NoxEscrowReputation is
         if (!Nox.isInitialized(baseReputationHandle)) {
             baseReputationHandle = Nox.toEuint256(1000);
             Nox.allowThis(baseReputationHandle);
-            Nox.allowPublicDecryption(baseReputationHandle);
         }
 
         euint256 currentRep = reputationScores[freelancer];
@@ -159,7 +156,6 @@ contract NoxEscrowReputation is
         }
 
         Nox.allowThis(nextRep);
-        Nox.allowPublicDecryption(nextRep);
         reputationScores[freelancer] = nextRep;
 
         emit ReputationUpdated(freelancer, nextRep);

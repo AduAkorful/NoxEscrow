@@ -362,6 +362,7 @@ export async function fetchUserEscrows(
 
             let deliverableText = "";
             let devKeyHex = chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}_dev`) || "";
+            let effectiveDevKey = "";
             if (milestoneInfo.isSubmitted) {
               if (!devKeyHex && allowInteractiveDecrypt && signer) {
                 try {
@@ -379,7 +380,8 @@ export async function fetchUserEscrows(
                 }
               }
 
-              if (useE2E && metadata && metadata.devs_cid && devKeyHex) {
+              effectiveDevKey = devKeyHex || decryptedKeyHex || chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}_dev`) || chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}_req`) || chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}`) || "";
+              if (useE2E && metadata && metadata.devs_cid && effectiveDevKey) {
                 try {
                   const devsUrl = metadata.devs_cid.startsWith("data:")
                     ? metadata.devs_cid
@@ -393,8 +395,21 @@ export async function fetchUserEscrows(
                     if (resp.ok) payload = await resp.json();
                   }
                   if (payload) {
-                    const rawDecrypted = await decryptText(payload.ciphertext, devKeyHex, payload.iv);
-                    deliverableText = rawDecrypted;
+                    let rawDecrypted = "";
+                    try {
+                      rawDecrypted = await decryptText(payload.ciphertext, effectiveDevKey, payload.iv);
+                    } catch {
+                      if (decryptedKeyHex && effectiveDevKey !== decryptedKeyHex) {
+                        try {
+                          rawDecrypted = await decryptText(payload.ciphertext, decryptedKeyHex, payload.iv);
+                        } catch {
+                          // ignore
+                        }
+                      }
+                    }
+                    if (rawDecrypted) {
+                      deliverableText = rawDecrypted;
+                    }
                   }
                 } catch (devMetaErr) {
                   console.warn(`Failed to fetch/decrypt deliverable payload for milestone ${m}:`, devMetaErr);
@@ -402,7 +417,7 @@ export async function fetchUserEscrows(
               }
             }
             deliverables.push(deliverableText);
-            deliverableKeys.push(devKeyHex);
+            deliverableKeys.push(effectiveDevKey || devKeyHex);
           } catch (err) {
             console.error(`Error processing milestone ${m}:`, err);
             requirements.push(`Milestone ${m + 1}`);
