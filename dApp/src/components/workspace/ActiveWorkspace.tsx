@@ -181,6 +181,44 @@ export function ActiveWorkspace({
                 </div>
               )}
             </div>
+
+            {(deliverableText || deliverableAttachedFiles.length > 0 || isPastMilestone || (isCurrentMilestone && selectedContract.activeMilestoneSubmitted)) && (
+              <div className="bg-[#070913] p-5 border border-[#00E676]/30 rounded-xl relative overflow-hidden shadow-[0_0_15px_rgba(0,230,118,0.05)]">
+                <Terminal className="w-4 h-4 text-[#00E676] absolute top-3 right-3 opacity-60" />
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-2 h-2 rounded-full bg-[#00E676] animate-pulse"></span>
+                  <span className="text-[10px] text-emerald-400 font-mono font-bold tracking-wider uppercase">SUBMITTED FREELANCER DELIVERABLE</span>
+                </div>
+                <p className="text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-wrap">
+                  {deliverableText || "Deliverable submitted on-chain. Decrypting details..."}
+                </p>
+                {deliverableAttachedFiles.length > 0 && (
+                  <div className="border-t border-white/5 pt-3 mt-3 flex flex-col gap-2">
+                    <span className="text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider">Submitted Deliverable Files:</span>
+                    {deliverableAttachedFiles.map((file, idx) => (
+                      <div key={idx} className="flex justify-between items-center bg-white/[0.02] border border-white/5 px-3 py-2 rounded-lg text-[10px] font-mono text-slate-300">
+                        <div className="flex items-center gap-2 truncate max-w-[180px]">
+                          <Paperclip className="w-3.5 h-3.5 text-[#00E676] shrink-0" />
+                          <span className="truncate">{file.name}</span>
+                        </div>
+                        <button
+                          onClick={() => handleDownloadFile(
+                            file.cid, 
+                            selectedContract.deliverableKeys?.[selectedMilestoneIndex] || selectedContract.milestoneKeys?.[selectedMilestoneIndex] || "", 
+                            file.name, 
+                            file.type
+                          )}
+                          disabled={downloadingFileCid === file.cid}
+                          className="px-2.5 py-1 bg-[#00E676]/10 hover:bg-[#00E676]/20 border border-[#00E676]/30 text-[#00E676] rounded text-[10px] transition-smooth hover:underline cursor-pointer disabled:opacity-50 font-bold"
+                        >
+                          {downloadingFileCid === file.cid ? "Decrypting..." : "Download File"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex justify-between items-center border-b border-white/5 pb-3 pt-1">
               <span className="text-slate-500 text-xs">MILESTONE_STATUS:</span>
               <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded border ${

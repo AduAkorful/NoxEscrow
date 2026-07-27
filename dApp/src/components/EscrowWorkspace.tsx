@@ -5,7 +5,7 @@ import { fetchAndDecryptFile, encryptText, decryptText } from '../crypto/fileUpl
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { TEECourtroom } from './TEECourtroom';
 import { supabase } from '../services/supabaseClient';
-import { getEscrowDisputeRecord, type EscrowDisputeRecord } from '../services/metadataService';
+import { getEscrowDisputeRecord, getEscrowMetadata, type EscrowDisputeRecord } from '../services/metadataService';
 import { ethers } from 'ethers';
 
 // Subcomponents
@@ -540,10 +540,71 @@ export function EscrowWorkspace({
     // legacy fallback
   }
 
+  // Dynamic deliverable payload loading & decryption
+  const [asyncDeliverableText, setAsyncDeliverableText] = useState("");
+  const [asyncDeliverableFiles, setAsyncDeliverableFiles] = useState<{ name: string; type: string; cid: string }[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDeliverableFromSupabase() {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_KEY;
+      if (!selectedContract.address || !supabaseUrl || !supabaseKey) return;
+
+      const effectiveKey = chatKey || selectedContract.deliverableKeys?.[selectedMilestoneIndex] || selectedContract.milestoneKeys?.[selectedMilestoneIndex];
+
+      try {
+        const meta = await getEscrowMetadata(
+          supabaseUrl,
+          supabaseKey,
+          selectedContract.address,
+          selectedMilestoneIndex
+        );
+
+        if (cancelled || !meta || !meta.devs_cid) return;
+
+        if (effectiveKey) {
+          const devsUrl = meta.devs_cid.startsWith("data:")
+            ? meta.devs_cid
+            : `https://gateway.pinata.cloud/ipfs/${meta.devs_cid}`;
+          let payload: any = null;
+          if (devsUrl.startsWith("data:")) {
+            const base64Data = devsUrl.split(",")[1];
+            payload = JSON.parse(atob(base64Data));
+          } else {
+            const resp = await fetch(devsUrl);
+            if (resp.ok) payload = await resp.json();
+          }
+          if (payload) {
+            const rawDecrypted = await decryptText(payload.ciphertext, effectiveKey, payload.iv);
+            if (rawDecrypted && !cancelled) {
+              if (rawDecrypted.trim().startsWith('{')) {
+                try {
+                  const parsed = JSON.parse(rawDecrypted);
+                  setAsyncDeliverableText(parsed.text || "");
+                  setAsyncDeliverableFiles(parsed.files || []);
+                  return;
+                } catch {
+                  // ignore
+                }
+              }
+              setAsyncDeliverableText(rawDecrypted);
+            }
+          }
+        }
+      } catch (dErr) {
+        console.warn("Failed to decrypt deliverable metadata in workspace effect:", dErr);
+      }
+    }
+
+    loadDeliverableFromSupabase();
+    return () => { cancelled = true; };
+  }, [selectedContract.address, selectedMilestoneIndex, chatKey, selectedContract.deliverableKeys, selectedContract.milestoneKeys]);
+
   // Safe parse deliverables JSON
   const currentDeliverable = selectedContract.deliverables?.[selectedMilestoneIndex] || "";
-  let deliverableText = currentDeliverable;
-  let deliverableAttachedFiles: { name: string; type: string; cid: string }[] = [];
+  let deliverableText = currentDeliverable || asyncDeliverableText;
+  let deliverableAttachedFiles: { name: string; type: string; cid: string }[] = asyncDeliverableFiles;
   try {
     if (currentDeliverable.trim().startsWith('{')) {
       const parsed = JSON.parse(currentDeliverable);
