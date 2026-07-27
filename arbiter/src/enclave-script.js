@@ -403,49 +403,96 @@ async function main() {
     credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   }
 
-  // 3. Recursively scan Render /etc/secrets directory for any mounted secret key file
+  // 3. Render uses Kubernetes-style secret mounts where files live inside a ..data symlink.
+  //    e.g. /etc/secrets/gcp-key.json is actually at /etc/secrets/..data/gcp-key.json
   if (!credPath && fs.existsSync("/etc/secrets")) {
-    function scanSecretDir(dirPath) {
+    // 3a. Try resolving the expected filename through ..data symlink first
+    const expectedName = (process.env.GOOGLE_APPLICATION_CREDENTIALS || "").split("/").pop() || "gcp-key.json";
+    const k8sDataPath = path.join("/etc/secrets", "..data", expectedName);
+    
+    if (fs.existsSync(k8sDataPath)) {
       try {
-        const items = fs.readdirSync(dirPath);
+        const content = fs.readFileSync(k8sDataPath, "utf8").trim();
+        if (content.startsWith("{")) {
+          console.log(`✔️ Located GCP credentials at Kubernetes symlink path: ${k8sDataPath}`);
+          // Write a copy to /tmp so GOOGLE_APPLICATION_CREDENTIALS points to a clean path
+          fs.writeFileSync("/tmp/gcp-key.json", content, { mode: 0o600 });
+          process.env.GOOGLE_APPLICATION_CREDENTIALS = "/tmp/gcp-key.json";
+          credPath = "/tmp/gcp-key.json";
+        }
+      } catch (readErr) {
+        console.warn(`⚠️ Could not read ${k8sDataPath}:`, readErr.message);
+      }
+    }
+    
+    // 3b. Scan all entries including ..data symlink for any GCP service account JSON
+    if (!credPath) {
+      try {
+        const items = fs.readdirSync("/etc/secrets");
+        console.log("📂 Render /etc/secrets contents:", items);
+        
         for (const item of items) {
-          if (item.startsWith("..")) continue; // Skip Kubernetes metadata symlinks
-          const fullPath = path.join(dirPath, item);
+          const fullPath = path.join("/etc/secrets", item);
           try {
-            const stat = fs.statSync(fullPath);
-            if (stat.isFile()) {
+            const stat = fs.lstatSync(fullPath);
+            
+            // Follow symlinks into directories (..data is a symlink to the versioned dir)
+            if (stat.isSymbolicLink() || stat.isDirectory()) {
+              const realPath = fs.realpathSync(fullPath);
+              const realStat = fs.statSync(realPath);
+              if (realStat.isDirectory()) {
+                const subItems = fs.readdirSync(realPath);
+                for (const sub of subItems) {
+                  const subPath = path.join(realPath, sub);
+                  try {
+                    const subContent = fs.readFileSync(subPath, "utf8").trim();
+                    if (subContent.startsWith("{") && (subContent.includes("private_key") || subContent.includes("service_account"))) {
+                      console.log(`✔️ Located GCP service account JSON key inside Render secret: ${subPath}`);
+                      fs.writeFileSync("/tmp/gcp-key.json", subContent, { mode: 0o600 });
+                      process.env.GOOGLE_APPLICATION_CREDENTIALS = "/tmp/gcp-key.json";
+                      credPath = "/tmp/gcp-key.json";
+                      break;
+                    }
+                  } catch { /* skip unreadable */ }
+                }
+                if (credPath) break;
+              } else if (realStat.isFile()) {
+                const content = fs.readFileSync(realPath, "utf8").trim();
+                if (content.startsWith("{") && (content.includes("private_key") || content.includes("service_account"))) {
+                  console.log(`✔️ Located GCP service account JSON key at: ${realPath}`);
+                  fs.writeFileSync("/tmp/gcp-key.json", content, { mode: 0o600 });
+                  process.env.GOOGLE_APPLICATION_CREDENTIALS = "/tmp/gcp-key.json";
+                  credPath = "/tmp/gcp-key.json";
+                  break;
+                }
+              }
+            } else if (stat.isFile()) {
               const content = fs.readFileSync(fullPath, "utf8").trim();
               if (content.startsWith("{") && (content.includes("private_key") || content.includes("service_account"))) {
-                console.log(`✔️ Located GCP service account JSON key at Render secret path: ${fullPath}`);
+                console.log(`✔️ Located GCP service account JSON key at: ${fullPath}`);
                 process.env.GOOGLE_APPLICATION_CREDENTIALS = fullPath;
-                return fullPath;
+                credPath = fullPath;
+                break;
               }
-            } else if (stat.isDirectory()) {
-              const subResult = scanSecretDir(fullPath);
-              if (subResult) return subResult;
             }
-          } catch {
-            // ignore unreadable items
-          }
+          } catch { /* skip unresolvable entries */ }
         }
       } catch (scanErr) {
-        console.warn("⚠️ Error scanning /etc/secrets directory:", scanErr.message);
+        console.warn("⚠️ Error scanning /etc/secrets:", scanErr.message);
       }
-      return null;
-    }
-
-    const foundSecret = scanSecretDir("/etc/secrets");
-    if (foundSecret) {
-      credPath = foundSecret;
     }
   }
 
-  // 4. If no valid credentials file exists on disk, delete invalid GOOGLE_APPLICATION_CREDENTIALS path from env
+  // 4. If no valid credentials file exists on disk, delete invalid GOOGLE_APPLICATION_CREDENTIALS from env
   if (!credPath || !fs.existsSync(credPath)) {
     if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      console.warn(`⚠️ Unsetting invalid GOOGLE_APPLICATION_CREDENTIALS environment variable ("${process.env.GOOGLE_APPLICATION_CREDENTIALS}") because file does not exist on disk.`);
+      console.warn(`⚠️ Unsetting invalid GOOGLE_APPLICATION_CREDENTIALS ("${process.env.GOOGLE_APPLICATION_CREDENTIALS}") — file does not exist on disk.`);
+      console.warn("⚠️ ADC will fall back to GCE metadata server (will fail on non-GCP hosts like Render).");
+      console.warn("💡 Ensure your GCP service account JSON is set as a Render environment variable (not a secret file).");
       delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
     }
+  } else {
+    console.log(`✔️ GOOGLE_APPLICATION_CREDENTIALS resolved to: ${credPath}`);
   }
 
   const projectId = process.env.VERTEX_PROJECT_ID || "project-eedabfd1-816e-4b2e-b15";
