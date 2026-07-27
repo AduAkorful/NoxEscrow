@@ -46,6 +46,34 @@ const escrowABI = [
   "function milestones(uint256) view returns (bytes32 requirementsHash, bytes32 deliverableHash, bytes32 payoutHandle, uint128 submissionTime, bool isSubmitted, bool isSettled)"
 ];
 
+async function triggerTaskRunner(payload) {
+  const PORT = process.env.PORT || 3000;
+  const endpoint = IEXEC_RUNNER_ENDPOINT || `http://127.0.0.1:${PORT}/trigger-task`;
+  const isLocal = endpoint.includes("127.0.0.1") || endpoint.includes("localhost");
+
+  if (isLocal) {
+    const localUrl = `http://127.0.0.1:${PORT}/trigger-task`;
+    try {
+      const response = await axios.post(localUrl, payload, { timeout: RUNNER_TIMEOUT });
+      return response;
+    } catch (err) {
+      console.warn(`⚠️ Local HTTP trigger on port ${PORT} failed (${err.message}). Forking enclave script directly...`);
+      return new Promise((resolve) => {
+        const scriptPath = path.resolve("src/enclave-script.js");
+        const child = fork(scriptPath, [JSON.stringify(payload)], {
+          env: { ...process.env }
+        });
+        child.on("exit", (code) => {
+          console.log(`🤖 [Task Runner] Enclave evaluation process exited with code ${code}`);
+        });
+        resolve({ status: 200, statusText: "Directly Forked" });
+      });
+    }
+  } else {
+    return await axios.post(endpoint, payload, { timeout: RUNNER_TIMEOUT });
+  }
+}
+
 async function reconcileDisputes(escrowClones, triggeredDisputes) {
   console.log(`\n🔄 [Reconciler] Running active dispute reconciliation scan over ${escrowClones.size} whitelisted contracts...`);
   const cloneList = Array.from(escrowClones);
@@ -79,12 +107,12 @@ async function reconcileDisputes(escrowClones, triggeredDisputes) {
               
               triggeredDisputes.set(key, now);
               
-              const response = await axios.post(IEXEC_RUNNER_ENDPOINT, {
+              const response = await triggerTaskRunner({
                 escrowAddress: cloneAddress,
                 milestoneIndex: milestoneIndexStr,
                 reqsHandle: reqsHex,
                 devsHandle: devsHex
-              }, { timeout: RUNNER_TIMEOUT });
+              });
               console.log(`🚀 [Reconciler] TEE execution triggered successfully! Response:`, response.status === 200 ? "Success" : response.statusText);
             }
           }
@@ -151,12 +179,12 @@ async function handleDisputeOpened(log, triggeredDisputes) {
 
     // 3. Trigger the iExec TEE execution task
     console.log("⏳ Forwarding dispute details to the iExec TEE task runner...");
-    const response = await axios.post(IEXEC_RUNNER_ENDPOINT, {
+    const response = await triggerTaskRunner({
       escrowAddress: contractAddress,
       milestoneIndex: milestoneIndexStr,
       reqsHandle: `0x${BigInt(requirementsHash).toString(16).padStart(64, "0")}`,
       devsHandle: `0x${BigInt(deliverableHash).toString(16).padStart(64, "0")}`
-    }, { timeout: RUNNER_TIMEOUT });
+    });
 
     console.log(`🚀 iExec TEE execution triggered successfully! Response:`, response.status === 200 ? "Success" : response.statusText);
   } catch (error) {
@@ -238,7 +266,9 @@ async function main() {
 
         // 2. Check for formal disputes raised on any registered escrow clones
         if (escrowClones.size > 0) {
+          const cloneAddresses = Array.from(escrowClones);
           const disputeLogs = await provider.getLogs({
+            address: cloneAddresses.length === 1 ? cloneAddresses[0] : cloneAddresses,
             topics: [DISPUTE_OPENED_TOPIC],
             fromBlock,
             toBlock
