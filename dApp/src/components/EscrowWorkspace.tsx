@@ -1,5 +1,5 @@
 import { X, Lock, AlertTriangle, Unlock, Paperclip } from 'lucide-react';
-import { type EscrowContract, decryptMilestoneChatKey } from '../services/escrowService';
+import { type EscrowContract, decryptMilestoneChatKey, decryptDeliverableKey } from '../services/escrowService';
 import { NoxEscrowContractABI } from '../contracts/NoxEscrowContract';
 import { fetchAndDecryptFile, encryptText, decryptText } from '../crypto/fileUploader';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -551,8 +551,6 @@ export function EscrowWorkspace({
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_KEY;
       if (!selectedContract.address || !supabaseUrl || !supabaseKey) return;
 
-      const effectiveKey = chatKey || selectedContract.deliverableKeys?.[selectedMilestoneIndex] || selectedContract.milestoneKeys?.[selectedMilestoneIndex];
-
       try {
         const meta = await getEscrowMetadata(
           supabaseUrl,
@@ -563,20 +561,30 @@ export function EscrowWorkspace({
 
         if (cancelled || !meta || !meta.devs_cid) return;
 
-        if (effectiveKey) {
-          const devsUrl = meta.devs_cid.startsWith("data:")
-            ? meta.devs_cid
-            : `https://gateway.pinata.cloud/ipfs/${meta.devs_cid}`;
-          let payload: any = null;
-          if (devsUrl.startsWith("data:")) {
-            const base64Data = devsUrl.split(",")[1];
-            payload = JSON.parse(atob(base64Data));
-          } else {
-            const resp = await fetch(devsUrl);
-            if (resp.ok) payload = await resp.json();
-          }
-          if (payload) {
-            const rawDecrypted = await decryptText(payload.ciphertext, effectiveKey, payload.iv);
+        const devsUrl = meta.devs_cid.startsWith("data:")
+          ? meta.devs_cid
+          : `https://gateway.pinata.cloud/ipfs/${meta.devs_cid}`;
+        let payload: any = null;
+        if (devsUrl.startsWith("data:")) {
+          const base64Data = devsUrl.split(",")[1];
+          payload = JSON.parse(atob(base64Data));
+        } else {
+          const resp = await fetch(devsUrl);
+          if (resp.ok) payload = await resp.json();
+        }
+
+        if (!payload || cancelled) return;
+
+        // Try candidate keys in sequence
+        const candidateKeys: string[] = [
+          chatKey || "",
+          selectedContract.deliverableKeys?.[selectedMilestoneIndex] || "",
+          selectedContract.milestoneKeys?.[selectedMilestoneIndex] || ""
+        ].filter(Boolean);
+
+        for (const testKey of candidateKeys) {
+          try {
+            const rawDecrypted = await decryptText(payload.ciphertext, testKey, payload.iv);
             if (rawDecrypted && !cancelled) {
               if (rawDecrypted.trim().startsWith('{')) {
                 try {
@@ -589,9 +597,39 @@ export function EscrowWorkspace({
                 }
               }
               setAsyncDeliverableText(rawDecrypted);
+              return;
             }
+          } catch {
+            // key mismatch, try next candidate
           }
         }
+
+        // If candidate keys failed, decrypt on-chain deliverableHash handle via KMS
+        if (getWeb3Signer) {
+          try {
+            const signer = await getWeb3Signer();
+            const devKey = await decryptDeliverableKey(signer, selectedContract.address, selectedMilestoneIndex, gatewayUrl);
+            if (devKey && !cancelled) {
+              const rawDecrypted = await decryptText(payload.ciphertext, devKey, payload.iv);
+              if (rawDecrypted && !cancelled) {
+                if (rawDecrypted.trim().startsWith('{')) {
+                  try {
+                    const parsed = JSON.parse(rawDecrypted);
+                    setAsyncDeliverableText(parsed.text || "");
+                    setAsyncDeliverableFiles(parsed.files || []);
+                    return;
+                  } catch {
+                    // ignore
+                  }
+                }
+                setAsyncDeliverableText(rawDecrypted);
+              }
+            }
+          } catch (kmsErr) {
+            console.warn("KMS deliverable handle decrypt error:", kmsErr);
+          }
+        }
+
       } catch (dErr) {
         console.warn("Failed to decrypt deliverable metadata in workspace effect:", dErr);
       }
@@ -599,7 +637,7 @@ export function EscrowWorkspace({
 
     loadDeliverableFromSupabase();
     return () => { cancelled = true; };
-  }, [selectedContract.address, selectedMilestoneIndex, chatKey, selectedContract.deliverableKeys, selectedContract.milestoneKeys]);
+  }, [selectedContract.address, selectedMilestoneIndex, chatKey, selectedContract.deliverableKeys, selectedContract.milestoneKeys, getWeb3Signer, gatewayUrl]);
 
   // Safe parse deliverables JSON
   const currentDeliverable = selectedContract.deliverables?.[selectedMilestoneIndex] || "";

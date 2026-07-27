@@ -616,6 +616,42 @@ export async function initializeEscrowMilestones(
 }
 
 /**
+ * Lazily decrypt a single milestone's deliverable handle to derive the deliverable key.
+ */
+export async function decryptDeliverableKey(
+  signer: ethers.JsonRpcSigner,
+  escrowAddress: string,
+  milestoneIndex: number = 0,
+  gatewayUrl: string = DEFAULT_NOX_GATEWAY
+): Promise<string> {
+  const cacheKey = `${escrowAddress.toLowerCase()}_ms_${milestoneIndex}_dev`;
+  const existing = chatKeyMemoryCache.get(cacheKey);
+  if (existing) {
+    return existing;
+  }
+
+  try {
+    const escrow = new ethers.Contract(escrowAddress, NoxEscrowContractABI, signer);
+    const milestoneInfo = await escrow.milestones(milestoneIndex);
+
+    if (!milestoneInfo.deliverableHash || milestoneInfo.deliverableHash === "0x0000000000000000000000000000000000000000000000000000000000000000") {
+      return "";
+    }
+
+    const handleClient = await getOrCreateHandleClient(signer, gatewayUrl);
+    const decryptedDev = await handleClient.decrypt(milestoneInfo.deliverableHash);
+    const decryptedKeyBigInt = decryptedDev.value as bigint;
+    const derivedKeyHex = decryptedKeyBigInt.toString(16).padStart(64, "0");
+    
+    chatKeyMemoryCache.set(cacheKey, derivedKeyHex);
+    return derivedKeyHex;
+  } catch (err) {
+    console.warn("Failed to decrypt deliverable key handle:", err);
+    return "";
+  }
+}
+
+/**
  * Submits a completed milestone deliverable (encrypted IPFS hash pointer) under zero-knowledge.
  */
 export async function submitMilestoneDeliverable(
@@ -634,15 +670,21 @@ export async function submitMilestoneDeliverable(
   let cacheCid = "";
 
   if (useE2E) {
-    // E2E Mode: Generate a random 32-byte key
-    const randomBytes = new Uint8Array(32);
-    window.crypto.getRandomValues(randomBytes);
-    const randomHexKey = Array.from(randomBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+    // Re-use shared milestone key if available, else generate a random 32-byte key
+    let randomHexKey = chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${milestoneIndex}_req`) || chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${milestoneIndex}_dev`) || "";
+
+    if (!randomHexKey) {
+      const randomBytes = new Uint8Array(32);
+      window.crypto.getRandomValues(randomBytes);
+      randomHexKey = Array.from(randomBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+
     const keyBigInt = BigInt("0x" + randomHexKey);
 
     // Encrypt the key itself with Nox KMS
     devEnc = await encryptNoxInput(signer, keyBigInt, "uint256", escrowAddress, gatewayUrl);
     chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_ms_${milestoneIndex}_dev`, randomHexKey);
+    chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_ms_${milestoneIndex}_req`, randomHexKey);
 
     // Encrypt attached files
     const fileCids: { name: string; type: string; cid: string }[] = [];
