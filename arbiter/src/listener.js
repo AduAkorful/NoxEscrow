@@ -9,9 +9,9 @@ const RPC_URL = process.env.RPC_URL;
 const FACTORY_ADDRESS = process.env.ESCROW_FACTORY_ADDRESS;
 const IEXEC_RUNNER_ENDPOINT = process.env.IEXEC_RUNNER_ENDPOINT;
 const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL || "15000", 10);
-const RECONCILIATION_INTERVAL = parseInt(process.env.RECONCILIATION_INTERVAL || "300000", 10);
+const RECONCILIATION_INTERVAL = parseInt(process.env.RECONCILIATION_INTERVAL || "30000", 10);
 const RUNNER_TIMEOUT = parseInt(process.env.IEXEC_RUNNER_TIMEOUT || "45000", 10);
-const RECONCILE_COOLDOWN = parseInt(process.env.RECONCILE_COOLDOWN || "120000", 10);
+const RECONCILE_COOLDOWN = parseInt(process.env.RECONCILE_COOLDOWN || "15000", 10);
 
 if (!RPC_URL) {
   console.error("❌ ERROR: RPC_URL environment variable is required.");
@@ -321,6 +321,11 @@ async function main() {
 
   // Run immediately once on start to initialize or catch up
   pollForEvents();
+  if (escrowClones.size > 0) {
+    reconcileDisputes(escrowClones, triggeredDisputes).catch((err) => {
+      console.error("⚠️ Error in startup dispute reconciliation:", err.message);
+    });
+  }
 
   // HTTP Server for Render health checks and local /trigger-task task runner
   const PORT = process.env.PORT || 3000;

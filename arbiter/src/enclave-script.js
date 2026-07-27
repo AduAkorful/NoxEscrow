@@ -7,13 +7,12 @@ import crypto from "crypto";
 import fs from "fs";
 
 // Load configuration from environment variables
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const PRIVATE_KEY = process.env.TEE_ARBITER_PRIVATE_KEY;
-const RPC_URL = process.env.RPC_URL;
-const NOX_GATEWAY_URL = process.env.NOX_GATEWAY_URL;
-const NOX_SUBGRAPH_URL = process.env.NOX_SUBGRAPH_URL;
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://bppqqbtyqclfstldnabn.supabase.co";
+const SUPABASE_KEY = process.env.SUPABASE_KEY || "";
+const PRIVATE_KEY = process.env.TEE_ARBITER_PRIVATE_KEY || "";
+const RPC_URL = process.env.RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com";
+const NOX_GATEWAY_URL = process.env.NOX_GATEWAY_URL || "https://gateway-testnets.noxprotocol.dev";
+const NOX_SUBGRAPH_URL = process.env.NOX_SUBGRAPH_URL || "https://thegraph.ethereum-sepolia-testnet.noxprotocol.io/api/subgraphs/id/9CsccKwvgYFo72zZeU4k4wj2NEBLdWhVE3EUandgmzgo";
 
 // ABI for resolveDispute on NoxEscrowContract
 const escrowABI = [
@@ -175,7 +174,7 @@ async function main() {
   let wallet;
   let useLiveSigner = false;
 
-  const isLocalNetwork = RPC_URL.includes("127.0.0.1") || RPC_URL.includes("localhost") || RPC_URL.includes("31337") || process.env.LOCAL_DRY_RUN === "true";
+  const isLocalNetwork = (RPC_URL && (RPC_URL.includes("127.0.0.1") || RPC_URL.includes("localhost") || RPC_URL.includes("31337"))) || process.env.LOCAL_DRY_RUN === "true";
 
   if (PRIVATE_KEY) {
     const provider = new ethers.JsonRpcProvider(RPC_URL);
@@ -188,7 +187,8 @@ async function main() {
       process.exit(1);
     }
     // Local testing or dry-run fallback
-    wallet = ethers.Wallet.createRandom();
+    const provider = new ethers.JsonRpcProvider(RPC_URL);
+    wallet = ethers.Wallet.createRandom().connect(provider);
     console.log(`⚠️ No TEE_ARBITER_PRIVATE_KEY provided. Operating in DRY-RUN mode.`);
     console.log(`Generated transient dry-run wallet: ${wallet.address}`);
   }
@@ -414,23 +414,16 @@ async function main() {
     }
   }
 
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "";
-  const hasValidCredsFile = credPath && fs.existsSync(credPath);
+  const projectId = process.env.VERTEX_PROJECT_ID || "project-eedabfd1-816e-4b2e-b15";
+  const location = process.env.VERTEX_LOCATION || "global";
 
-  if (hasValidCredsFile || geminiKey || process.env.VERTEX_PROJECT_ID) {
-    try {
-      let ai;
-      if (hasValidCredsFile || (process.env.VERTEX_PROJECT_ID && !geminiKey)) {
-        console.log(`\n🤖 Initializing Google Gemini 2.5 Flash client via ADC Vertex AI (Credentials: ${credPath || "Default ADC"})...`);
-        ai = new GoogleGenAI({
-          vertex: true,
-          project: process.env.VERTEX_PROJECT_ID,
-          location: process.env.VERTEX_LOCATION || "us-central1"
-        });
-      } else if (geminiKey) {
-        console.log("\n🤖 Initializing Google Gemini 2.5 Flash client via Google AI Studio API Key...");
-        ai = new GoogleGenAI({ apiKey: geminiKey });
-      }
+  try {
+    console.log(`\n🤖 Initializing Google Gemini 2.5 Flash client via Vertex AI ADC (Project: ${projectId}, Location: ${location})...`);
+    const ai = new GoogleGenAI({
+      vertex: true,
+      project: projectId,
+      location: location
+    });
 
       const systemPrompt = `You are a highly analytical, objective, and expert Smart Contract and Software Engineering Auditor acting as the supreme arbiter for NoxEscrow.
 
@@ -549,10 +542,6 @@ ${sanitizeXmlContent(freelancerStatement)}
       console.error("❌ FATAL: AI API failure. Aborting execution to prevent fraudulent verdict execution.");
       process.exit(1);
     }
-  } else {
-    console.error("❌ FATAL: GEMINI_API_KEY is missing. Production AI assessment cannot proceed.");
-    process.exit(1);
-  }
 
   const ruleInFavorOfFreelancer = (adjudicationVerdict === "PAY_FREELANCER");
 
