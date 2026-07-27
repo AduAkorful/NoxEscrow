@@ -55,7 +55,7 @@ export function ReputationGauge({
 
   const displayScore = onChainScore !== null ? Number(onChainScore) : null;
   const effectiveScore = displayScore ?? 1000;
-  
+
   const clampedScore = Math.max(100, Math.min(999, effectiveScore));
 
   let rank = "Initiate Gatekeeper";
@@ -96,15 +96,15 @@ export function ReputationGauge({
             </linearGradient>
           </defs>
           <circle cx="72" cy="72" fill="transparent" r="56" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="8"></circle>
-          <circle 
-            cx="72" 
-            cy="72" 
-            fill="transparent" 
-            r="56" 
-            stroke="url(#repGradient)" 
-            strokeWidth="8" 
-            strokeDasharray="351.8" 
-            strokeDashoffset={dashOffset} 
+          <circle
+            cx="72"
+            cy="72"
+            fill="transparent"
+            r="56"
+            stroke="url(#repGradient)"
+            strokeWidth="8"
+            strokeDasharray="351.8"
+            strokeDashoffset={dashOffset}
             strokeLinecap="round"
             className="transition-all duration-1000 ease-out"
           ></circle>

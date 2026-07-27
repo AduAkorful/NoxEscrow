@@ -892,15 +892,32 @@ export const NOX_ESCROW_FACTORY = import.meta.env.VITE_NOX_ESCROW_FACTORY || add
 
 /**
  * Fetches and decrypts the freelancer's on-chain reputation score from the registry.
- * Returns null if the reputation registry is not configured or decryption fails.
+ * Uses publicDecrypt for zero-knowledge on-chain reputation handles.
  */
 export async function getOnChainReputation(
-  signer: ethers.JsonRpcSigner,
+  signerOrProvider: ethers.JsonRpcSigner | ethers.Provider | null,
   reputationRegistryAddress: string,
   freelancerAddress: string,
   gatewayUrl: string = DEFAULT_NOX_GATEWAY
 ): Promise<bigint | null> {
+  if (!freelancerAddress || !ethers.isAddress(freelancerAddress)) {
+    return null;
+  }
+
   let registryAddr = reputationRegistryAddress;
+  let providerOrSigner: any = signerOrProvider;
+
+  if (!providerOrSigner) {
+    if (typeof window !== "undefined" && (window as any).ethereum) {
+      try {
+        providerOrSigner = new ethers.BrowserProvider((window as any).ethereum);
+      } catch {
+        providerOrSigner = new ethers.JsonRpcProvider("https://ethereum-sepolia-rpc.publicnode.com");
+      }
+    } else {
+      providerOrSigner = new ethers.JsonRpcProvider("https://ethereum-sepolia-rpc.publicnode.com");
+    }
+  }
 
   if (!registryAddr || registryAddr === ethers.ZeroAddress) {
     if (NOX_ESCROW_FACTORY && ethers.isAddress(NOX_ESCROW_FACTORY)) {
@@ -908,7 +925,7 @@ export async function getOnChainReputation(
         const factory = new ethers.Contract(
           NOX_ESCROW_FACTORY,
           ["function reputationRegistry() view returns (address)"],
-          signer
+          providerOrSigner
         );
         registryAddr = await factory.reputationRegistry();
       } catch (fErr) {
@@ -926,7 +943,7 @@ export async function getOnChainReputation(
     const reputationABI = [
       "function getReputation(address freelancer) view returns (bytes32)"
     ];
-    const reputation = new ethers.Contract(registryAddr, reputationABI, signer);
+    const reputation = new ethers.Contract(registryAddr, reputationABI, providerOrSigner);
 
     const repHandle = await reputation.getReputation(freelancerAddress);
 
@@ -934,16 +951,25 @@ export async function getOnChainReputation(
       return null;
     }
 
-    const handleClient = await createEthersHandleClient(signer as any, {
+    const handleClient = await createEthersHandleClient(providerOrSigner as any, {
       smartContractAddress: NOX_CONTRACT_MANAGER,
       gatewayUrl: gatewayUrl as any,
       subgraphUrl: NOX_SUBGRAPH_URL,
     });
 
+    try {
+      const pubRes = await handleClient.publicDecrypt(repHandle);
+      if (pubRes && pubRes.value !== undefined) {
+        return BigInt(pubRes.value);
+      }
+    } catch (pubErr) {
+      console.warn("publicDecrypt failed, trying private decrypt:", pubErr);
+    }
+
     const decrypted = await handleClient.decrypt(repHandle);
-    return BigInt(decrypted.value);
+    return BigInt(decrypted?.value ?? decrypted);
   } catch (err) {
-    console.warn("Failed to fetch on-chain reputation:", err);
+    console.error("Failed to fetch on-chain reputation from KMS:", err);
     return null;
   }
 }
