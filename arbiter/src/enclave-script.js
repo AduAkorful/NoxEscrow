@@ -378,54 +378,69 @@ async function main() {
   let adjudicationReasoning = "Automatic fallback due to model evaluation issue.";
   let evaluationScore = 0;
 
-  // --- Resolution for GOOGLE_APPLICATION_CREDENTIALS on Render ---
-  let rawCredVal = process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.GCP_SERVICE_ACCOUNT_KEY || process.env.GCP_KEY || "";
+  // --- Robust GCP ADC Credential Auto-Discovery for Render ---
   let credPath = "";
 
-  if (rawCredVal) {
-    const trimmedCred = rawCredVal.trim();
-    if (trimmedCred.startsWith("{")) {
-      // Credentials environment variable contains raw JSON content directly
+  // 1. Check all environment variables for raw JSON service account keys
+  for (const [envName, envVal] of Object.entries(process.env)) {
+    if (!envVal || typeof envVal !== "string") continue;
+    const trimmed = envVal.trim();
+    if (trimmed.startsWith("{") && (trimmed.includes("private_key") || trimmed.includes("service_account"))) {
       try {
-        console.log("🔑 Detected raw JSON content in GCP credentials env var. Writing to /tmp/gcp-key.json...");
-        fs.writeFileSync("/tmp/gcp-key.json", trimmedCred, { mode: 0o600 });
-        process.env.GOOGLE_APPLICATION_CREDENTIALS = "/tmp/gcp-key.json";
+        console.log(`🔑 Discovered raw GCP credentials JSON in env var "${envName}". Writing to /tmp/gcp-key.json...`);
+        fs.writeFileSync("/tmp/gcp-key.json", trimmed, { mode: 0o600 });
         credPath = "/tmp/gcp-key.json";
+        process.env.GOOGLE_APPLICATION_CREDENTIALS = "/tmp/gcp-key.json";
+        break;
       } catch (writeErr) {
-        console.error("⚠️ Failed to write raw GCP credentials JSON to /tmp/gcp-key.json:", writeErr.message);
+        console.error("⚠️ Failed to write GCP credentials JSON to /tmp/gcp-key.json:", writeErr.message);
       }
-    } else if (fs.existsSync(trimmedCred)) {
-      credPath = trimmedCred;
-      process.env.GOOGLE_APPLICATION_CREDENTIALS = credPath;
     }
   }
 
-  // If specified credPath was not valid, scan /etc/secrets directory on Render for any mounted secret key file
+  // 2. Check if process.env.GOOGLE_APPLICATION_CREDENTIALS points to an existing file path
+  if (!credPath && process.env.GOOGLE_APPLICATION_CREDENTIALS && fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
+    credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  }
+
+  // 3. Recursively scan Render /etc/secrets directory for any mounted secret key file
   if (!credPath && fs.existsSync("/etc/secrets")) {
-    try {
-      const secretFiles = fs.readdirSync("/etc/secrets");
-      console.log("📂 Available Render secret files in /etc/secrets:", secretFiles);
-      for (const f of secretFiles) {
-        const full = path.join("/etc/secrets", f);
-        try {
-          const content = fs.readFileSync(full, "utf8").trim();
-          if (content.startsWith("{") && (content.includes("private_key") || content.includes("service_account"))) {
-            console.log(`✔️ Located GCP service account JSON key at secret path: ${full}`);
-            process.env.GOOGLE_APPLICATION_CREDENTIALS = full;
-            credPath = full;
-            break;
+    function scanSecretDir(dirPath) {
+      try {
+        const items = fs.readdirSync(dirPath);
+        for (const item of items) {
+          if (item.startsWith("..")) continue; // Skip Kubernetes metadata symlinks
+          const fullPath = path.join(dirPath, item);
+          try {
+            const stat = fs.statSync(fullPath);
+            if (stat.isFile()) {
+              const content = fs.readFileSync(fullPath, "utf8").trim();
+              if (content.startsWith("{") && (content.includes("private_key") || content.includes("service_account"))) {
+                console.log(`✔️ Located GCP service account JSON key at Render secret path: ${fullPath}`);
+                process.env.GOOGLE_APPLICATION_CREDENTIALS = fullPath;
+                return fullPath;
+              }
+            } else if (stat.isDirectory()) {
+              const subResult = scanSecretDir(fullPath);
+              if (subResult) return subResult;
+            }
+          } catch {
+            // ignore unreadable items
           }
-        } catch {
-          // ignore unreadable file
         }
+      } catch (scanErr) {
+        console.warn("⚠️ Error scanning /etc/secrets directory:", scanErr.message);
       }
-    } catch (dirErr) {
-      console.warn("⚠️ Error reading /etc/secrets directory:", dirErr.message);
+      return null;
+    }
+
+    const foundSecret = scanSecretDir("/etc/secrets");
+    if (foundSecret) {
+      credPath = foundSecret;
     }
   }
 
-  // If still no valid credentials file exists on disk, MUST delete GOOGLE_APPLICATION_CREDENTIALS from env
-  // to prevent Google Auth library from attempting lstat on an invalid file path
+  // 4. If no valid credentials file exists on disk, delete invalid GOOGLE_APPLICATION_CREDENTIALS path from env
   if (!credPath || !fs.existsSync(credPath)) {
     if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       console.warn(`⚠️ Unsetting invalid GOOGLE_APPLICATION_CREDENTIALS environment variable ("${process.env.GOOGLE_APPLICATION_CREDENTIALS}") because file does not exist on disk.`);
