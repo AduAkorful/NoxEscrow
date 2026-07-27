@@ -264,6 +264,7 @@ async function main() {
   
   const addressConfig = {
     factory: factoryAddress,
+    reputationRegistry: reputationAddress,
     cUSDC: cUSDCAddress,
     teeArbiter: teeArbiterAddress,
     gatewayUrl: gatewayUrl,

@@ -888,6 +888,8 @@ export async function getConfidentialUSDCBalance(
   }
 }
 
+export const NOX_ESCROW_FACTORY = import.meta.env.VITE_NOX_ESCROW_FACTORY || addresses.factory || "";
+
 /**
  * Fetches and decrypts the freelancer's on-chain reputation score from the registry.
  * Returns null if the reputation registry is not configured or decryption fails.
@@ -898,7 +900,24 @@ export async function getOnChainReputation(
   freelancerAddress: string,
   gatewayUrl: string = DEFAULT_NOX_GATEWAY
 ): Promise<bigint | null> {
-  if (!reputationRegistryAddress || reputationRegistryAddress === ethers.ZeroAddress) {
+  let registryAddr = reputationRegistryAddress;
+
+  if (!registryAddr || registryAddr === ethers.ZeroAddress) {
+    if (NOX_ESCROW_FACTORY && ethers.isAddress(NOX_ESCROW_FACTORY)) {
+      try {
+        const factory = new ethers.Contract(
+          NOX_ESCROW_FACTORY,
+          ["function reputationRegistry() view returns (address)"],
+          signer
+        );
+        registryAddr = await factory.reputationRegistry();
+      } catch (fErr) {
+        console.warn("Failed to fetch reputationRegistry from factory contract:", fErr);
+      }
+    }
+  }
+
+  if (!registryAddr || registryAddr === ethers.ZeroAddress) {
     console.warn("Reputation registry not configured");
     return null;
   }
@@ -907,7 +926,7 @@ export async function getOnChainReputation(
     const reputationABI = [
       "function getReputation(address freelancer) view returns (bytes32)"
     ];
-    const reputation = new ethers.Contract(reputationRegistryAddress, reputationABI, signer);
+    const reputation = new ethers.Contract(registryAddr, reputationABI, signer);
 
     const repHandle = await reputation.getReputation(freelancerAddress);
 

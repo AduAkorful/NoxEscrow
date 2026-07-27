@@ -54,14 +54,13 @@ export function ReputationGauge({
   }, [signer, reputationRegistryAddress, walletAddress, gatewayUrl]);
 
   const displayScore = onChainScore !== null ? Number(onChainScore) : null;
+  const effectiveScore = displayScore ?? 1000;
   
-  const clampedScore = displayScore !== null 
-    ? Math.max(100, Math.min(999, displayScore))
-    : Math.max(100, Math.min(999, 600 + (completedCount * 100) - (disputedCount * 150)));
+  const clampedScore = Math.max(100, Math.min(999, effectiveScore));
 
   let rank = "Initiate Gatekeeper";
   let cert = "Bronze TEE Certified";
-  let certBadgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/30";
+  let certBadgeClass = "bg-[#38BDF8]/10 text-[#38BDF8] border-[#38BDF8]/30";
 
   if (clampedScore >= 800) {
     rank = "Elite Overseer";
@@ -117,10 +116,10 @@ export function ReputationGauge({
           ) : (
             <>
               <span className="font-bold text-3xl text-white">
-                {displayScore !== null ? displayScore.toLocaleString() : clampedScore}
+                {displayScore !== null ? displayScore.toLocaleString() : "--"}
               </span>
               <span className="text-[11px] text-slate-400 font-medium tracking-wide">
-                {displayScore !== null ? "On-Chain Score" : "Local Score"}
+                On-Chain Score
               </span>
             </>
           )}
