@@ -4,6 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 import { ethers } from "ethers";
 import axios from "axios";
 import crypto from "crypto";
+import fs from "fs";
 
 // Load configuration from environment variables
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -376,22 +377,59 @@ async function main() {
   let adjudicationReasoning = "Automatic fallback due to model evaluation issue.";
   let evaluationScore = 0;
 
-  // --- Hybrid Google Gen AI SDK Initialization (AI Studio Key or local GCP ADC) ---
-  const useGcpADC = !GEMINI_API_KEY || !GEMINI_API_KEY.startsWith("AIzaSy");
+  // --- Resolution for GOOGLE_APPLICATION_CREDENTIALS on Render ---
+  let credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || "";
   
-  if (GEMINI_API_KEY || useGcpADC) {
+  if (credPath) {
+    const trimmedCred = credPath.trim();
+    if (trimmedCred.startsWith("{")) {
+      // GOOGLE_APPLICATION_CREDENTIALS contains raw JSON content directly
+      try {
+        console.log("🔑 Detected raw JSON content in GOOGLE_APPLICATION_CREDENTIALS. Writing to /tmp/gcp-key.json...");
+        fs.writeFileSync("/tmp/gcp-key.json", trimmedCred, { mode: 0o600 });
+        process.env.GOOGLE_APPLICATION_CREDENTIALS = "/tmp/gcp-key.json";
+        credPath = "/tmp/gcp-key.json";
+      } catch (writeErr) {
+        console.error("⚠️ Failed to write raw GCP credentials JSON to /tmp/gcp-key.json:", writeErr.message);
+      }
+    } else if (!fs.existsSync(credPath)) {
+      console.warn(`⚠️ Specified GOOGLE_APPLICATION_CREDENTIALS file "${credPath}" was not found on disk.`);
+      // Check common Render secret file mount locations
+      const commonPaths = [
+        "/etc/secrets/gcp-key.json",
+        "/etc/secrets/gcp_key.json",
+        "/etc/secrets/service_account.json",
+        "/etc/secrets/gcp-key",
+        "/etc/secrets/key.json",
+        "./gcp-key.json"
+      ];
+      const foundPath = commonPaths.find(p => fs.existsSync(p));
+      if (foundPath) {
+        console.log(`✔️ Located GCP credentials file at Render secret path: ${foundPath}`);
+        process.env.GOOGLE_APPLICATION_CREDENTIALS = foundPath;
+        credPath = foundPath;
+      } else {
+        console.warn("⚠️ Could not locate GCP credentials file at any common secret mount paths.");
+      }
+    }
+  }
+
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "";
+  const hasValidCredsFile = credPath && fs.existsSync(credPath);
+
+  if (hasValidCredsFile || geminiKey || process.env.VERTEX_PROJECT_ID) {
     try {
       let ai;
-      if (!useGcpADC) {
-        console.log("\n🤖 Initializing Google Gemini 2.5 Flash client via Google AI Studio API Key...");
-        ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-      } else {
-        console.log("\n🤖 Initializing Google Gemini 2.5 Flash client via local Application Default Credentials (ADC) Vertex AI...");
+      if (hasValidCredsFile || (process.env.VERTEX_PROJECT_ID && !geminiKey)) {
+        console.log(`\n🤖 Initializing Google Gemini 2.5 Flash client via ADC Vertex AI (Credentials: ${credPath || "Default ADC"})...`);
         ai = new GoogleGenAI({
           vertex: true,
           project: process.env.VERTEX_PROJECT_ID,
-          location: process.env.VERTEX_LOCATION
+          location: process.env.VERTEX_LOCATION || "us-central1"
         });
+      } else if (geminiKey) {
+        console.log("\n🤖 Initializing Google Gemini 2.5 Flash client via Google AI Studio API Key...");
+        ai = new GoogleGenAI({ apiKey: geminiKey });
       }
 
       const systemPrompt = `You are a highly analytical, objective, and expert Smart Contract and Software Engineering Auditor acting as the supreme arbiter for NoxEscrow.
