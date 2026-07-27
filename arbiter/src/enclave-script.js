@@ -5,6 +5,7 @@ import { ethers } from "ethers";
 import axios from "axios";
 import crypto from "crypto";
 import fs from "fs";
+import path from "path";
 
 // Load configuration from environment variables
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://bppqqbtyqclfstldnabn.supabase.co";
@@ -399,15 +400,24 @@ async function main() {
     }
   }
 
-  // If specified credPath was not valid, scan /etc/secrets directory on Render for any mounted .json key file
+  // If specified credPath was not valid, scan /etc/secrets directory on Render for any mounted secret key file
   if (!credPath && fs.existsSync("/etc/secrets")) {
     try {
       const secretFiles = fs.readdirSync("/etc/secrets");
-      const jsonSecret = secretFiles.find(f => f.endsWith(".json"));
-      if (jsonSecret) {
-        credPath = path.join("/etc/secrets", jsonSecret);
-        console.log(`✔️ Located GCP credentials secret file dynamically at: ${credPath}`);
-        process.env.GOOGLE_APPLICATION_CREDENTIALS = credPath;
+      console.log("📂 Available Render secret files in /etc/secrets:", secretFiles);
+      for (const f of secretFiles) {
+        const full = path.join("/etc/secrets", f);
+        try {
+          const content = fs.readFileSync(full, "utf8").trim();
+          if (content.startsWith("{") && (content.includes("private_key") || content.includes("service_account"))) {
+            console.log(`✔️ Located GCP service account JSON key at secret path: ${full}`);
+            process.env.GOOGLE_APPLICATION_CREDENTIALS = full;
+            credPath = full;
+            break;
+          }
+        } catch {
+          // ignore unreadable file
+        }
       }
     } catch (dirErr) {
       console.warn("⚠️ Error reading /etc/secrets directory:", dirErr.message);
