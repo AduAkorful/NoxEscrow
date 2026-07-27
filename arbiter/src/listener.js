@@ -222,6 +222,8 @@ async function main() {
   }
 
   const CONFIRMATION_BLOCKS = 6;
+  const MAX_POLL_RANGE = 20; // 20 blocks max range per eth_getLogs call
+  const MAX_ARCHIVE_LOOKBACK = 40; // Restrict lookback strictly to 40 recent blocks to avoid RPC archive node errors
 
   async function pollForEvents() {
     if (isPolling) return;
@@ -232,61 +234,70 @@ async function main() {
 
       if (safeLatest <= 0) return;
       
-      if (lastProcessedBlock === null) {
-        lastProcessedBlock = Math.max(0, safeLatest - 100);
-        console.log(`📡 Block polling initialized with ${CONFIRMATION_BLOCKS}-block safety depth. Starting from block: ${lastProcessedBlock}`);
+      const maxLookback = Math.max(0, safeLatest - MAX_ARCHIVE_LOOKBACK);
+
+      if (lastProcessedBlock === null || lastProcessedBlock < maxLookback) {
+        lastProcessedBlock = maxLookback;
+        console.log(`📡 Block polling initialized with ${CONFIRMATION_BLOCKS}-block safety depth. Starting from recent block: ${lastProcessedBlock}`);
       }
 
       if (safeLatest > lastProcessedBlock) {
         const fromBlock = lastProcessedBlock + 1;
-        const toBlock = Math.min(safeLatest, fromBlock + 99); // Max 100 blocks per request
+        const toBlock = Math.min(safeLatest, fromBlock + (MAX_POLL_RANGE - 1)); // Max 20 blocks per request
         
         console.log(`🔍 Polling blocks ${fromBlock} to ${toBlock} (safe tip: ${safeLatest}, chain tip: ${chainLatest})...`);
         
-        // 1. Check for any newly created escrow clones from the factory
-        const escrowCreatedLogs = await provider.getLogs({
-          address: FACTORY_ADDRESS,
-          topics: [ESCROW_CREATED_TOPIC],
-          fromBlock,
-          toBlock
-        });
-
-        for (const log of escrowCreatedLogs) {
-          try {
-            const parsed = factoryContract.interface.parseLog(log);
-            const cloneAddress = parsed.args.escrowAddress.toLowerCase();
-            if (!escrowClones.has(cloneAddress)) {
-              console.log(`➕ Dynamic registry: Registered new escrow clone: ${cloneAddress}`);
-              escrowClones.add(cloneAddress);
-            }
-          } catch (parseErr) {
-            console.error("⚠️ Failed to parse EscrowCreated log:", parseErr.message);
-          }
-        }
-
-        // 2. Check for formal disputes raised on any registered escrow clones
-        if (escrowClones.size > 0) {
-          const cloneAddresses = Array.from(escrowClones);
-          const disputeLogs = await provider.getLogs({
-            address: cloneAddresses.length === 1 ? cloneAddresses[0] : cloneAddresses,
-            topics: [DISPUTE_OPENED_TOPIC],
+        try {
+          // 1. Check for any newly created escrow clones from the factory
+          const escrowCreatedLogs = await provider.getLogs({
+            address: FACTORY_ADDRESS,
+            topics: [ESCROW_CREATED_TOPIC],
             fromBlock,
             toBlock
           });
 
-          for (const log of disputeLogs) {
-            if (escrowClones.has(log.address.toLowerCase())) {
-              await handleDisputeOpened(log, triggeredDisputes);
+          for (const log of escrowCreatedLogs) {
+            try {
+              const parsed = factoryContract.interface.parseLog(log);
+              const cloneAddress = parsed.args.escrowAddress.toLowerCase();
+              if (!escrowClones.has(cloneAddress)) {
+                console.log(`➕ Dynamic registry: Registered new escrow clone: ${cloneAddress}`);
+                escrowClones.add(cloneAddress);
+              }
+            } catch (parseErr) {
+              console.error("⚠️ Failed to parse EscrowCreated log:", parseErr.message);
             }
           }
-        } else {
-          console.log("ℹ️ Skipping dispute polling (no active escrow clones registered).");
+        } catch (factoryLogErr) {
+          console.warn(`⚠️ Warning fetching EscrowCreated logs (${fromBlock}..${toBlock}):`, factoryLogErr.message);
         }
 
+        try {
+          // 2. Check for formal disputes raised on any registered escrow clones
+          if (escrowClones.size > 0) {
+            const cloneAddresses = Array.from(escrowClones);
+            const disputeLogs = await provider.getLogs({
+              address: cloneAddresses.length === 1 ? cloneAddresses[0] : cloneAddresses,
+              topics: [DISPUTE_OPENED_TOPIC],
+              fromBlock,
+              toBlock
+            });
+
+            for (const log of disputeLogs) {
+              if (escrowClones.has(log.address.toLowerCase())) {
+                await handleDisputeOpened(log, triggeredDisputes);
+              }
+            }
+          }
+        } catch (disputeLogErr) {
+          console.warn(`⚠️ Warning fetching DisputeOpened logs (${fromBlock}..${toBlock}):`, disputeLogErr.message);
+        }
+
+        // Always advance pointer so polling is never stuck retrying past block ranges
         lastProcessedBlock = toBlock;
       }
     } catch (error) {
-      console.error("⚠️ Error during event polling:", error.message);
+      console.error("⚠️ Error during event polling cycle:", error.message);
     } finally {
       isPolling = false;
     }
