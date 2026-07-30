@@ -119,6 +119,7 @@ contract NoxEscrowReputation is
         }
 
         Nox.allowThis(nextRep);
+        Nox.allowPublicDecryption(nextRep);
         reputationScores[freelancer] = nextRep;
 
         emit ReputationUpdated(freelancer, nextRep);
@@ -156,6 +157,7 @@ contract NoxEscrowReputation is
         }
 
         Nox.allowThis(nextRep);
+        Nox.allowPublicDecryption(nextRep);
         reputationScores[freelancer] = nextRep;
 
         emit ReputationUpdated(freelancer, nextRep);

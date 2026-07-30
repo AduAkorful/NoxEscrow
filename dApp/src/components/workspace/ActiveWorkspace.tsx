@@ -61,9 +61,10 @@ export function ActiveWorkspace({
   setShowReleaseConfirm,
   milestoneBudget
 }: ActiveWorkspaceProps) {
-  const isPastMilestone = selectedMilestoneIndex < selectedContract.milestonesCompleted;
-  const isCurrentMilestone = selectedMilestoneIndex === selectedContract.milestonesCompleted;
-  const isFutureMilestone = selectedMilestoneIndex > selectedContract.milestonesCompleted;
+  const isRefunded = selectedContract.milestoneRefunded?.[selectedMilestoneIndex] || (selectedContract.status === 'REFUNDED' && (selectedContract.disputeRecord ? selectedMilestoneIndex >= selectedContract.disputeRecord.milestone_index : selectedMilestoneIndex >= selectedContract.milestonesCompleted - 1));
+  const isPastMilestone = selectedMilestoneIndex < selectedContract.milestonesCompleted && !isRefunded;
+  const isCurrentMilestone = selectedMilestoneIndex === selectedContract.milestonesCompleted && selectedContract.status !== 'REFUNDED';
+  const isFutureMilestone = selectedMilestoneIndex > selectedContract.milestonesCompleted && selectedContract.status !== 'REFUNDED';
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -72,7 +73,15 @@ export function ActiveWorkspace({
         <div>
           <span className="font-mono text-[9px] uppercase tracking-widest text-[#7F00FF] font-bold block mb-4">Milestone Specifications</span>
           <div className="space-y-4 font-mono">
-            {isPastMilestone ? (
+            {isRefunded ? (
+              <div className="p-4 border border-rose-500/30 bg-rose-950/20 rounded-xl text-rose-400 font-mono text-xs flex items-center justify-between shadow-[0_0_15px_rgba(244,63,94,0.1)]">
+                <span className="flex items-center gap-1.5 font-bold uppercase text-[10px]">
+                  <AlertTriangle className="w-4 h-4 text-rose-400" />
+                  Milestone {selectedMilestoneIndex + 1} Refunded to Client
+                </span>
+                <span className="text-[9px] text-rose-300">Settled via TEE Dispute Resolution</span>
+              </div>
+            ) : isPastMilestone ? (
               <div className="p-4 border border-emerald-500/20 bg-emerald-950/15 rounded-xl text-emerald-400 font-mono text-xs flex items-center justify-between">
                 <span className="flex items-center gap-1.5 font-bold uppercase text-[10px]">
                   <CheckCircle2 className="w-4 h-4 text-[#00E676]" />
@@ -222,17 +231,21 @@ export function ActiveWorkspace({
             <div className="flex justify-between items-center border-b border-white/5 pb-3 pt-1">
               <span className="text-slate-500 text-xs">MILESTONE_STATUS:</span>
               <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded border ${
-                isPastMilestone 
-                  ? 'text-[#00E676] bg-emerald-950/20 border-emerald-500/30' 
-                  : isCurrentMilestone 
-                    ? (selectedContract.activeMilestoneSubmitted ? 'text-[#00F2FE] bg-[#00F2FE]/10 border-[#00F2FE]/30' : 'text-amber-400 bg-amber-950/20 border-amber-500/30')
-                    : 'text-slate-500 bg-slate-900/40 border-slate-700/30'
+                isRefunded
+                  ? 'text-rose-400 bg-rose-950/20 border-rose-500/30'
+                  : isPastMilestone 
+                    ? 'text-[#00E676] bg-emerald-950/20 border-emerald-500/30' 
+                    : isCurrentMilestone 
+                      ? (selectedContract.activeMilestoneSubmitted ? 'text-[#00F2FE] bg-[#00F2FE]/10 border-[#00F2FE]/30' : 'text-amber-400 bg-amber-950/20 border-amber-500/30')
+                      : 'text-slate-500 bg-slate-900/40 border-slate-700/30'
               }`}>
-                {isPastMilestone 
-                  ? 'SETTLED_COMPLETED' 
-                  : isCurrentMilestone 
-                    ? (selectedContract.activeMilestoneSubmitted ? 'ACTIVE_SUBMITTED' : 'ACTIVE_LOCKED')
-                    : 'LOCKED_PENDING'}
+                {isRefunded
+                  ? 'DISPUTED_REFUNDED'
+                  : isPastMilestone 
+                    ? 'SETTLED_COMPLETED' 
+                    : isCurrentMilestone 
+                      ? (selectedContract.activeMilestoneSubmitted ? 'ACTIVE_SUBMITTED' : 'ACTIVE_LOCKED')
+                      : 'LOCKED_PENDING'}
               </span>
             </div>
             <div className="flex justify-between items-center">
@@ -272,7 +285,38 @@ export function ActiveWorkspace({
         <div>
           <span className="font-mono text-[9px] uppercase tracking-widest text-[#7F00FF] font-bold block mb-4">Actions Console</span>
           
-          {selectedContract.milestonesCompleted === selectedContract.totalMilestones ? (
+          {selectedContract.status === 'REFUNDED' ? (
+            <div className="space-y-4">
+              <div className="p-5 bg-rose-950/15 border border-rose-500/30 rounded-xl text-xs font-mono text-rose-400 flex gap-4 shadow-[0_0_15px_rgba(244,63,94,0.1)]">
+                <AlertTriangle className="w-5 h-5 flex-shrink-0 text-rose-400 drop-shadow-[0_0_5px_#f43f5e]" />
+                <div className="flex flex-col gap-1">
+                  <strong className="block mb-0.5 tracking-wider uppercase">Escrow Agreement Refunded</strong>
+                  <span className="font-sans text-[11px] text-slate-300">
+                    Dispute settled in favor of the client by Intel TDX TEE AI Arbiter. Milestone funds returned to client wallet.
+                  </span>
+                </div>
+              </div>
+
+              {selectedContract.disputeRecord && (
+                <div className="bg-[#070913] p-5 border border-rose-500/30 rounded-xl space-y-3 shadow-[0_0_15px_rgba(244,63,94,0.05)]">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                    <span className="text-[10px] text-rose-400 font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
+                      <Terminal className="w-3.5 h-3.5 text-rose-400" /> TEE AI Arbitration Verdict
+                    </span>
+                    <span className="text-[9px] font-mono text-slate-400 bg-rose-950/40 px-2 py-0.5 rounded border border-rose-500/20">
+                      Score: {selectedContract.disputeRecord.score}/100
+                    </span>
+                  </div>
+                  <div className="text-xs font-mono text-slate-200">
+                    <strong>Verdict:</strong> <span className={selectedContract.disputeRecord.verdict === 'PAY_FREELANCER' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{selectedContract.disputeRecord.verdict}</span>
+                  </div>
+                  <p className="text-xs text-slate-300 font-sans leading-relaxed bg-white/[0.02] p-3 rounded-lg border border-white/5">
+                    "{selectedContract.disputeRecord.reasoning}"
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : selectedContract.milestonesCompleted === selectedContract.totalMilestones && selectedContract.status === 'COMPLETED' ? (
             <div className="p-5 bg-emerald-950/10 border border-emerald-900/25 rounded-xl text-xs font-mono text-[#00E676] flex gap-4 shadow-[0_0_15px_rgba(0,230,118,0.03)]">
               <ShieldCheck className="w-5 h-5 flex-shrink-0 text-[#00E676] drop-shadow-[0_0_5px_#00E676]" />
               <div className="flex flex-col gap-1">
@@ -310,7 +354,7 @@ export function ActiveWorkspace({
                   <div className="flex flex-col text-right">
                     <span className="text-[8px] font-mono text-slate-500 uppercase">Remaining</span>
                     <span className="font-mono text-xs font-bold text-[#38BDF8] mt-0.5">
-                      {(selectedContract.status === 'COMPLETED' || selectedContract.status === 'REFUNDED' ? 0 : selectedContract.budget - ((selectedContract.budget / selectedContract.totalMilestones) * selectedContract.milestonesCompleted)).toLocaleString()} cUSDC
+                      {(selectedContract.status === 'COMPLETED' ? 0 : selectedContract.budget - ((selectedContract.budget / selectedContract.totalMilestones) * selectedContract.milestonesCompleted)).toLocaleString()} cUSDC
                     </span>
                   </div>
                 </div>
@@ -336,7 +380,36 @@ export function ActiveWorkspace({
                 </div>
               </div>
 
-              {isPastMilestone ? (
+              {isRefunded ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-rose-950/15 border border-rose-500/30 rounded-xl text-xs font-mono text-rose-400 flex gap-3 shadow-[0_0_15px_rgba(244,63,94,0.05)]">
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0 text-rose-400 drop-shadow-[0_0_5px_#f43f5e]" />
+                    <div className="flex flex-col gap-0.5">
+                      <strong className="block tracking-wider uppercase">Milestone {selectedMilestoneIndex + 1} Refunded to Client</strong>
+                      <span className="font-sans text-[11px] text-slate-300">TEE AI Arbiter ruled in favor of client. Milestone budget returned on-chain.</span>
+                    </div>
+                  </div>
+
+                  {selectedContract.disputeRecord && (
+                    <div className="bg-[#070913] p-4 border border-rose-500/20 rounded-xl space-y-2">
+                      <span className="text-[10px] text-rose-400 font-mono font-bold uppercase tracking-wider">Gemini 2.5 Flash TEE Arbiter Reasoning</span>
+                      <p className="text-xs text-slate-300 font-sans leading-relaxed bg-white/[0.02] p-3 rounded-lg border border-white/5">
+                        "{selectedContract.disputeRecord.reasoning}"
+                      </p>
+                    </div>
+                  )}
+
+                  {deliverableText && (
+                    <div className="bg-[#070913] p-5 border border-rose-500/20 rounded-xl relative overflow-hidden">
+                      <Terminal className="w-4 h-4 text-rose-400 absolute top-3 right-3 opacity-50" />
+                      <span className="text-[10px] text-slate-500 block mb-2 font-bold tracking-wider uppercase">SUBMITTED DELIVERABLE (DISPUTED)</span>
+                      <p className="text-xs text-slate-200 leading-relaxed font-sans mb-3 whitespace-pre-wrap">
+                        {deliverableText}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : isPastMilestone ? (
                 <div className="space-y-4">
                   <div className="p-4 bg-emerald-950/10 border border-emerald-900/25 rounded-xl text-xs font-mono text-[#00E676] flex gap-3 shadow-[0_0_15px_rgba(0,230,118,0.03)]">
                     <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-[#00E676] drop-shadow-[0_0_5px_#00E676]" />

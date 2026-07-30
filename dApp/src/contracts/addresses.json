@@ -1,5 +1,6 @@
 {
   "factory": "0xE14BF8F83690ABcd0A74b299DF1cb3055d323537",
+  "reputationRegistry": "0xC0eEBD4D4A90946DF5841e5Df29cf2a724449632",
   "cUSDC": "0x85601895391541846b8Be994F00D1f7f17a878db",
   "teeArbiter": "0x74B4134C8d527a8D8AE8cb9503ab2043bCfC0ffd",
   "gatewayUrl": "https://gateway-testnets.noxprotocol.dev",

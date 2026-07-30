@@ -5,7 +5,7 @@ import { fetchAndDecryptFile, encryptText, decryptText } from '../crypto/fileUpl
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { TEECourtroom } from './TEECourtroom';
 import { supabase } from '../services/supabaseClient';
-import { getEscrowDisputeRecord, getEscrowMetadata, type EscrowDisputeRecord } from '../services/metadataService';
+import { getLatestEscrowDisputeRecord, getEscrowMetadata, type EscrowDisputeRecord } from '../services/metadataService';
 import { ethers } from 'ethers';
 
 // Subcomponents
@@ -117,15 +117,17 @@ export function EscrowWorkspace({
   // Fetch live Gemini TEE dispute evaluation record from Supabase
   useEffect(() => {
     if (!selectedContract.address) return;
+    if (selectedContract.disputeRecord) {
+      setDisputeRecord(selectedContract.disputeRecord);
+    }
     const fetchDispute = async () => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_KEY;
       if (supabaseUrl && supabaseKey) {
-        const rec = await getEscrowDisputeRecord(
+        const rec = await getLatestEscrowDisputeRecord(
           supabaseUrl,
           supabaseKey,
-          selectedContract.address,
-          selectedContract.milestonesCompleted
+          selectedContract.address
         );
         if (rec) setDisputeRecord(rec);
       }
@@ -134,7 +136,7 @@ export function EscrowWorkspace({
     fetchDispute();
     const interval = setInterval(fetchDispute, 5000);
     return () => clearInterval(interval);
-  }, [selectedContract.address, selectedContract.milestonesCompleted, selectedContract.status]);
+  }, [selectedContract.address, selectedContract.disputeRecord, selectedContract.status]);
 
   // Poll on-chain status to auto-refresh when dispute is settled
   useEffect(() => {

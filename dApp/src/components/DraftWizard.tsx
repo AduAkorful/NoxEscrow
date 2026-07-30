@@ -3,6 +3,7 @@ import { Plus, X, Paperclip, Trash2, ShieldCheck, User, ArrowRight, Briefcase, C
 
 import { ethers } from 'ethers';
 import { getFreelancerProfilesFromSupabase } from '../services/freelancerService';
+import { calculateClientDeposit } from '../services/escrowService';
 
 interface DraftWizardProps {
   walletAddress: string | null;
@@ -480,7 +481,7 @@ export function DraftWizard({
               <div className="flex justify-between items-center gap-2">
                 <span className="text-slate-400 font-medium">Processing Fee (1.0%)</span>
                 <span className="font-mono text-[#38BDF8] font-bold whitespace-nowrap">
-                  {(totalBudget * 0.01).toFixed(2)} <span className="text-[11px] text-[#38BDF8]/80 font-normal">cUSDC</span>
+                  {calculateClientDeposit(totalBudget).clientFee.toFixed(2)} <span className="text-[11px] text-[#38BDF8]/80 font-normal">cUSDC</span>
                 </span>
               </div>
 
@@ -488,7 +489,7 @@ export function DraftWizard({
                 <span className="text-[11px] text-slate-400 font-medium">Total Required Client Deposit</span>
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-2xl font-bold font-mono text-[#38BDF8] tracking-tight">
-                    {(totalBudget * 1.01).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {calculateClientDeposit(totalBudget).totalDeposit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                   <span className="text-xs font-semibold text-slate-400">cUSDC</span>
                 </div>

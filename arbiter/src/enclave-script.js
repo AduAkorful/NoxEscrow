@@ -684,6 +684,55 @@ ${sanitizeXmlContent(freelancerStatement)}
         }
       );
       console.log("✔️ Live Gemini evaluation record persisted to Supabase!");
+
+      // If ruling was in favor of client (freelancer lost dispute), update freelancer_profiles in Supabase
+      if (adjudicationVerdict === "REFUND_CLIENT") {
+        try {
+          const escrowContract = new ethers.Contract(
+            escrowAddress,
+            ["function freelancer() view returns (address)"],
+            provider
+          );
+          const freelancerAddr = (await escrowContract.freelancer()).toLowerCase();
+          console.log(`📉 Updating freelancer reputation penalty in Supabase for: ${freelancerAddr}...`);
+
+          const getResp = await axios.get(
+            `${supabaseUrl}/rest/v1/freelancer_profiles?wallet_address=eq.${freelancerAddr}`,
+            {
+              headers: {
+                "apikey": supabaseKey,
+                "Authorization": `Bearer ${supabaseKey}`
+              }
+            }
+          );
+
+          if (getResp.data && getResp.data.length > 0) {
+            const currentProf = getResp.data[0];
+            const currentLost = currentProf.disputes_lost || 0;
+            const currentScore = currentProf.reputation_score !== undefined ? currentProf.reputation_score : 1000;
+            const newScore = Math.max(0, currentScore - 500);
+
+            await axios.patch(
+              `${supabaseUrl}/rest/v1/freelancer_profiles?wallet_address=eq.${freelancerAddr}`,
+              {
+                disputes_lost: currentLost + 1,
+                reputation_score: newScore,
+                updated_at: new Date().toISOString()
+              },
+              {
+                headers: {
+                  "apikey": supabaseKey,
+                  "Authorization": `Bearer ${supabaseKey}`,
+                  "Content-Type": "application/json"
+                }
+              }
+            );
+            console.log(`✔️ Updated Supabase freelancer profile: disputes_lost=${currentLost + 1}, reputation_score=${newScore}`);
+          }
+        } catch (profErr) {
+          console.warn("⚠️ Could not update freelancer_profiles in Supabase:", profErr.message);
+        }
+      }
     } catch (sbErr) {
       console.error("⚠️ Warning: Failed to persist dispute record to Supabase:", sbErr.message);
     }

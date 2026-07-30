@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import { NoxEscrowFactoryABI } from "../contracts/NoxEscrowFactory";
 import { NoxEscrowContractABI } from "../contracts/NoxEscrowContract";
 import { ERC7984ABI } from "../contracts/ERC7984";
-import { getEscrowMetadata, insertEscrowMetadata, updateEscrowDeliverable, savePendingSync } from "./metadataService";
+import { getEscrowMetadata, insertEscrowMetadata, updateEscrowDeliverable, savePendingSync, getLatestEscrowDisputeRecord, type EscrowDisputeRecord } from "./metadataService";
 import { encryptText, decryptText, uploadToPinata, encryptAndUploadFile } from "../crypto/fileUploader";
 import addresses from "../contracts/addresses.json";
 
@@ -62,6 +62,11 @@ export interface EscrowContract {
   milestoneKeys?: string[];
   deliverableKeys?: string[];
   title?: string;
+  milestoneSettled?: boolean[];
+  milestoneRefunded?: boolean[];
+  earnedPayout?: number;
+  refundedAmount?: number;
+  disputeRecord?: EscrowDisputeRecord | null;
 }
 
 export interface MetadataConfig {
@@ -252,6 +257,15 @@ export async function fetchUserEscrows(
       if (isClient || isFreelancer) {
         const statusNames: EscrowContract['status'][] = ['SIGNING', 'ACTIVE', 'DISPUTED', 'COMPLETED', 'REFUNDED'];
 
+        let dynamicFeeBps = 50;
+        try {
+          const feeOnChain = await escrow.platformFeeBps();
+          dynamicFeeBps = Number(feeOnChain);
+        } catch {
+          // fallback to 50 BPS if uninitialized
+        }
+        const feeMultiplier = (10000 - dynamicFeeBps) / 10000;
+
         const requirements: string[] = [];
         const deliverables: string[] = [];
         const milestoneKeys: string[] = [];
@@ -277,6 +291,24 @@ export async function fetchUserEscrows(
         const activeMilestoneIndex = Number(activeMilestone);
         const useE2E = metadataConfig && metadataConfig.supabaseUrl && metadataConfig.supabaseKey;
 
+        let latestDisputeRecord: EscrowDisputeRecord | null = null;
+        if (useE2E) {
+          try {
+            latestDisputeRecord = await getLatestEscrowDisputeRecord(
+              metadataConfig.supabaseUrl!,
+              metadataConfig.supabaseKey!,
+              escrowAddress
+            );
+          } catch (dErr) {
+            console.warn("Failed to fetch latest dispute record:", dErr);
+          }
+        }
+
+        const currentStatusStr = statusNames[Number(status)] || 'ACTIVE';
+        const milestoneSettled: boolean[] = [];
+        const milestoneRefunded: boolean[] = [];
+        const milestonePayoutValues: number[] = [];
+
         for (let m = 0; m < Number(totalMilestones); m++) {
           try {
             const milestoneInfo = await escrow.milestones(m);
@@ -299,7 +331,7 @@ export async function fetchUserEscrows(
               }
             }
 
-            let payoutValue = Number(status) === 0 ? 0 : 0;
+            let payoutValue = 0;
             if (handleClient && allowInteractiveDecrypt) {
               try {
                 const decryptedPayout = await handleClient.decrypt(milestoneInfo.payoutHandle);
@@ -311,6 +343,7 @@ export async function fetchUserEscrows(
               payoutValue = Number(metadata.payout_amount);
             }
             accumulatedBudget += payoutValue;
+            milestonePayoutValues.push(payoutValue);
 
             let decryptedKeyHex = chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}_req`) || "";
             if (!decryptedKeyHex && allowInteractiveDecrypt && signer) {
@@ -424,6 +457,51 @@ export async function fetchUserEscrows(
             deliverables.push("");
             milestoneKeys.push("");
             deliverableKeys.push("");
+            milestonePayoutValues.push(0);
+          }
+        }
+
+        let totalEarnedPayout = 0;
+        let totalRefundedAmount = 0;
+        let disputedIndex = -1;
+        if (latestDisputeRecord && latestDisputeRecord.milestone_index !== undefined) {
+          disputedIndex = Number(latestDisputeRecord.milestone_index);
+        }
+
+        for (let m = 0; m < Number(totalMilestones); m++) {
+          let isMSettled = false;
+          let isMRefunded = false;
+          const pVal = milestonePayoutValues[m] || 0;
+
+          if (currentStatusStr === 'REFUNDED') {
+            if (disputedIndex >= 0) {
+              if (m < disputedIndex) {
+                isMSettled = true;
+              } else {
+                isMRefunded = true;
+              }
+            } else {
+              if (m < activeMilestoneIndex) {
+                isMSettled = true;
+              } else {
+                isMRefunded = true;
+              }
+            }
+          } else if (currentStatusStr === 'COMPLETED') {
+            isMSettled = true;
+          } else {
+            if (m < activeMilestoneIndex) {
+              isMSettled = true;
+            }
+          }
+
+          milestoneSettled.push(isMSettled);
+          milestoneRefunded.push(isMRefunded);
+
+          if (isMSettled) {
+            totalEarnedPayout += pVal;
+          } else if (isMRefunded) {
+            totalRefundedAmount += pVal;
           }
         }
 
@@ -434,7 +512,7 @@ export async function fetchUserEscrows(
           milestonesCompleted: activeMilestoneIndex,
           totalMilestones: Number(totalMilestones),
           budget: accumulatedBudget,
-          status: statusNames[Number(status)] || 'ACTIVE',
+          status: currentStatusStr,
           requirements,
           deliverables,
           activeMilestoneSubmitted,
@@ -442,7 +520,12 @@ export async function fetchUserEscrows(
           reviewWindow: Number(reviewWindow),
           milestoneKeys,
           deliverableKeys,
-          title: contractTitle
+          title: contractTitle,
+          milestoneSettled,
+          milestoneRefunded,
+          earnedPayout: totalEarnedPayout * feeMultiplier,
+          refundedAmount: totalRefundedAmount * 1.01,
+          disputeRecord: latestDisputeRecord
         });
       }
     }

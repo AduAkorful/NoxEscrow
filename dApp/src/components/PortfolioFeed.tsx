@@ -17,7 +17,7 @@ import {
   Percent,
   Lock
 } from 'lucide-react';
-import { type EscrowContract } from '../services/escrowService';
+import { type EscrowContract, calculateClientDeposit, calculateFreelancerEarnings } from '../services/escrowService';
 
 interface PortfolioFeedProps {
   activeEscrows: EscrowContract[];
@@ -49,14 +49,18 @@ export function PortfolioFeed({
   // Client Metrics
   const clientCapitalLocked = activeEscrows
     .filter(e => e.status === 'ACTIVE' || e.status === 'DISPUTED')
-    .reduce((sum, e) => sum + e.budget * 1.01, 0); // Budget + 1.0% Client Fee
+    .reduce((sum, e) => sum + calculateClientDeposit(e.budget).totalDeposit, 0);
 
   const uniqueCounterparties = new Set(activeEscrows.map(e => e.counterparty.toLowerCase())).size;
 
   // Freelancer Metrics
   const totalNetEarnings = activeEscrows
-    .filter(e => e.status === 'COMPLETED')
-    .reduce((sum, e) => sum + (e.budget * 0.995), 0); // Budget minus 0.5% protocol fee
+    .reduce((sum, e) => {
+      if (e.earnedPayout !== undefined) {
+        return sum + e.earnedPayout;
+      }
+      return sum + (e.status === 'COMPLETED' ? calculateFreelancerEarnings(e.budget).netPayout : 0);
+    }, 0);
 
   const pendingReviewCount = activeEscrows.filter(e => e.activeMilestoneSubmitted).length;
 
@@ -266,8 +270,12 @@ export function PortfolioFeed({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredEscrows.map((escrow) => {
             const isClient = viewMode === 'client';
-            const clientTotalDeposit = escrow.budget * 1.01;
-            const freelancerNetEarnings = escrow.budget * 0.995;
+            const clientTotalDeposit = calculateClientDeposit(escrow.budget).totalDeposit;
+            const freelancerNetEarnings = escrow.earnedPayout !== undefined 
+              ? escrow.earnedPayout 
+              : (escrow.status === 'COMPLETED' ? calculateFreelancerEarnings(escrow.budget).netPayout : 0);
+
+            const settledCount = escrow.milestoneSettled ? escrow.milestoneSettled.filter(Boolean).length : (escrow.status === 'COMPLETED' ? escrow.totalMilestones : escrow.milestonesCompleted);
 
             return (
               <div
@@ -325,6 +333,13 @@ export function PortfolioFeed({
                     <span className="text-sm font-bold font-mono text-white">
                       {isClient ? `${clientTotalDeposit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} cUSDC` : `${freelancerNetEarnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} cUSDC`}
                     </span>
+                    {escrow.status === 'REFUNDED' && (
+                      <span className="text-[10px] font-mono text-rose-400 mt-0.5">
+                        {isClient && escrow.refundedAmount 
+                          ? `Refunded to Wallet: ${escrow.refundedAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} cUSDC`
+                          : `Succeeded: ${settledCount}/${escrow.totalMilestones} Milestones (${freelancerNetEarnings.toFixed(2)} cUSDC Paid)`}
+                      </span>
+                    )}
                   </div>
 
                   <button

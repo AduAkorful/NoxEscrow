@@ -35,7 +35,26 @@ async function main() {
   const wallet = new ethers.Wallet(privateKey, provider);
   console.log(`👤 Deployer/Owner Address: ${wallet.address}`);
 
-  const reputationProxyAddress = "0xC0eEBD4D4A90946DF5841e5Df29cf2a724449632";
+  let reputationProxyAddress = process.env.REPUTATION_PROXY_ADDRESS || "";
+  const addressesPath = path.resolve(__dirname, "../../dApp/src/contracts/addresses.json");
+  if (!reputationProxyAddress && fs.existsSync(addressesPath)) {
+    try {
+      const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf8"));
+      if (addresses.reputationRegistry) {
+        reputationProxyAddress = addresses.reputationRegistry;
+      } else if (addresses.factory) {
+        const factoryAbi = ["function reputationRegistry() view returns (address)"];
+        const factoryContract = new ethers.Contract(addresses.factory, factoryAbi, provider);
+        reputationProxyAddress = await factoryContract.reputationRegistry();
+      }
+    } catch (readErr) {
+      console.warn("Could not read addresses.json:", readErr);
+    }
+  }
+
+  if (!reputationProxyAddress) {
+    reputationProxyAddress = "0xC0eEBD4D4A90946DF5841e5Df29cf2a724449632";
+  }
   console.log(`📍 Reputation Proxy Target: ${reputationProxyAddress}`);
 
   // 1. Load compiled NoxEscrowReputation artifact

@@ -174,6 +174,36 @@ export async function getEscrowDisputeRecord(
   }
 }
 
+/**
+ * Retrieves the latest Gemini AI evaluation record for an escrow contract address across any milestone.
+ */
+export async function getLatestEscrowDisputeRecord(
+  supabaseUrl: string,
+  supabaseKey: string,
+  escrowAddress: string
+): Promise<EscrowDisputeRecord | null> {
+  try {
+    const url = `${supabaseUrl}/rest/v1/escrow_disputes?escrow_address=eq.${escrowAddress.toLowerCase()}&order=created_at.desc&limit=1`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`
+      }
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0];
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export interface PendingSync {
   id: string;
   type: "INSERT" | "UPDATE" | "STATEMENT";
