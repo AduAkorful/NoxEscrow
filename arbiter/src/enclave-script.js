@@ -531,7 +531,7 @@ async function main() {
   try {
     console.log(`\n🤖 Initializing Google Gemini 2.5 Flash client via Vertex AI ADC (Project: ${projectId}, Location: ${location})...`);
     const ai = new GoogleGenAI({
-      vertex: true,
+      vertexai: true,
       project: projectId,
       location: location
     });
