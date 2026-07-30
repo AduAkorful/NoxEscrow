@@ -483,20 +483,50 @@ async function main() {
     }
   }
 
-  // 4. If no valid credentials file exists on disk, delete invalid GOOGLE_APPLICATION_CREDENTIALS from env
+  // 4. Validate, sanitize (unescape \\n in private_key), and finalize credentials file path
   if (!credPath || !fs.existsSync(credPath)) {
     if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       console.warn(`⚠️ Unsetting invalid GOOGLE_APPLICATION_CREDENTIALS ("${process.env.GOOGLE_APPLICATION_CREDENTIALS}") — file does not exist on disk.`);
       console.warn("⚠️ ADC will fall back to GCE metadata server (will fail on non-GCP hosts like Render).");
-      console.warn("💡 Ensure your GCP service account JSON is set as a Render environment variable (not a secret file).");
       delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
     }
   } else {
+    try {
+      const rawContent = fs.readFileSync(credPath, "utf8").trim();
+      if (rawContent.startsWith("{")) {
+        const parsedKey = JSON.parse(rawContent);
+        
+        // Unescape literal "\\n" in private_key if needed
+        if (parsedKey.private_key && typeof parsedKey.private_key === "string" && parsedKey.private_key.includes("\\n")) {
+          console.log("🧹 Sanitizing GCP Service Account JSON key: unescaping literal '\\n' line breaks in private_key...");
+          parsedKey.private_key = parsedKey.private_key.replace(/\\n/g, "\n");
+        }
+        
+        // Write clean, validated JSON key to /tmp/gcp-key.json
+        const cleanJsonStr = JSON.stringify(parsedKey, null, 2);
+        fs.writeFileSync("/tmp/gcp-key.json", cleanJsonStr, { mode: 0o600 });
+        credPath = "/tmp/gcp-key.json";
+        process.env.GOOGLE_APPLICATION_CREDENTIALS = "/tmp/gcp-key.json";
+
+        if (parsedKey.type === "service_account") {
+          console.log(`✔️ Valid GCP Service Account JSON loaded successfully for: ${parsedKey.client_email || "service account"}`);
+        } else if (parsedKey.type === "authorized_user") {
+          console.warn("⚠️ WARNING: Loaded key is an 'authorized_user' credential. Vertex AI requires a 'service_account' key!");
+        }
+      }
+    } catch (keyParseErr) {
+      console.warn("⚠️ Failed to parse or sanitize GCP credentials JSON:", keyParseErr.message);
+    }
     console.log(`✔️ GOOGLE_APPLICATION_CREDENTIALS resolved to: ${credPath}`);
   }
 
   const projectId = process.env.VERTEX_PROJECT_ID || "project-eedabfd1-816e-4b2e-b15";
-  const location = process.env.VERTEX_LOCATION || "global";
+  // Force us-central1 if location is unspecified or set to "global" (global breaks Vertex AI routing in @google/genai)
+  let location = process.env.VERTEX_LOCATION || "us-central1";
+  if (location === "global") {
+    console.log("ℹ️ Override: Setting VERTEX_LOCATION from 'global' to 'us-central1' to ensure Vertex AI API endpoint routing.");
+    location = "us-central1";
+  }
 
   try {
     console.log(`\n🤖 Initializing Google Gemini 2.5 Flash client via Vertex AI ADC (Project: ${projectId}, Location: ${location})...`);

@@ -34,7 +34,7 @@ services:
       - key: VERTEX_PROJECT_ID
         value: "project-eedabfd1-816e-4b2e-b15" # Automatically set to your active project ID!
       - key: VERTEX_LOCATION
-        value: "global"
+        value: "us-central1"
       - key: GOOGLE_APPLICATION_CREDENTIALS
         value: "/etc/secrets/gcp-key.json"
 
