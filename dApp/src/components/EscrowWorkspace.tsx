@@ -765,6 +765,7 @@ export function EscrowWorkspace({
           disputeReason={disputeStatement}
           disputeRecord={disputeRecord}
           milestoneIndex={selectedContract.milestonesCompleted}
+          userRole={selectedContract.role}
           simulationMode={import.meta.env.DEV}
           onResolve={async (ruling) => {
             alert(`TEE Enclave consensus finalized: Dispute settled. Ruling: ${ruling}. Escrow state updated.`);

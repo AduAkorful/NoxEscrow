@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, Terminal, ShieldAlert, Award } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { updateEscrowStatement } from '../services/metadataService';
 
 interface ChatMessage {
   sender: 'CLIENT' | 'FREELANCER' | 'TEE_SYSTEM';
@@ -17,6 +18,7 @@ interface TEECourtroomProps {
   simulationMode?: boolean;
   disputeRecord?: any;
   milestoneIndex?: number;
+  userRole?: 'CLIENT' | 'FREELANCER';
 }
 
 export function TEECourtroom({
@@ -24,9 +26,9 @@ export function TEECourtroom({
   clientAddress,
   freelancerAddress,
   disputeReason,
-  simulationMode = false,
   disputeRecord = null,
-  milestoneIndex
+  milestoneIndex,
+  userRole = 'CLIENT'
 }: TEECourtroomProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [metadata, setMetadata] = useState<any>(null);
@@ -150,23 +152,48 @@ export function TEECourtroom({
     }
   }, [disputeRecord]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const [isSubmittingStatement, setIsSubmittingStatement] = useState(false);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputVal.trim()) return;
+    if (!inputVal.trim() || isSubmittingStatement) return;
+
+    const val = inputVal.trim();
+    const role = userRole || 'CLIENT';
 
     const newMsg: ChatMessage = {
-      sender: 'CLIENT',
-      text: inputVal,
+      sender: role,
+      text: val,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     };
 
     setMessages(prev => [...prev, newMsg]);
     setInputVal('');
+    setIsSubmittingStatement(true);
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_KEY;
+
+    if (supabaseUrl && supabaseKey && escrowAddress && milestoneIndex !== undefined) {
+      try {
+        await updateEscrowStatement(
+          supabaseUrl,
+          supabaseKey,
+          escrowAddress,
+          milestoneIndex,
+          val,
+          role
+        );
+      } catch (err) {
+        console.warn("Failed to sync courtroom statement to Supabase:", err);
+      }
+    }
 
     setTeeLogs(prev => [
       ...prev,
-      `[${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}] User statement submitted to TEE dispute record.`
+      `[${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}] ${role} statement synced to enclave metadata.`
     ]);
+    setIsSubmittingStatement(false);
   };
 
   return (
@@ -235,27 +262,24 @@ export function TEECourtroom({
         </div>
 
         {/* Action inputs */}
-        {!simulationMode ? (
-          <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 font-mono text-[10px] uppercase font-bold text-center rounded-xl tracking-wider">
-            🔒 COURT ROOM STATEMENTS ARE LOCKED FOR TEE ENCLAVE ASSESSMENT
-          </div>
-        ) : (
-          <form onSubmit={handleSendMessage} className="flex gap-2">
-            <input 
-              type="text" 
-              placeholder="Provide counter-evidence or chat to enclave..."
-              value={inputVal}
-              onChange={(e) => setInputVal(e.target.value)}
-              className="flex-1 bg-[#05070F] border border-white/5 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-200 focus:border-[#00F2FE]/45 focus:outline-none transition-smooth"
-            />
-            <button 
-              type="submit"
-              className="w-10 h-10 rounded-xl border border-[#00F2FE]/30 bg-[#00F2FE]/5 text-[#00F2FE] hover:bg-[#00F2FE]/25 flex items-center justify-center transition-smooth cursor-pointer active:scale-95"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
-        )}
+        <form onSubmit={handleSendMessage} className="flex gap-2 mt-2">
+          <input 
+            type="text" 
+            placeholder={userRole === 'FREELANCER' ? "Submit freelancer counter-argument / evidence statement to enclave..." : "Submit client argument / evidence statement to enclave..."}
+            value={inputVal}
+            onChange={(e) => setInputVal(e.target.value)}
+            disabled={isSubmittingStatement}
+            className="flex-1 bg-[#05070F] border border-white/5 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-200 focus:border-[#00F2FE]/45 focus:outline-none transition-smooth"
+          />
+          <button 
+            type="submit"
+            disabled={isSubmittingStatement || !inputVal.trim()}
+            className="px-4 py-2.5 rounded-xl border border-[#00F2FE]/30 bg-[#00F2FE]/10 text-[#00F2FE] hover:bg-[#00F2FE]/25 font-mono text-xs font-bold flex items-center gap-2 transition-smooth cursor-pointer active:scale-95 disabled:opacity-50 shrink-0"
+          >
+            <Send className="w-4 h-4" />
+            <span>{isSubmittingStatement ? 'Syncing...' : 'Submit Statement'}</span>
+          </button>
+        </form>
       </div>
 
       {/* AI consensus telemetry (5 cols) */}

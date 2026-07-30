@@ -37,7 +37,9 @@ export function TelemetryAttestation({
         <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-white/[0.01] border border-white/5">
           <span className="text-[8px] font-mono text-slate-500 uppercase font-bold tracking-wider">Consensus Confidence</span>
           <span className="text-[11px] font-mono text-slate-200">
-            {disputeRecord ? `${disputeRecord.score}% Rating Consensus` : selectedContract.status === 'DISPUTED' ? 'Evaluating...' : '100% Operational'}
+            {disputeRecord 
+              ? `Score: ${disputeRecord.score}/100`
+              : selectedContract.status === 'DISPUTED' ? 'Evaluating...' : '100% Operational'}
           </span>
         </div>
         <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-white/[0.01] border border-white/5">
