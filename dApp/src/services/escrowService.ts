@@ -1056,14 +1056,23 @@ export async function getOnChainReputation(
 
   try {
     const reputationABI = [
-      "function getReputation(address freelancer) view returns (bytes32)"
+      "function getReputation(address freelancer) view returns (bytes32)",
+      "function baseReputationHandle() view returns (bytes32)"
     ];
     const reputation = new ethers.Contract(registryAddr, reputationABI, providerOrSigner);
 
-    const repHandle = await reputation.getReputation(freelancerAddress);
+    let repHandle = await reputation.getReputation(freelancerAddress);
 
     if (repHandle === "0x0000000000000000000000000000000000000000000000000000000000000000" || !repHandle) {
-      return null;
+      try {
+        repHandle = await reputation.baseReputationHandle();
+      } catch {
+        // ignore
+      }
+    }
+
+    if (repHandle === "0x0000000000000000000000000000000000000000000000000000000000000000" || !repHandle) {
+      return 1000n;
     }
 
     const handleClient = await createEthersHandleClient(providerOrSigner as any, {

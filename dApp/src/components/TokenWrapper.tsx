@@ -104,30 +104,17 @@ export function TokenWrapper({
     }
   }, [walletAddress, cUSDCAddress, gatewayUrl, getWeb3Signer]);
 
-  // Initial load on page mount (checks session storage for previously decrypted balance)
+  // Initial load on page mount and wallet connect: fetch live public and confidential balances from blockchain
   useEffect(() => {
     fetchPublicBalances();
 
     if (walletAddress) {
-      const savedBal = sessionStorage.getItem(`nox_cusdc_bal_${walletAddress.toLowerCase()}`);
-      const savedRevealed = sessionStorage.getItem(`nox_cusdc_revealed_${walletAddress.toLowerCase()}`);
-
-      if (savedRevealed === "true" && savedBal !== null) {
-        try {
-          setCUSDCBalance(BigInt(savedBal));
-          setIsConfidentialRevealed(true);
-        } catch {
-          setIsConfidentialRevealed(false);
-        }
-      } else {
-        setIsConfidentialRevealed(false);
-        setCUSDCBalance(0n);
-      }
+      revealConfidentialBalance();
     } else {
       setIsConfidentialRevealed(false);
       setCUSDCBalance(0n);
     }
-  }, [walletAddress, fetchPublicBalances]);
+  }, [walletAddress, fetchPublicBalances, revealConfidentialBalance]);
 
   // --- Execute Approval ---
   const handleApprove = async (amountToApprove: bigint) => {

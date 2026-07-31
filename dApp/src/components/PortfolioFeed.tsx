@@ -48,7 +48,6 @@ export function PortfolioFeed({
 
   // Client Metrics
   const clientCapitalLocked = activeEscrows
-    .filter(e => e.status === 'ACTIVE' || e.status === 'DISPUTED')
     .reduce((sum, e) => sum + calculateClientDeposit(e.budget).totalDeposit, 0);
 
   const uniqueCounterparties = new Set(activeEscrows.map(e => e.counterparty.toLowerCase())).size;
