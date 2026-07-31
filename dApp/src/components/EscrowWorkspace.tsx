@@ -1,5 +1,5 @@
 import { X, Lock, AlertTriangle, Unlock, Paperclip } from 'lucide-react';
-import { type EscrowContract, decryptMilestoneChatKey, decryptDeliverableKey } from '../services/escrowService';
+import { type EscrowContract, decryptDeliverableKey } from '../services/escrowService';
 import { NoxEscrowContractABI } from '../contracts/NoxEscrowContract';
 import { fetchAndDecryptFile, encryptText, decryptText } from '../crypto/fileUploader';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -154,7 +154,7 @@ export function EscrowWorkspace({
         if (!cancelled && currentOnChainStatus !== 'DISPUTED') {
           console.log(`⚖️ Dispute resolved on-chain to status: ${currentOnChainStatus}. Reloading contracts...`);
           if (loadOnChainContracts) {
-            await loadOnChainContracts(true);
+            await loadOnChainContracts(false);
           } else {
             window.location.reload();
           }
@@ -171,9 +171,8 @@ export function EscrowWorkspace({
     };
   }, [selectedContract.address, selectedContract.status, getWeb3Signer, loadOnChainContracts]);
 
-  // Lazy chat key: derived on-demand from on-chain handle
+  // Lazy chat key: derived on-demand from on-chain handle or vaultKey
   const [chatKey, setChatKey] = useState<string | null>(null);
-  const [, setIsChatKeyDeriving] = useState(false);
   const chatKeyDerivedRef = useRef(false);
 
   // Reset key caches when selected contract address changes to prevent key carryover leak
@@ -184,7 +183,7 @@ export function EscrowWorkspace({
 
   // Derive chat key lazily when vaultKey is unlocked (once per workspace open)
   useEffect(() => {
-    if (chatKeyDerivedRef.current || !vaultKey || !getWeb3Signer || !selectedContract.address) return;
+    if (chatKeyDerivedRef.current || !selectedContract.address) return;
     // If we already have a milestoneKey from the contract, use it directly
     const existingKey = selectedContract.milestoneKeys?.[0];
     if (existingKey) {
@@ -192,26 +191,13 @@ export function EscrowWorkspace({
       chatKeyDerivedRef.current = true;
       return;
     }
-    // Otherwise, lazily decrypt the milestone 0 handle
-    let cancelled = false;
-    const deriveChatKey = async () => {
-      setIsChatKeyDeriving(true);
-      try {
-        const signer = await getWeb3Signer();
-        const key = await decryptMilestoneChatKey(signer, selectedContract.address, 0, gatewayUrl);
-        if (!cancelled) {
-          setChatKey(key);
-          chatKeyDerivedRef.current = true;
-        }
-      } catch (err) {
-        console.warn("Failed to derive chat key:", err);
-      } finally {
-        if (!cancelled) setIsChatKeyDeriving(false);
-      }
-    };
-    deriveChatKey();
-    return () => { cancelled = true; };
-  }, [vaultKey, getWeb3Signer, selectedContract.address, selectedContract.milestoneKeys, gatewayUrl]);
+    // Otherwise use vaultKey directly
+    if (vaultKey) {
+      setChatKey(vaultKey);
+      chatKeyDerivedRef.current = true;
+      return;
+    }
+  }, [vaultKey, selectedContract.address, selectedContract.milestoneKeys]);
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const prevMsgCountRef = useRef(0);

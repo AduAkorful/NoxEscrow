@@ -285,100 +285,87 @@ export function ActiveWorkspace({
         <div>
           <span className="font-mono text-[9px] uppercase tracking-widest text-[#7F00FF] font-bold block mb-4">Actions Console</span>
           
-          {selectedContract.status === 'REFUNDED' ? (
-            <div className="space-y-4">
-              <div className="p-5 bg-rose-950/15 border border-rose-500/30 rounded-xl text-xs font-mono text-rose-400 flex gap-4 shadow-[0_0_15px_rgba(244,63,94,0.1)]">
+          <div className="space-y-6">
+            {/* Top Agreement Summary Banner if Refunded or Completed */}
+            {selectedContract.status === 'REFUNDED' && (
+              <div className="p-4 bg-rose-950/15 border border-rose-500/30 rounded-xl text-xs font-mono text-rose-400 flex gap-3 shadow-[0_0_15px_rgba(244,63,94,0.1)]">
                 <AlertTriangle className="w-5 h-5 flex-shrink-0 text-rose-400 drop-shadow-[0_0_5px_#f43f5e]" />
-                <div className="flex flex-col gap-1">
-                  <strong className="block mb-0.5 tracking-wider uppercase">Escrow Agreement Refunded</strong>
+                <div className="flex flex-col gap-0.5">
+                  <strong className="block tracking-wider uppercase">Escrow Agreement Refunded</strong>
                   <span className="font-sans text-[11px] text-slate-300">
-                    Dispute settled in favor of the client by Intel TDX TEE AI Arbiter. Milestone funds returned to client wallet.
+                    Dispute settled in favor of client by Intel TDX TEE AI Arbiter. Remaining milestone funds returned to client.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {selectedContract.status === 'COMPLETED' && (
+              <div className="p-4 bg-emerald-950/10 border border-emerald-900/25 rounded-xl text-xs font-mono text-[#00E676] flex gap-3 shadow-[0_0_15px_rgba(0,230,118,0.03)]">
+                <ShieldCheck className="w-5 h-5 flex-shrink-0 text-[#00E676] drop-shadow-[0_0_5px_#00E676]" />
+                <div className="flex flex-col gap-0.5">
+                  <strong className="block tracking-wider uppercase">Escrow Agreement Completed</strong>
+                  <span className="font-sans text-[11px] text-slate-400">
+                    All milestones successfully verified and settled on-chain.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Real-time Milestone Escrow Financial Ledger Panel */}
+            <div className="bg-[#05070F] border border-white/5 p-4 rounded-xl flex flex-col gap-3">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-[#00F2FE]" />
+                  <span className="font-mono text-[9px] uppercase tracking-wider text-slate-300 font-bold">
+                    Escrow Vault Financial Ledger
+                  </span>
+                </div>
+                <span className="font-mono text-[8px] text-emerald-400 uppercase">✓ Hardware Attested</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2.5 border-y border-white/5 py-3 my-1">
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-mono text-slate-500 uppercase">Total Locked</span>
+                  <span className="font-mono text-xs font-bold text-white mt-0.5">
+                    {selectedContract.budget.toLocaleString()} cUSDC
+                  </span>
+                </div>
+                <div className="flex flex-col text-center border-x border-white/5 px-2">
+                  <span className="text-[8px] font-mono text-slate-500 uppercase">Released</span>
+                  <span className="font-mono text-xs font-bold text-emerald-400 mt-0.5">
+                    {((selectedContract.earnedPayout ? selectedContract.earnedPayout / 0.995 : (selectedContract.budget / selectedContract.totalMilestones) * selectedContract.milestonesCompleted)).toLocaleString()} cUSDC
+                  </span>
+                </div>
+                <div className="flex flex-col text-right">
+                  <span className="text-[8px] font-mono text-slate-500 uppercase">
+                    {selectedContract.status === 'REFUNDED' ? 'Refunded' : 'Remaining'}
+                  </span>
+                  <span className="font-mono text-xs font-bold text-[#38BDF8] mt-0.5">
+                    {(selectedContract.status === 'REFUNDED' && selectedContract.refundedAmount ? selectedContract.refundedAmount / 1.01 : (selectedContract.status === 'COMPLETED' ? 0 : selectedContract.budget - ((selectedContract.budget / selectedContract.totalMilestones) * selectedContract.milestonesCompleted))).toLocaleString()} cUSDC
                   </span>
                 </div>
               </div>
 
-              {selectedContract.disputeRecord && (
-                <div className="bg-[#070913] p-5 border border-rose-500/30 rounded-xl space-y-3 shadow-[0_0_15px_rgba(244,63,94,0.05)]">
-                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                    <span className="text-[10px] text-rose-400 font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
-                      <Terminal className="w-3.5 h-3.5 text-rose-400" /> TEE AI Arbitration Verdict
-                    </span>
-                    <span className="text-[9px] font-mono text-slate-400 bg-rose-950/40 px-2 py-0.5 rounded border border-rose-500/20">
-                      Score: {selectedContract.disputeRecord.score}/100
-                    </span>
-                  </div>
-                  <div className="text-xs font-mono text-slate-200">
-                    <strong>Verdict:</strong> <span className={selectedContract.disputeRecord.verdict === 'PAY_FREELANCER' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{selectedContract.disputeRecord.verdict}</span>
-                  </div>
-                  <p className="text-xs text-slate-300 font-sans leading-relaxed bg-white/[0.02] p-3 rounded-lg border border-white/5">
-                    "{selectedContract.disputeRecord.reasoning}"
-                  </p>
+              <div className="space-y-1.5 mt-0.5">
+                <div className="flex justify-between text-[9px] font-mono">
+                  <span className="text-slate-400 uppercase">Ledger Settlement progress</span>
+                  <span className="text-white font-bold">{Math.round((selectedContract.milestonesCompleted / selectedContract.totalMilestones) * 100)}% Settled</span>
                 </div>
-              )}
-            </div>
-          ) : selectedContract.milestonesCompleted === selectedContract.totalMilestones && selectedContract.status === 'COMPLETED' ? (
-            <div className="p-5 bg-emerald-950/10 border border-emerald-900/25 rounded-xl text-xs font-mono text-[#00E676] flex gap-4 shadow-[0_0_15px_rgba(0,230,118,0.03)]">
-              <ShieldCheck className="w-5 h-5 flex-shrink-0 text-[#00E676] drop-shadow-[0_0_5px_#00E676]" />
-              <div className="flex flex-col gap-1">
-                <strong className="block mb-0.5 tracking-wider uppercase">Escrow Agreement Completed</strong>
-                <span className="font-sans text-[11px] text-slate-400">All milestones successfully verified and settled. Payouts successfully unlocked to contractor.</span>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Real-time Milestone Escrow Financial Ledger Panel */}
-              <div className="bg-[#05070F] border border-white/5 p-4 rounded-xl flex flex-col gap-3">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <Activity className="w-3.5 h-3.5 text-[#00F2FE]" />
-                    <span className="font-mono text-[9px] uppercase tracking-wider text-slate-300 font-bold">
-                      Escrow Vault Financial Ledger
-                    </span>
-                  </div>
-                  <span className="font-mono text-[8px] text-emerald-400 uppercase">✓ Hardware Attested</span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2.5 border-y border-white/5 py-3 my-1">
-                  <div className="flex flex-col">
-                    <span className="text-[8px] font-mono text-slate-500 uppercase">Total Locked</span>
-                    <span className="font-mono text-xs font-bold text-white mt-0.5">
-                      {selectedContract.budget.toLocaleString()} cUSDC
-                    </span>
-                  </div>
-                  <div className="flex flex-col text-center border-x border-white/5 px-2">
-                    <span className="text-[8px] font-mono text-slate-500 uppercase">Released</span>
-                    <span className="font-mono text-xs font-bold text-emerald-400 mt-0.5">
-                      {((selectedContract.budget / selectedContract.totalMilestones) * selectedContract.milestonesCompleted).toLocaleString()} cUSDC
-                    </span>
-                  </div>
-                  <div className="flex flex-col text-right">
-                    <span className="text-[8px] font-mono text-slate-500 uppercase">Remaining</span>
-                    <span className="font-mono text-xs font-bold text-[#38BDF8] mt-0.5">
-                      {(selectedContract.status === 'COMPLETED' ? 0 : selectedContract.budget - ((selectedContract.budget / selectedContract.totalMilestones) * selectedContract.milestonesCompleted)).toLocaleString()} cUSDC
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 mt-0.5">
-                  <div className="flex justify-between text-[9px] font-mono">
-                    <span className="text-slate-400 uppercase">Ledger Settlement progress</span>
-                    <span className="text-white font-bold">{Math.round((selectedContract.milestonesCompleted / selectedContract.totalMilestones) * 100)}% Settled</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-900 border border-white/5 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-[#00F2FE] to-[#7F00FF] transition-all duration-500"
-                      style={{ width: `${(selectedContract.milestonesCompleted / selectedContract.totalMilestones) * 100}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="p-2.5 bg-[#0B0E17]/60 border border-white/[0.04] rounded-xl text-[10px] font-sans text-slate-400 leading-normal flex items-start gap-2">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#38BDF8] shrink-0 mt-0.5" />
-                  <span>
-                    <strong>ZK Budget Assurance:</strong> All settlement variables are processed cryptographically on-chain. Decrypted balances are only visible to verified contract counterparties.
-                  </span>
+                <div className="w-full h-1.5 bg-slate-900 border border-white/5 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-[#00F2FE] to-[#7F00FF] transition-all duration-500"
+                    style={{ width: `${(selectedContract.milestonesCompleted / selectedContract.totalMilestones) * 100}%` }}
+                  />
                 </div>
               </div>
+
+              <div className="p-2.5 bg-[#0B0E17]/60 border border-white/[0.04] rounded-xl text-[10px] font-sans text-slate-400 leading-normal flex items-start gap-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#38BDF8] shrink-0 mt-0.5" />
+                <span>
+                  <strong>ZK Budget Assurance:</strong> All settlement variables are processed cryptographically on-chain. Decrypted balances are only visible to verified contract counterparties.
+                </span>
+              </div>
+            </div>
 
               {isRefunded ? (
                 <div className="space-y-4">
@@ -654,7 +641,6 @@ export function ActiveWorkspace({
                 )
               )}
             </div>
-          )}
         </div>
       </div>
     </div>

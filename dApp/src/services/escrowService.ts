@@ -227,9 +227,9 @@ export async function fetchUserEscrows(
   signer: ethers.JsonRpcSigner,
   factoryAddress: string,
   userAddress: string,
-  gatewayUrl: string = DEFAULT_NOX_GATEWAY,
+  _gatewayUrl: string = DEFAULT_NOX_GATEWAY,
   metadataConfig?: MetadataConfig,
-  allowInteractiveDecrypt: boolean = false
+  _allowInteractiveDecrypt: boolean = false
 ): Promise<EscrowContract[]> {
   try {
     const factory = new ethers.Contract(factoryAddress, NoxEscrowFactoryABI, signer);
@@ -275,19 +275,6 @@ export async function fetchUserEscrows(
         let accumulatedBudget = 0;
         let contractTitle = "Confidential Escrow Agreement";
 
-        let handleClient: any = null;
-        if (allowInteractiveDecrypt) {
-          try {
-            handleClient = await createEthersHandleClient(signer as any, {
-              smartContractAddress: NOX_CONTRACT_MANAGER,
-              gatewayUrl: gatewayUrl as any,
-              subgraphUrl: NOX_SUBGRAPH_URL,
-            });
-          } catch (hErr) {
-            console.warn("Handle client creation skipped:", hErr);
-          }
-        }
-
         const activeMilestoneIndex = Number(activeMilestone);
         const useE2E = metadataConfig && metadataConfig.supabaseUrl && metadataConfig.supabaseKey;
 
@@ -332,35 +319,13 @@ export async function fetchUserEscrows(
             }
 
             let payoutValue = 0;
-            if (handleClient && allowInteractiveDecrypt) {
-              try {
-                const decryptedPayout = await handleClient.decrypt(milestoneInfo.payoutHandle);
-                payoutValue = Number(decryptedPayout.value);
-              } catch (payErr) {
-                console.warn(`Failed to decrypt payout handle for milestone ${m}:`, payErr);
-              }
-            } else if (metadata && metadata.payout_amount) {
+            if (metadata && metadata.payout_amount) {
               payoutValue = Number(metadata.payout_amount);
             }
             accumulatedBudget += payoutValue;
             milestonePayoutValues.push(payoutValue);
 
             let decryptedKeyHex = chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}_req`) || "";
-            if (!decryptedKeyHex && allowInteractiveDecrypt && signer) {
-              try {
-                handleClient = handleClient || await createEthersHandleClient(signer as any, {
-                  smartContractAddress: NOX_CONTRACT_MANAGER,
-                  gatewayUrl: gatewayUrl as any,
-                  subgraphUrl: NOX_SUBGRAPH_URL,
-                });
-                const decryptedReq = await handleClient.decrypt(milestoneInfo.requirementsHash);
-                const decryptedKeyBigInt = decryptedReq.value as bigint;
-                decryptedKeyHex = decryptedKeyBigInt.toString(16).padStart(64, "0");
-                chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_ms_${m}_req`, decryptedKeyHex);
-              } catch (reqErr) {
-                console.warn(`Failed to decrypt requirement handle for milestone ${m}:`, reqErr);
-              }
-            }
             milestoneKeys.push(decryptedKeyHex);
 
             let reqText = "";
@@ -395,25 +360,8 @@ export async function fetchUserEscrows(
 
             let deliverableText = "";
             let devKeyHex = chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}_dev`) || "";
-            let effectiveDevKey = "";
+            let effectiveDevKey = devKeyHex || decryptedKeyHex || chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}`) || "";
             if (milestoneInfo.isSubmitted) {
-              if (!devKeyHex && allowInteractiveDecrypt && signer) {
-                try {
-                  handleClient = handleClient || await createEthersHandleClient(signer as any, {
-                    smartContractAddress: NOX_CONTRACT_MANAGER,
-                    gatewayUrl: gatewayUrl as any,
-                    subgraphUrl: NOX_SUBGRAPH_URL,
-                  });
-                  const decryptedDev = await handleClient.decrypt(milestoneInfo.deliverableHash);
-                  const devKeyBigInt = decryptedDev.value as bigint;
-                  devKeyHex = devKeyBigInt.toString(16).padStart(64, "0");
-                  chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_ms_${m}_dev`, devKeyHex);
-                } catch (devErr) {
-                  console.warn(`Failed to decrypt deliverable handle for milestone ${m}:`, devErr);
-                }
-              }
-
-              effectiveDevKey = devKeyHex || decryptedKeyHex || chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}_dev`) || chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}_req`) || chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}`) || "";
               if (useE2E && metadata && metadata.devs_cid && effectiveDevKey) {
                 try {
                   const devsUrl = metadata.devs_cid.startsWith("data:")
