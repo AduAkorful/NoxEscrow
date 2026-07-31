@@ -112,7 +112,6 @@ export async function getOrCreateHandleClient(
   }
 
   cachedHandleClient = await createEthersHandleClient(signer as any, {
-    smartContractAddress: NOX_CONTRACT_MANAGER as any,
     gatewayUrl: gatewayUrl as any,
     subgraphUrl: NOX_SUBGRAPH_URL as any,
   });
@@ -1076,9 +1075,8 @@ export async function getOnChainReputation(
     }
 
     const handleClient = await createEthersHandleClient(providerOrSigner as any, {
-      smartContractAddress: NOX_CONTRACT_MANAGER,
       gatewayUrl: gatewayUrl as any,
-      subgraphUrl: NOX_SUBGRAPH_URL,
+      subgraphUrl: NOX_SUBGRAPH_URL as any,
     });
 
     const pubRes = await handleClient.publicDecrypt(repHandle);
