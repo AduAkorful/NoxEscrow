@@ -1,5 +1,6 @@
 import { createEthersHandleClient } from "@iexec-nox/handle";
 import { ethers } from "ethers";
+import { supabase } from "./supabaseClient";
 import { NoxEscrowFactoryABI } from "../contracts/NoxEscrowFactory";
 import { NoxEscrowContractABI } from "../contracts/NoxEscrowContract";
 import { ERC7984ABI } from "../contracts/ERC7984";
@@ -1051,6 +1052,20 @@ export async function getOnChainReputation(
   if (!registryAddr || registryAddr === ethers.ZeroAddress) {
     console.warn("Reputation registry not configured");
     return null;
+  }
+
+  // 1. Try fetching actual persisted reputation score from Supabase profile
+  try {
+    const { data: prof } = await supabase
+      .from('freelancer_profiles')
+      .select('reputation_score')
+      .eq('wallet_address', freelancerAddress.toLowerCase())
+      .single();
+    if (prof && prof.reputation_score !== undefined && prof.reputation_score !== null) {
+      return BigInt(prof.reputation_score);
+    }
+  } catch {
+    // proceed to on-chain handle decryption
   }
 
   try {
