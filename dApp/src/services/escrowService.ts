@@ -594,9 +594,9 @@ export async function initializeEscrowMilestones(
   const useE2E = metadataConfig && metadataConfig.pinataJWT && metadataConfig.supabaseUrl && metadataConfig.supabaseKey;
 
   for (let i = 0; i < payouts.length; i++) {
-    // 1. Payout volume is always encrypted via Nox KMS directly (ensuring integer input for BigInt)
-    const safePayoutInt = Math.round(payouts[i]);
-    const payoutEnc = await encryptNoxInput(signer, BigInt(safePayoutInt), "uint256", escrowAddress, gatewayUrl);
+    // 1. Payout volume is encrypted via Nox KMS directly (scaled to 6 token decimals for cUSDC)
+    const payoutBaseUnits = ethers.parseUnits(payouts[i].toString(), 6);
+    const payoutEnc = await encryptNoxInput(signer, payoutBaseUnits, "uint256", escrowAddress, gatewayUrl);
     encryptedPayouts.push(payoutEnc.handle);
     payoutProofs.push(payoutEnc.handleProof);
 
