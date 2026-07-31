@@ -243,7 +243,7 @@ function App() {
       const savedVaultKey = sessionStorage.getItem('nox_vault_key_' + connectedAddress.toLowerCase());
       if (savedVaultKey) {
         setVaultKey(savedVaultKey);
-      } else if (walletAddress && walletAddress.toLowerCase() !== connectedAddress.toLowerCase()) {
+      } else {
         // Reset sensitive derived state on account switch to prevent key bleed
         setVaultKey(null);
       }

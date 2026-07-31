@@ -1,7 +1,7 @@
 import { X, Lock, AlertTriangle, Unlock, Paperclip } from 'lucide-react';
-import { type EscrowContract, decryptDeliverableKey } from '../services/escrowService';
+import { type EscrowContract, decryptDeliverableKey, getOrFetchEscrowKey, chatKeyMemoryCache } from '../services/escrowService';
 import { NoxEscrowContractABI } from '../contracts/NoxEscrowContract';
-import { fetchAndDecryptFile, encryptText, decryptText } from '../crypto/fileUploader';
+import { fetchAndDecryptFile, encryptText, decryptText, decryptTextWithFallbacks } from '../crypto/fileUploader';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { TEECourtroom } from './TEECourtroom';
 import { supabase } from '../services/supabaseClient';
@@ -181,23 +181,70 @@ export function EscrowWorkspace({
     setChatKey(null);
   }, [selectedContract.address]);
 
-  // Derive chat key lazily when vaultKey is unlocked (once per workspace open)
+  // Helper to gather all possible candidate encryption/decryption keys for this workspace
+  const getCandidateKeys = useCallback(() => {
+    if (!selectedContract.address) return [];
+    const escrowAddrClean = selectedContract.address.toLowerCase();
+    return [
+      chatKey,
+      ...(selectedContract.milestoneKeys || []),
+      ...(selectedContract.deliverableKeys || []),
+      chatKeyMemoryCache.get(`${escrowAddrClean}_ms_0_req`),
+      chatKeyMemoryCache.get(`${escrowAddrClean}_ms_0`),
+      chatKeyMemoryCache.get(`${escrowAddrClean}_ms_0_dev`),
+      chatKeyMemoryCache.get(`${escrowAddrClean}_ms_${selectedMilestoneIndex}_req`),
+      chatKeyMemoryCache.get(`${escrowAddrClean}_ms_${selectedMilestoneIndex}_dev`),
+      vaultKey
+    ];
+  }, [chatKey, selectedContract.address, selectedContract.milestoneKeys, selectedContract.deliverableKeys, selectedMilestoneIndex, vaultKey]);
+
+  // Derive chat key lazily when workspace opens
   useEffect(() => {
-    if (chatKeyDerivedRef.current || !selectedContract.address) return;
-    // If we already have a milestoneKey from the contract, use it directly
-    const existingKey = selectedContract.milestoneKeys?.[0];
-    if (existingKey) {
+    if (!selectedContract.address) return;
+    const escrowAddrClean = selectedContract.address.toLowerCase();
+
+    // 1. Check if we already have a 64-char milestone key from memory/session cache
+    const existingKey = 
+      selectedContract.milestoneKeys?.find(k => k && k.length === 64) || 
+      chatKeyMemoryCache.get(`${escrowAddrClean}_ms_0_req`) ||
+      chatKeyMemoryCache.get(`${escrowAddrClean}_ms_0`) ||
+      chatKeyMemoryCache.get(`${escrowAddrClean}_ms_0_dev`);
+
+    if (existingKey && existingKey.length === 64) {
       setChatKey(existingKey);
       chatKeyDerivedRef.current = true;
       return;
     }
-    // Otherwise use vaultKey directly
-    if (vaultKey) {
-      setChatKey(vaultKey);
-      chatKeyDerivedRef.current = true;
-      return;
-    }
-  }, [vaultKey, selectedContract.address, selectedContract.milestoneKeys]);
+
+    // 2. Lazily attempt to decrypt the on-chain Nox KMS handle for milestone 0 requirement
+    let cancelled = false;
+    const attemptKmsDecrypt = async () => {
+      try {
+        if (getWeb3Signer && !cancelled) {
+          const s = await getWeb3Signer();
+          if (s && !cancelled) {
+            const derivedKey = await getOrFetchEscrowKey(s, selectedContract.address, gatewayUrl);
+            if (derivedKey && derivedKey.length === 64 && !cancelled) {
+              setChatKey(derivedKey);
+              chatKeyDerivedRef.current = true;
+              return;
+            }
+          }
+        }
+      } catch (kmsErr) {
+        console.warn("Lazy KMS chat key derivation failed, using vaultKey fallback:", kmsErr);
+      }
+
+      // 3. Fallback to vaultKey if KMS derivation fails or signer is locked
+      if (vaultKey && !cancelled) {
+        setChatKey(vaultKey);
+        chatKeyDerivedRef.current = true;
+      }
+    };
+
+    attemptKmsDecrypt();
+    return () => { cancelled = true; };
+  }, [selectedContract.address, selectedContract.milestoneKeys, vaultKey, getWeb3Signer, gatewayUrl]);
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const prevMsgCountRef = useRef(0);
@@ -213,7 +260,7 @@ export function EscrowWorkspace({
 
   // Chat Subscribe, Load & High-Frequency Sync
   useEffect(() => {
-    if (!selectedContract.address || !chatKey) return;
+    if (!selectedContract.address) return;
     const escrowAddrClean = selectedContract.address.toLowerCase();
 
     const loadMessages = async () => {
@@ -230,9 +277,13 @@ export function EscrowWorkspace({
         }
 
         if (data) {
+          const candidateKeys = getCandidateKeys();
           const decrypted = await Promise.all(data.map(async (msg: any) => {
             try {
-              const plain = await decryptText(msg.ciphertext, chatKey, msg.iv);
+              const { plain, usedKey } = await decryptTextWithFallbacks(msg.ciphertext, candidateKeys, msg.iv);
+              if (usedKey && usedKey !== chatKey && usedKey.length === 64) {
+                setChatKey(usedKey);
+              }
               return {
                 id: msg.id,
                 sender: msg.sender_address,
@@ -279,7 +330,10 @@ export function EscrowWorkspace({
         async (payload) => {
           const newMsg = payload.new;
           try {
-            const plain = await decryptText(newMsg.ciphertext, chatKey, newMsg.iv);
+            const { plain, usedKey } = await decryptTextWithFallbacks(newMsg.ciphertext, getCandidateKeys(), newMsg.iv);
+            if (usedKey && usedKey !== chatKey && usedKey.length === 64) {
+              setChatKey(usedKey);
+            }
             setMessages(prev => {
               if (prev.some(m => m.id === newMsg.id)) return prev;
               const cleanPrev = prev.filter(m => !m.id.startsWith('temp-'));
@@ -304,11 +358,11 @@ export function EscrowWorkspace({
       supabase.removeChannel(channel);
       clearInterval(pollInterval);
     };
-  }, [selectedContract.address, chatKey]);
+  }, [selectedContract.address, chatKey, getCandidateKeys]);
 
   // Load reviews
   const loadReviews = useCallback(async () => {
-    if (!selectedContract.address || !chatKey || !walletAddress) return;
+    if (!selectedContract.address || !walletAddress) return;
     const escrowAddrClean = selectedContract.address.toLowerCase();
     const milestoneIndex = selectedMilestoneIndex;
 
@@ -335,7 +389,7 @@ export function EscrowWorkspace({
           setBothReviewsSubmitted(true);
           const decrypted = await Promise.all(data.map(async (rev: any) => {
             try {
-              const plain = await decryptText(rev.ciphertext, chatKey, rev.iv);
+              const { plain } = await decryptTextWithFallbacks(rev.ciphertext, getCandidateKeys(), rev.iv);
               const parsed = JSON.parse(plain);
               return {
                 reviewer: rev.reviewer_address,
@@ -359,7 +413,7 @@ export function EscrowWorkspace({
     } catch (err) {
       console.error("Error in loadReviews:", err);
     }
-  }, [selectedContract.address, chatKey, walletAddress, selectedMilestoneIndex]);
+  }, [selectedContract.address, walletAddress, selectedMilestoneIndex, getCandidateKeys]);
 
   // Double-Blind Review Auto-Polling
   useEffect(() => {

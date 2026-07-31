@@ -162,7 +162,7 @@ export function bytes32HashToString(val: bigint): string {
 }
 
 const memoryCacheMap = new Map<string, string>();
-const chatKeyMemoryCache = {
+export const chatKeyMemoryCache = {
   get(key: string): string | undefined {
     if (memoryCacheMap.has(key)) {
       return memoryCacheMap.get(key);
@@ -217,6 +217,35 @@ export async function decryptMilestoneChatKey(
   const derivedKeyHex = decryptedKeyBigInt.toString(16).padStart(64, "0");
   
   chatKeyMemoryCache.set(cacheKey, derivedKeyHex);
+  chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_escrow_key`, derivedKeyHex);
+  return derivedKeyHex;
+}
+
+/**
+ * Resolves the single unified 256-bit symmetric escrowKey for an escrow contract instance.
+ * Checks memory/session cache first. If absent, decrypts the on-chain milestone 0 Nox handle
+ * via Nox KMS once and caches the result for all escrow payloads (requirements, deliverables, chat, reviews).
+ */
+export async function getOrFetchEscrowKey(
+  signer: ethers.JsonRpcSigner,
+  escrowAddress: string,
+  gatewayUrl: string = DEFAULT_NOX_GATEWAY
+): Promise<string> {
+  const addrClean = escrowAddress.toLowerCase();
+  const cacheKey = `${addrClean}_escrow_key`;
+  const existing = 
+    chatKeyMemoryCache.get(cacheKey) ||
+    chatKeyMemoryCache.get(`${addrClean}_ms_0_req`) ||
+    chatKeyMemoryCache.get(`${addrClean}_ms_0`);
+
+  if (existing && existing.length === 64) {
+    return existing;
+  }
+
+  const derivedKeyHex = await decryptMilestoneChatKey(signer, escrowAddress, 0, gatewayUrl);
+  chatKeyMemoryCache.set(cacheKey, derivedKeyHex);
+  chatKeyMemoryCache.set(`${addrClean}_ms_0_req`, derivedKeyHex);
+  chatKeyMemoryCache.set(`${addrClean}_ms_0`, derivedKeyHex);
   return derivedKeyHex;
 }
 
@@ -325,7 +354,11 @@ export async function fetchUserEscrows(
             accumulatedBudget += payoutValue;
             milestonePayoutValues.push(payoutValue);
 
-            let decryptedKeyHex = chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}_req`) || "";
+            let decryptedKeyHex = 
+              chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_escrow_key`) ||
+              chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${m}_req`) ||
+              chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_0`) ||
+              "";
             milestoneKeys.push(decryptedKeyHex);
 
             let reqText = "";
@@ -570,15 +603,21 @@ export async function initializeEscrowMilestones(
     // 2. Encrypt requirements text
     let reqsEnc;
     if (useE2E) {
-      // E2E Mode: Generate a random 32-byte key
-      const randomBytes = new Uint8Array(32);
-      window.crypto.getRandomValues(randomBytes);
-      const randomHexKey = Array.from(randomBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+      // E2E Mode: Reuse or generate ONE single 32-byte escrowKey for this escrow contract instance
+      let randomHexKey = chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_escrow_key`) || "";
+      if (!randomHexKey || randomHexKey.length !== 64) {
+        const randomBytes = new Uint8Array(32);
+        window.crypto.getRandomValues(randomBytes);
+        randomHexKey = Array.from(randomBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+        chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_escrow_key`, randomHexKey);
+      }
+      chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_ms_${i}_req`, randomHexKey);
+      chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_ms_${i}`, randomHexKey);
+
       const keyBigInt = BigInt("0x" + randomHexKey);
 
       // Encrypt the key itself with Nox KMS
       reqsEnc = await encryptNoxInput(signer, keyBigInt, "uint256", escrowAddress, gatewayUrl);
-      chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_ms_${i}_req`, randomHexKey);
 
       // Encrypt attached files
       const fileCids: { name: string; type: string; cid: string }[] = [];
@@ -701,19 +740,22 @@ export async function submitMilestoneDeliverable(
   let cacheCid = "";
 
   if (useE2E) {
-    // Re-use shared milestone key if available, else generate a random 32-byte key
-    let randomHexKey = chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${milestoneIndex}_req`) || chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${milestoneIndex}_dev`) || "";
+    // Re-use single unified escrowKey for all contract deliverables
+    let randomHexKey = 
+      chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_escrow_key`) ||
+      chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_${milestoneIndex}_req`) ||
+      chatKeyMemoryCache.get(`${escrowAddress.toLowerCase()}_ms_0`) ||
+      "";
 
-    if (!randomHexKey) {
-      const randomBytes = new Uint8Array(32);
-      window.crypto.getRandomValues(randomBytes);
-      randomHexKey = Array.from(randomBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+    if (!randomHexKey || randomHexKey.length !== 64) {
+      randomHexKey = await getOrFetchEscrowKey(signer, escrowAddress, gatewayUrl);
     }
 
     const keyBigInt = BigInt("0x" + randomHexKey);
 
     // Encrypt the key itself with Nox KMS
     devEnc = await encryptNoxInput(signer, keyBigInt, "uint256", escrowAddress, gatewayUrl);
+    chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_escrow_key`, randomHexKey);
     chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_ms_${milestoneIndex}_dev`, randomHexKey);
     chatKeyMemoryCache.set(`${escrowAddress.toLowerCase()}_ms_${milestoneIndex}_req`, randomHexKey);
 

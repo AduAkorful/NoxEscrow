@@ -52,6 +52,18 @@ function sanitizeXmlContent(text) {
     .replace(/>/g, "&gt;");
 }
 
+// Security Helper: Enforce payload length bounds to prevent LLM context exhaustion / Denial-of-Wallet attacks
+function enforcePayloadLength(str, maxBytes = 50000, fieldName = "Payload") {
+  if (!str || typeof str !== "string") return "";
+  const buf = Buffer.from(str, "utf8");
+  if (buf.length > maxBytes) {
+    console.warn(`⚠️ [Arbiter Security] ${fieldName} exceeds max bound (${buf.length} bytes > ${maxBytes} bytes). Truncating payload safely...`);
+    const truncatedBuf = buf.subarray(0, maxBytes);
+    return truncatedBuf.toString("utf8") + `\n\n[TRUNCATED BY ARBITER SECURITY: Content exceeded maximum ${maxBytes} bytes limit]`;
+  }
+  return str;
+}
+
 // Convert a hex string back to a readable UTF-8 string (stripping trailing null-bytes)
 function hexToUtf8(hex) {
   try {
@@ -130,13 +142,20 @@ async function downloadFromIPFS(cid) {
     throw new Error(`Non-200 response from gateway ${url}`);
   };
 
-  try {
-    console.log(`📥 Downloading IPFS payload in parallel across ${gateways.length} gateways...`);
-    const data = await Promise.any(gateways.map(url => fetchGateway(url)));
-    return data;
-  } catch (err) {
-    throw new Error(`Failed to download from all IPFS gateways for CID ${cid}.`);
+  const maxAttempts = 2;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      console.log(`📥 Downloading IPFS payload in parallel across ${gateways.length} gateways (attempt ${attempt}/${maxAttempts})...`);
+      const data = await Promise.any(gateways.map(url => fetchGateway(url)));
+      return data;
+    } catch (err) {
+      if (attempt < maxAttempts) {
+        console.warn(`⚠️ IPFS parallel download attempt ${attempt} failed. Retrying in 2 seconds...`);
+        await new Promise(res => setTimeout(res, 2000));
+      }
+    }
   }
+  throw new Error(`Failed to download from all IPFS gateways for CID ${cid} after retries.`);
 }
 
 async function main() {
@@ -418,6 +437,13 @@ async function main() {
   console.log("🔍 Parsing metadata JSON payloads and resolving any encrypted file attachments...");
   plaintextRequirements = await parseAndResolveJsonPayload(plaintextRequirements, reqsHex);
   plaintextDeliverables = await parseAndResolveJsonPayload(plaintextDeliverables, devsHex);
+
+  // Enforce security bounds on all payload fields prior to LLM evaluation
+  plaintextRequirements = enforcePayloadLength(plaintextRequirements, 50000, "Requirements Payload");
+  plaintextDeliverables = enforcePayloadLength(plaintextDeliverables, 50000, "Deliverables Payload");
+  clientStatement = enforcePayloadLength(clientStatement, 10000, "Client Statement");
+  freelancerStatement = enforcePayloadLength(freelancerStatement, 10000, "Freelancer Statement");
+  decryptedChatHistory = enforcePayloadLength(decryptedChatHistory, 30000, "Chat History");
 
   // 5. Invoke Google Gemini 2.5 Flash
   let adjudicationVerdict = "REFUND_CLIENT";
