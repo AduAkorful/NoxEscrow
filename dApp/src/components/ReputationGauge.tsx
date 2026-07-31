@@ -26,7 +26,7 @@ export function ReputationGauge({
 
   useEffect(() => {
     async function fetchReputation() {
-      if (!signer || !reputationRegistryAddress || !walletAddress) {
+      if (!reputationRegistryAddress || !walletAddress) {
         setOnChainScore(null);
         return;
       }

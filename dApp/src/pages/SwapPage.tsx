@@ -26,6 +26,9 @@ export function SwapPage({
   factoryAddress,
   contractsList
 }: SwapPageProps) {
+  const completedCount = contractsList.filter(c => c.status === 'COMPLETED').length;
+  const disputedCount = contractsList.filter(c => c.status === 'DISPUTED' || c.status === 'REFUNDED').length;
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 flex flex-col items-center gap-10">
       
@@ -60,6 +63,8 @@ export function SwapPage({
             reputationRegistryAddress={reputationRegistryAddress}
             walletAddress={walletAddress}
             gatewayUrl={gatewayUrl}
+            completedCount={completedCount}
+            disputedCount={disputedCount}
           />
           <EventLog
             signer={signer}

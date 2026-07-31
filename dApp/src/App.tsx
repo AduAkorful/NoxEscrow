@@ -497,7 +497,7 @@ function App() {
                 gatewayUrl={gatewayUrl} 
                 getWeb3Signer={getWeb3Signer}
                 signer={signer}
-                reputationRegistryAddress={currentRegistry}
+                reputationRegistryAddress={currentRegistry || addresses.reputationRegistry || ""}
                 factoryAddress={factoryAddress}
                 contractsList={contractsList}
               />
