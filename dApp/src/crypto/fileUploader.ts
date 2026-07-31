@@ -106,39 +106,6 @@ export async function decryptText(ciphertextHex: string, hexKey: string, ivHex: 
 }
 
 /**
- * Decrypts AES-256-GCM encrypted ciphertext, trying multiple candidate keys sequentially.
- * Returns both the decrypted text and the key that successfully authenticated the ciphertext.
- */
-export async function decryptTextWithFallbacks(
-  ciphertextHex: string,
-  candidateKeys: (string | null | undefined)[],
-  ivHex: string
-): Promise<{ plain: string; usedKey: string }> {
-  const cleanKeys = Array.from(
-    new Set(
-      candidateKeys.filter((k): k is string => Boolean(k && typeof k === "string" && k.length === 64))
-    )
-  );
-
-  if (cleanKeys.length === 0) {
-    throw new Error("No valid 64-character hex keys provided for decryption.");
-  }
-
-  for (const key of cleanKeys) {
-    try {
-      const plain = await decryptText(ciphertextHex, key, ivHex);
-      if (plain !== undefined && plain !== null) {
-        return { plain, usedKey: key };
-      }
-    } catch {
-      // try next candidate key
-    }
-  }
-
-  throw new Error("Decryption failed across all candidate keys.");
-}
-
-/**
  * Uploads a JSON payload to Pinata IPFS using the REST API pinning/pinJSONToIPFS.
  * @param jsonPayload The JSON object containing { ciphertext, iv }.
  * @param pinataJWT The Pinata JWT API Token.

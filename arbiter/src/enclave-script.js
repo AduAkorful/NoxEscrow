@@ -370,14 +370,8 @@ async function main() {
           let plain = "";
           try {
             plain = decryptPayload(msg.ciphertext, reqsHex, msg.iv);
-          } catch {
-            if (devsHex && devsHex !== reqsHex) {
-              try {
-                plain = decryptPayload(msg.ciphertext, devsHex, msg.iv);
-              } catch {
-                // ignore
-              }
-            }
+          } catch (decErr) {
+            console.warn(`⚠️ Chat message decryption failed for msg ID ${msg.id}:`, decErr.message);
           }
           if (plain) {
             const senderRole = (msg.sender_address && msg.sender_address.toLowerCase() === clientAddress.toLowerCase()) 
