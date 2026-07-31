@@ -88,12 +88,16 @@ export function TokenWrapper({
     setErrorMessage(null);
 
     try {
+      // Clear any stale cached keys in session storage to guarantee live query
+      sessionStorage.removeItem(`nox_cusdc_bal_${walletAddress.toLowerCase()}`);
+      sessionStorage.removeItem(`nox_cusdc_revealed_${walletAddress.toLowerCase()}`);
+
       const signer = await getWeb3Signer();
       const confidentialBal = await getConfidentialUSDCBalance(signer, cUSDCAddress, walletAddress, gatewayUrl);
       setCUSDCBalance(confidentialBal);
       setIsConfidentialRevealed(true);
 
-      // Persist decrypted balance in sessionStorage for this session
+      // Persist live decrypted balance in sessionStorage for active view
       sessionStorage.setItem(`nox_cusdc_bal_${walletAddress.toLowerCase()}`, confidentialBal.toString());
       sessionStorage.setItem(`nox_cusdc_revealed_${walletAddress.toLowerCase()}`, "true");
     } catch (err: any) {
@@ -104,30 +108,13 @@ export function TokenWrapper({
     }
   }, [walletAddress, cUSDCAddress, gatewayUrl, getWeb3Signer]);
 
-  // Initial load on page mount: query public USDC balance (0 wallet signature popups)
+  // Initial load on page mount: query public USDC balance (0 wallet signature popups, no stale storage pre-population)
   useEffect(() => {
     fetchPublicBalances();
 
-    if (walletAddress) {
-      const savedBal = sessionStorage.getItem(`nox_cusdc_bal_${walletAddress.toLowerCase()}`);
-      const savedRevealed = sessionStorage.getItem(`nox_cusdc_revealed_${walletAddress.toLowerCase()}`);
-
-      if (savedRevealed === "true" && savedBal !== null) {
-        try {
-          setCUSDCBalance(BigInt(savedBal));
-          setIsConfidentialRevealed(true);
-        } catch {
-          setIsConfidentialRevealed(false);
-          setCUSDCBalance(0n);
-        }
-      } else {
-        setIsConfidentialRevealed(false);
-        setCUSDCBalance(0n);
-      }
-    } else {
-      setIsConfidentialRevealed(false);
-      setCUSDCBalance(0n);
-    }
+    // Always reset confidential reveal state on mount / account switch so user explicitly triggers live decryption
+    setIsConfidentialRevealed(false);
+    setCUSDCBalance(0n);
   }, [walletAddress, fetchPublicBalances]);
 
   // --- Execute Approval ---
@@ -274,12 +261,17 @@ export function TokenWrapper({
         </div>
 
         <button
-          onClick={() => fetchPublicBalances(true)}
-          disabled={isRefreshing}
+          onClick={() => {
+            fetchPublicBalances(true);
+            if (isConfidentialRevealed) {
+              revealConfidentialBalance();
+            }
+          }}
+          disabled={isRefreshing || isDecryptingBalance}
           className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-all cursor-pointer disabled:opacity-50"
           title="Refresh balances"
         >
-          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[#38BDF8]' : ''}`} />
+          <RefreshCw className={`w-4 h-4 ${(isRefreshing || isDecryptingBalance) ? 'animate-spin text-[#38BDF8]' : ''}`} />
         </button>
       </div>
 
