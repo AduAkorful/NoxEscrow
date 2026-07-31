@@ -564,6 +564,11 @@ export function ActiveWorkspace({
                       <Terminal className="w-4 h-4" />
                       {isLoading ? "Signing handle..." : "Submit Deliverable (Enter)"}
                     </button>
+                    {!deliverableInput.trim() && deliverableFiles.length === 0 && (
+                      <span className="text-[10px] font-mono text-amber-400/80 block text-center">
+                        ℹ️ Type a brief summary or attach project files above to enable submission
+                      </span>
+                    )}
                   </div>
                 )
               ) : (
@@ -627,6 +632,9 @@ export function ActiveWorkspace({
                       <Unlock className="w-4 h-4" />
                       {isLoading ? "Executing transactions..." : "Release Milestone Payout"}
                     </button>
+                    <span className="text-[10px] font-mono text-emerald-400/80 block text-center">
+                      ℹ️ Releases {milestoneBudget.toLocaleString()} cUSDC on-chain & records {ratingInput}★ rating in global NERM registry
+                    </span>
                   </div>
                 ) : (
                   <div className="p-5 bg-amber-950/10 border border-amber-500/20 rounded-xl space-y-2 text-xs font-mono text-amber-300">

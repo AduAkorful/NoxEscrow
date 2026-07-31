@@ -7,7 +7,11 @@ import {
   Wallet,
   Unlock,
   User,
-  ChevronDown
+  ChevronDown,
+  Menu,
+  X,
+  Copy,
+  Check
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -31,6 +35,7 @@ interface HeaderProps {
   vaultKey: string | null;
   onDeriveKey: () => void;
   isDerivingKey: boolean;
+  addToast?: (message: string, type?: "success" | "error" | "info") => void;
 }
 
 export function Header({
@@ -53,10 +58,22 @@ export function Header({
   onLogout,
   vaultKey,
   onDeriveKey,
-  isDerivingKey
+  isDerivingKey,
+  addToast
 }: HeaderProps) {
   const isCloudEncrypted = Boolean(pinataJWT && supabaseUrl && supabaseKey);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState(false);
+
+  const handleCopyAddress = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!walletAddress) return;
+    navigator.clipboard.writeText(walletAddress);
+    setCopiedAddress(true);
+    if (addToast) addToast("Wallet address copied to clipboard!", "success");
+    setTimeout(() => setCopiedAddress(false), 2000);
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full bg-[#0B0E17]/90 backdrop-blur-2xl border-b border-white/[0.08] transition-all">
@@ -213,6 +230,17 @@ export function Header({
                   className="absolute right-0 top-full mt-2 w-56 bg-[#131826] border border-white/[0.15] rounded-2xl shadow-2xl p-2 z-50 animate-fade-in space-y-1"
                 >
                   <button
+                    onClick={handleCopyAddress}
+                    className="w-full px-3 py-2.5 text-left rounded-xl hover:bg-white/[0.08] text-xs font-semibold text-slate-300 flex items-center justify-between transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Copy className="w-4 h-4 text-emerald-400" />
+                      <span>Copy Wallet Address</span>
+                    </div>
+                    {copiedAddress ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : null}
+                  </button>
+
+                  <button
                     onClick={() => {
                       setIsDropdownOpen(false);
                       if (onSelectProfile) onSelectProfile();
@@ -259,9 +287,87 @@ export function Header({
             </button>
           )}
 
+          {/* Mobile Menu Toggle Button */}
+          <button
+            onClick={() => setIsMobileMenuOpen(prev => !prev)}
+            className="md:hidden p-2 rounded-xl bg-[#131826] border border-white/[0.1] text-slate-300 hover:text-white transition-colors cursor-pointer"
+            aria-label="Toggle Navigation Menu"
+          >
+            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+
         </div>
 
       </div>
+
+      {/* Mobile Slide-Out Drawer Overlay */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden bg-[#0B0E17]/95 border-b border-white/[0.1] px-6 py-6 space-y-4 animate-slide-down">
+          <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+            <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">Navigation</span>
+            <div className="flex items-center gap-1 bg-[#131826] p-1 rounded-lg border border-white/[0.08]">
+              <button
+                onClick={() => setViewMode('client')}
+                className={`px-2.5 py-1 rounded text-[11px] font-bold ${viewMode === 'client' ? 'bg-[#38BDF8] text-[#0B0E17]' : 'text-slate-400'}`}
+              >
+                Client
+              </button>
+              <button
+                onClick={() => setViewMode('freelancer')}
+                className={`px-2.5 py-1 rounded text-[11px] font-bold ${viewMode === 'freelancer' ? 'bg-[#C084FC] text-[#0B0E17]' : 'text-slate-400'}`}
+              >
+                Freelancer
+              </button>
+            </div>
+          </div>
+
+          <nav className="flex flex-col gap-2">
+            <button
+              onClick={() => { setIsMobileMenuOpen(false); if (onSelectMarketplace) onSelectMarketplace(); }}
+              className={`text-left py-2.5 text-sm font-bold border-b border-white/5 ${activeTab === 'marketplace' ? 'text-[#38BDF8]' : 'text-slate-300'}`}
+            >
+              Marketplace
+            </button>
+            <button
+              onClick={() => { setIsMobileMenuOpen(false); onSelectWrapper(); }}
+              className={`text-left py-2.5 text-sm font-bold border-b border-white/5 ${activeTab === 'swap' ? 'text-[#38BDF8]' : 'text-slate-300'}`}
+            >
+              Shielded Swap
+            </button>
+            <button
+              onClick={() => { setIsMobileMenuOpen(false); onSelectVaults(); }}
+              className={`text-left py-2.5 text-sm font-bold border-b border-white/5 ${activeTab === 'vaults' ? 'text-white' : 'text-slate-300'}`}
+            >
+              Escrow Vaults
+            </button>
+            <button
+              onClick={() => { setIsMobileMenuOpen(false); onSelectDeploy(); }}
+              className={`text-left py-2.5 text-sm font-bold border-b border-white/5 ${activeTab === 'deploy' ? 'text-white' : 'text-slate-300'}`}
+            >
+              Deploy Escrow
+            </button>
+            {isAdmin && (
+              <button
+                onClick={() => { setIsMobileMenuOpen(false); onToggleAdminConfig(); }}
+                className={`text-left py-2.5 text-sm font-bold ${activeTab === 'admin' ? 'text-purple-400' : 'text-slate-300'}`}
+              >
+                Admin Panel
+              </button>
+            )}
+          </nav>
+
+          {walletAddress && !vaultKey && (
+            <button
+              onClick={() => { setIsMobileMenuOpen(false); onDeriveKey(); }}
+              disabled={isDerivingKey}
+              className="w-full py-3 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2"
+            >
+              <KeyRound className="w-4 h-4 animate-pulse" />
+              {isDerivingKey ? 'Deriving Key...' : 'Unlock Vault Key'}
+            </button>
+          )}
+        </div>
+      )}
     </header>
   );
 }

@@ -130,6 +130,11 @@ export function DraftWizard({
     }));
   };
 
+  const applyTemplate = (template: { title: string; items: MilestoneItem[] }) => {
+    setDraftTitle(template.title);
+    setMilestoneItems(template.items);
+  };
+
   const totalBudget = milestoneItems.reduce((acc, item) => {
     const val = Number(item.payout);
     return acc + (isNaN(val) ? 0 : val);
@@ -222,6 +227,60 @@ export function DraftWizard({
                 }`}
               >
                 <Briefcase className="w-3.5 h-3.5" /> Freelancer (Invoice / Proposal)
+              </button>
+            </div>
+          </div>
+
+          {/* Preset Templates Selector */}
+          <div className="flex flex-col gap-2">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              🚀 Quick Milestone Templates
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => applyTemplate({
+                  title: "Web3 dApp Development",
+                  items: [
+                    { payout: "1500", requirements: "Architecture Blueprint, UI/UX Mockups & Contract Interfaces" },
+                    { payout: "2000", requirements: "Smart Contract Deployment, Viem/Wagmi Frontend Integration & Vault State Machine" },
+                    { payout: "1500", requirements: "E2E Unit & Integration Test Suite, Security Verification & Production Build" }
+                  ]
+                })}
+                className="p-3 bg-[#131826] hover:bg-[#38BDF8]/10 hover:border-[#38BDF8]/40 border border-white/[0.08] rounded-xl text-left transition-all cursor-pointer group"
+              >
+                <div className="text-xs font-bold text-white group-hover:text-[#38BDF8]">Web3 dApp Dev</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">3 Milestones • $5,000 cUSDC</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => applyTemplate({
+                  title: "Smart Contract Audit",
+                  items: [
+                    { payout: "1750", requirements: "Manual Code Review, Slither & Aderyn Static Analysis, Invariant Test Suite" },
+                    { payout: "1750", requirements: "Formal Audit Report, Threat Modeling, PoC Exploit Suite & Remediation Verification" }
+                  ]
+                })}
+                className="p-3 bg-[#131826] hover:bg-[#C084FC]/10 hover:border-[#C084FC]/40 border border-white/[0.08] rounded-xl text-left transition-all cursor-pointer group"
+              >
+                <div className="text-xs font-bold text-white group-hover:text-[#C084FC]">Contract Audit</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">2 Milestones • $3,500 cUSDC</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => applyTemplate({
+                  title: "UI/UX Design System",
+                  items: [
+                    { payout: "1000", requirements: "Figma Wireframes, Color Palette Tokens & Typography System" },
+                    { payout: "1000", requirements: "Interactive React Component Library with shadcn/ui & Dark Mode Glassmorphism" }
+                  ]
+                })}
+                className="p-3 bg-[#131826] hover:bg-emerald-500/10 hover:border-emerald-500/40 border border-white/[0.08] rounded-xl text-left transition-all cursor-pointer group"
+              >
+                <div className="text-xs font-bold text-white group-hover:text-emerald-400">UI/UX Design</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">2 Milestones • $2,000 cUSDC</div>
               </button>
             </div>
           </div>
